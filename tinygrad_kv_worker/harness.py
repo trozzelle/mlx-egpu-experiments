@@ -31,12 +31,14 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-# Model config for the Phase 0 target (Llama 3.2 1B). The harness carries the
-# producer properties (`n_kv_heads`/`head_dim`/`num_layers`) that the exporter
-# validates against the produced tensors; they are compile-time defaults here
-# so the deferred runs do not need to re-specify them.
+# Model geometry for the Phase 0 target (Llama 3.2 1B). These are only
+# FALLBACK defaults; export() derives the authoritative geometry from the
+# actual block-cache tensor shapes (see export()), so a wrong constant here
+# can never corrupt the interchange. Real Llama 3.2 1B geometry (verified
+# from the GGUF + mlx config): hidden=2048, n_heads=32, n_kv_heads=8,
+# head_dim = 2048/32 = 64, 16 decoder layers.
 N_KV_HEADS = 8
-HEAD_DIM = 128
+HEAD_DIM = 64
 NUM_LAYERS = 16
 # Token-decoding budget for both the native baseline and the injected path;
 # they must decode the same count for a token-for-token comparison.
@@ -258,32 +260,48 @@ def prefill_tinygrad(
 def export(
     block_caches: Sequence[np.ndarray],
     S: int,
-    n_kv_heads: int = N_KV_HEADS,
-    head_dim: int = HEAD_DIM,
-    num_layers: int = NUM_LAYERS,
+    n_kv_heads: Optional[int] = None,
+    head_dim: Optional[int] = None,
+    num_layers: Optional[int] = None,
     out_path: str = "",
 ) -> None:
     """Serialize tinygrad block caches into an mlx-lm prompt cache.
 
     Delegates entirely to ``tinygrad_kv_worker.exporter.export_prompt_cache`` —
-    the reusable Phase 1/2 core. This wrapper supplies the Phase 0 model
-    defaults and (when ``out_path`` is empty) a temp file the caller can
-    resolve via ``export.return_value`` semantics — but it returns ``None`` to
-    match the exporter contract. Callers that need a concrete path should pass
-    ``out_path`` explicitly.
+    the reusable Phase 1/2 core. Geometry (``n_kv_heads``/``head_dim``/
+    ``num_layers``) is derived from the actual block-cache tensor shapes unless
+    explicitly overridden, so a wrong module-level constant can never corrupt
+    the interchange. This wrapper returns ``None`` to match the exporter
+    contract.
 
     Args:
         block_caches: ordered per-block ``[2, B, n_kv_heads, max_context,
             head_dim]`` fp32 tensors.
         S: valid prefix length (offset == prompt length).
-        n_kv_heads, head_dim, num_layers: model geometry (Llama 3.2 1B defaults).
+        n_kv_heads, head_dim, num_layers: optional geometry overrides; when
+            ``None`` (the default) they are derived from ``block_caches``
+            tensor shapes.
         out_path: destination ``.safetensors``; must end in ``.safetensors``.
 
     Raises:
+        HarnessError: no block caches provided, or a cache is not the expected
+            5-D ``[2, B, n_kv_heads, max_context, head_dim]`` shape.
         ValueError/AssertionError: any shape/dtype/count mismatch (fail loud,
         per the exporter contract).
     """
     from tinygrad_kv_worker.exporter import export_prompt_cache
+
+    if not block_caches:
+        raise HarnessError("cannot export: no block caches provided")
+    first = np.asarray(block_caches[0])
+    if first.ndim != 5:
+        raise HarnessError(
+            f"block cache shape {first.shape}; expected 5-D "
+            "[2,B,n_kv_heads,max_context,head_dim]"
+        )
+    n_kv_heads = n_kv_heads if n_kv_heads is not None else first.shape[2]
+    head_dim = head_dim if head_dim is not None else first.shape[4]
+    num_layers = num_layers if num_layers is not None else len(block_caches)
 
     export_prompt_cache(block_caches, out_path, n_kv_heads, head_dim, num_layers, S)
 
@@ -449,7 +467,7 @@ def injected_path(
         cache_path = tmp.name
         tmp.close()
 
-    export(block_caches, S, N_KV_HEADS, HEAD_DIM, NUM_LAYERS, cache_path)
+    export(block_caches, S, out_path=cache_path)
     try:
         prompt_cache, metadata = load_prompt_cache(cache_path, return_metadata=True)
     finally:

@@ -35,7 +35,9 @@ Serialized prompt cache as a single `.safetensors`, per the mlx-lm `save_prompt_
 
 - `state` → `{ keys: (1, n_kv_heads, S, k_head_dim) fp16,
                  values: (1, n_kv_heads, S, v_head_dim) fp16 }`
-  - Llama 3.2 1B: `(1, 8, S, 128)` each, fp16.
+  - Llama 3.2 1B: `(1, 8, S, 64)` each, fp16. (head_dim = hidden 2048 / 32 attention
+    heads = 64, verified from the GGUF metadata and mlx config; the design's earlier
+    `128` was a research error.)
 - `meta_state` → `str(S)` (offset == prompt length).
 - Recorded per-layer class = `"KVCache"`.
 
