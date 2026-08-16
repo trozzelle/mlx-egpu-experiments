@@ -313,45 +313,102 @@ def _decode(model, tokenizer, prompt_ids: List[int], max_new_tokens: int,
             prompt_cache=None) -> List[int]:
     """Decode ``max_new_tokens`` token ids via mlx-lm ``generate_step``.
 
-    When ``prompt_cache`` is ``None`` the model prefilles normally (native
-    baseline); when a prompt cache is supplied, ``generate_step`` skips
-    prefill entirely and decodes from it (injected path) — pinned §2.
+    ``generate_step`` is a generator that yields one ``(token, logprobs)``
+    pair per decoded token (including the first). It prefilles the prompt
+    normally when ``prompt_cache`` is ``None`` (native baseline) and decodes
+    from a pre-supplied prompt cache when one is passed (injected path);
+    ``max_tokens=max_new_tokens`` bounds the generator to exactly
+    ``max_new_tokens`` yielded tokens. ``prompt`` must be passed as an
+    ``mx.array`` (mlx-lm 0.31.3 contract), not a Python list.
     """
     import mlx.core as mx
     from mlx_lm.generate import generate_step  # type: ignore
 
+    prompt = mx.array(prompt_ids)
     token_ids: List[int] = []
-    for _ in range(max_new_tokens):
-        next_token = generate_step(
-            prompt_ids,
-            model,
-            prompt_cache=prompt_cache,
-        )
-        if next_token is None:
-            break
-        token_ids.append(int(next_token))
-        prompt_ids = prompt_ids + [next_token]
-        # Keep the supplied prompt cache authoritative for the injected path;
-        # the native path builds nothing until the next call prefilles again.
+    for y, _logprobs in generate_step(
+        prompt,
+        model,
+        max_tokens=max_new_tokens,
+        prompt_cache=prompt_cache,
+    ):
+        token_ids.append(int(y))
     mx.clear_cache()
     return token_ids
+
+
+def _harvest_native_kv(prompt_cache, S: int,
+                       num_layers: int = NUM_LAYERS) -> List[Dict[str, np.ndarray]]:
+    """Harvest per-layer prefill KV from an mlx ``prompt_cache``.
+
+    ``prompt_cache`` is a list of per-layer cache objects (one per model
+    layer, aligned with ``model.layers``) exposed by ``make_prompt_cache`` /
+    ``generate_step``. Each entry's ``state`` is ``(keys, values)`` with shape
+    ``[B, n_kv_heads, N, head_dim]``. After a decode of ``M`` tokens the
+    offset is ``S + M``; slicing to ``[..., :S, :]`` recovers exactly the
+    prefill-prefix positions that the producer KV covers, since the first
+    ``S`` causal positions are fixed during decode.
+
+    Returns a per-layer list aligned with the producer's ``block_caches``,
+    each a dict ``{'K': ndarray, 'V': ndarray}`` (``[B, n_kv_heads, S,
+    head_dim]`` fp32) — the shape contract :func:`compare` expects.
+    """
+    layers: List[Dict[str, np.ndarray]] = []
+    if prompt_cache is None:
+        return layers
+    for cache in prompt_cache:
+        try:
+            k, v = cache.state
+        except Exception:  # pragma: no cover - unexpected cache variant
+            raise HarnessError(
+                "mlx native cache entry exposes no `state` (keys/values); "
+                "cannot harvest per-layer KV for the delta gate."
+            )
+        layers.append(
+            {
+                "K": np.asarray(k[..., :S, :], dtype=np.float32),
+                "V": np.asarray(v[..., :S, :], dtype=np.float32),
+            }
+        )
+    if len(layers) != num_layers:
+        raise HarnessError(
+            f"native KV harvest produced {len(layers)} layers but the Phase 0 "
+            f"model has {num_layers}; producer vs native deltas need aligned layers."
+        )
+    return layers
 
 
 def native_baseline(
     mlx_model_id_or_path: str,
     prompt: str,
     max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
-) -> List[int]:
+) -> Tuple[List[int], List[Dict[str, np.ndarray]]]:
     """Run the native mlx baseline: prefill normally, then decode.
 
-    Returns the ordered list of decoded token ids (``R`` in the gate).
+    The baseline owns an explicit per-layer prompt cache (via
+    ``make_prompt_cache``) so the producer-vs-native per-layer KV deltas can be
+    harvested from the prefill prefix (the first ``S`` causal positions are
+    fixed during decode regardless of ``max_new_tokens``).
+
+    Returns:
+        ``(token_ids, native_kv)`` where ``token_ids`` is the ordered list of
+        decoded token ids (``R`` in the gate) and ``native_kv`` is the
+        per-layer ``{'K': ndarray, 'V': ndarray}`` list (shape ``[B,
+        n_kv_heads, S, head_dim]`` fp32) for the delta gate.
 
     Raises:
         MissingWeightsError: weights not on disk.
     """
     model, tokenizer = _load_mlx_model(mlx_model_id_or_path)
     prompt_ids = tokenizer.encode(prompt)
-    return _decode(model, tokenizer, prompt_ids, max_new_tokens, prompt_cache=None)
+    from mlx_lm.models.cache import make_prompt_cache  # type: ignore
+
+    prompt_cache = make_prompt_cache(model)
+    token_ids = _decode(
+        model, tokenizer, prompt_ids, max_new_tokens, prompt_cache=prompt_cache
+    )
+    native_kv = _harvest_native_kv(prompt_cache, S=len(prompt_ids))
+    return token_ids, native_kv
 
 
 def injected_path(
@@ -607,10 +664,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     "mlx decode vs native baseline).",
     )
     parser.add_argument(
-        "--gguf", required=True, help="Path to the tinygrad GGUF model file."
+        "--gguf", required=False, help="Path to the tinygrad GGUF model file."
     )
     parser.add_argument(
-        "--mlx", required=True, help="Path to the mlx safetensors weights dir."
+        "--mlx", required=False, help="Path to the mlx safetensors weights dir."
     )
     parser.add_argument(
         "--max-context", type=int, default=DEFAULT_MAX_CONTEXT,
@@ -637,6 +694,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"Deferred template written to {args.out}")
         return 0
 
+    if not args.gguf or not args.mlx:
+        print(
+            "error: --gguf and --mlx are required when running the gate "
+            "(they are optional only with --print-only).",
+            file=sys.stderr,
+        )
+        return 2
+
     if not os.path.exists(args.mlx):
         print(
             f"error: MLX safetensors weights not found at {args.mlx!r}. "
@@ -651,15 +716,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         native_model, native_tokenizer = _load_mlx_model(args.mlx)
         for idx, prompt in enumerate(PROMPT_SET):
-            # R: native baseline (mlx prefill + decode).
-            R = native_baseline(args.mlx, prompt, args.max_new_tokens)
+            # R: native baseline (mlx prefill + decode) + per-layer native KV.
+            R, native_kv = native_baseline(args.mlx, prompt, args.max_new_tokens)
             # P: tinygrad prefill -> export -> import -> decode.
             block_caches, S = prefill_tinygrad(args.gguf, args.max_context, prompt)
+            producer_kv = [
+                {"K": bc[0], "V": bc[1]} for bc in block_caches
+            ]
             P = injected_path(
                 native_model, block_caches, S, prompt,
                 tokenizer=native_tokenizer, max_new_tokens=args.max_new_tokens,
             )
-            rep = compare(P, R)
+            rep = compare(
+                P, R,
+                per_layer_kv={"producer": producer_kv, "native": native_kv},
+            )
             ok = ok and rep["exact_match"]
             results["prompts"].append(
                 {
@@ -668,6 +739,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     "exact_match": rep["exact_match"],
                 }
             )
+            if idx == 0:
+                # Report the per-layer delta table once (design-required
+                # evidence); it is identical across the prompt set up to the
+                # prefill length S.
+                results["per_layer"] = rep["per_layer"]
+                results["flagged_layers"] = rep["flagged_layers"]
+            # A clean gate must not report PASS without the per-layer deltas
+            # actually being computed: every prompt must yield one delta row
+            # per model layer.
+            n_layers = rep.get("n_layers", NUM_LAYERS)
+            if len(rep["per_layer"]) != n_layers:
+                raise HarnessError(
+                    f"producer/native per-layer KV deltas not computed "
+                    f"({len(rep['per_layer'])}/{n_layers} layers); refusing to "
+                    "report PASS without the required evidence."
+                )
     except MissingWeightsError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
