@@ -57,12 +57,22 @@ Sources: `mlx_lm/models/cache.py` (`KVCache`, `save_prompt_cache`, `load_prompt_
   - `update_and_fetch(keys, values)`: preserves input dtype on preallocated `mx.zeros`; grows by
     `step=256`.
   - `state` property → `(keys[..., :offset], values[..., :offset])`.
-  - `meta_state` → `str(offset)`.
+  - **`meta_state` (REV snapshot 2026-08-16, mlx-lm 0.31.3):** the standard `KVCache` has **no**
+    `meta_state` override — it inherits `_BaseCache.meta_state`, whose **setter raises `ValueError`
+    for any truthy value** (`"This cache has no meta_state but a meta_state was set."`). So
+    `KVCache.from_state(state, str(S))` **raises for `S > 0`**, and per-layer `meta_state` must stay
+    `""`. Only `QuantizedKVCache` / `RotatingKVCache` / `ChunkedKVCache` define accepting
+    `meta_state` overrides. `offset` is reconstructed from `state.keys.shape[2]`, so **`offset == S`
+    survives the round-trip** via `keys.shape[2]`, not `meta_state`.
   - `from_state(state, meta_state)`, `trim(n)`, `is_trimmable()`.
 - **Serialize / deserialize (the Phase 0–2 bridge):**
-  - `save_prompt_cache(file, cache)` — writes each layer's `state` arrays + class name + `meta_state`
-    to `.safetensors`.
-  - `load_prompt_cache(file)` — rebuilds `[KVCache.from_state(...)]` (dispatch on class name).
+  - `save_prompt_cache(file, cache, metadata={})` — writes each layer's `state` arrays + class name +
+    empty `meta_state`, plus a **global `metadata` dict**, to `.safetensors`. The exporter records
+    `S` (offset) in global metadata: `{'offset': str(S), 'num_layers':…, 'n_kv_heads':…, 'head_dim':…}`.
+  - `load_prompt_cache(file, return_metadata=False)` — rebuilds `[KVCache.from_state(...)]`
+    (dispatch on class name); with `return_metadata=True` returns `(cache, metadata)`.
+  - **Downstream note:** if upstream restores a `meta_state` override on the standard `KVCache`,
+    per-layer metadata can switch to `str(S)` — one-line change; the global copy makes this safe.
 - **Prefill seam:** `generate_step(prompt, model, prompt_cache=None, prefill_step_size=2048, …)`:
   - If `prompt_cache` pre-supplied → **skips prefill entirely**, decodes from it.
   - Else chunked prefill: `model(prompt[:n][None], cache=prompt_cache)`; `mx.eval([c.state ...])`;
