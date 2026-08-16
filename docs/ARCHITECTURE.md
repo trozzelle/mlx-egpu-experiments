@@ -46,8 +46,9 @@ prefill producer  ──KV interchange format──▶  prefill consumer
 ```
 
 The producer runs the prompt forward pass on the eGPU and emits a prompt cache over the KV
-interchange format. The consumer imports it, skips its own prefill, and decodes on Metal. The format
-is durable for Path A; the Path C endgame may evolve it.
+interchange format. For mlx-lm `generate_step`, the imported cache covers the `S-1` prefix and the
+consumer replays the final prompt token before decoding; it does not recompute the offloaded prefix.
+The format is durable for Path A; the Path C endgame may evolve it.
 
 ## Ownership table
 
@@ -66,7 +67,7 @@ is durable for Path A; the Path C endgame may evolve it.
    in producer memory → serialized to KV interchange format (a prompt cache).
 2. **Handoff:** prompt cache crosses the device boundary (file / IPC bytes).
 3. **Decode (consumer):** consumer imports prompt cache, supplies it to its generation path,
-   skips prefill, decodes autoregressively on Metal.
+   replays the final prompt token required by mlx-lm's API, and decodes autoregressively on Metal.
 
 ## State and artifact ownership
 
