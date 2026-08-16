@@ -53,7 +53,8 @@ Sources: `mlx_lm/models/cache.py` (`KVCache`, `save_prompt_cache`, `load_prompt_
 - **Cache construct:** `make_prompt_cache(model, max_kv_size=None)` → `[KVCache() per layer]`.
 - **`KVCache`** (standard; GQA/RoPE LLMs):
   - `keys`, `values`: `mx.array`, shape `(B, n_kv_heads, S, head_dim)`. For Llama 3.2 1B:
-    `(1, 8, S, 128)` each, **fp16**.
+    `(1, 8, S, 64)` each, **fp16**. (head_dim = hidden 2048 / 32 heads = 64 for
+    Llama 3.2 1B; the earlier `128` was a research error.)
   - `update_and_fetch(keys, values)`: preserves input dtype on preallocated `mx.zeros`; grows by
     `step=256`.
   - `state` property → `(keys[..., :offset], values[..., :offset])`.

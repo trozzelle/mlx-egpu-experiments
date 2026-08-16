@@ -72,7 +72,7 @@ def export_prompt_cache(
             numpy array (fp32) or an ``mx.array`` convertible to numpy.
         out_path: destination ``.safetensors`` path.
         n_kv_heads: number of KV heads (e.g. 8 for Llama 3.2 1B).
-        head_dim: per-head dimension (e.g. 128 for Llama 3.2 1B).
+        head_dim: per-head dimension (e.g. 64 for Llama 3.2 1B).
         num_layers: expected layer count; must equal ``len(block_caches)``.
         S: valid prefix length (offset == prompt length). Must be ``> 0``,
             ``<= max_context`` for every layer, and the number of layers must

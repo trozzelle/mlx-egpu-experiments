@@ -68,8 +68,9 @@ mlx-lm's KV (prompt) cache is a cleanly serializable object:
   then `mx.clear_cache()`. If a `prompt_cache` is **pre-supplied**, mlx-lm **skips prefill** and
   starts from the final-token `_step` → decode. This is the exact seam to inject an offloaded prefill.
 
-Llama 3.2 1B geometry (used later): 16 layers, 8 KV heads (`n_kv_heads=8`), `head_dim=128` →
-per-token KV = 2 × 16 × 8 × 128 × 2 B (fp16) = **64 KiB/token**. A 4k-token prompt ≈ **256 MiB** of KV.
+Llama 3.2 1B geometry (used later): 16 layers, 8 KV heads (`n_kv_heads=8`), `head_dim=64` →
+per-token KV = 2 × 16 × 8 × 64 × 2 B (fp16) = **32 KiB/token**. A 4k-token prompt = **128 MiB** of KV.
+(head_dim = hidden 2048 / 32 attention heads = 64; an earlier `128` was a research error.)
 
 ---
 
