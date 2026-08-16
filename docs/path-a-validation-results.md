@@ -1,81 +1,48 @@
 # Path A — Phase 0 numeric-parity validation results
 
-Status: **RUN COMPLETED — GATE NOT PASSED (weight-precision confound)**
+Status: **RUN COMPLETED — GATE PASSED**
 
-Gate: injected path `P` must equal native baseline `R` token-for-token across the prompt set; per-layer numeric deltas reported and flagged above the `1e-3` fp16 probe tolerance. Semantic equivalence is the acceptable bar if a completion is not bit-exact (DESIGN.md §Validation).
+Gate: injected path `P` must equal native baseline `R` token-for-token across the prompt set; per-layer numeric deltas are reported and flagged above the `1e-3` fp16 probe tolerance for diagnosis.
 
 ## Result summary
 
-The gate ran end-to-end (tinygrad prefill → export → mlx decode vs native mlx baseline) across the
-3-prompt suite)Skip, but **`P != R` on every prompt**, and **all 16 layers exceed the `1e-3` fp16
-probe tolerance** with large per-layer deltas (K max|Δ| up to ~0.53). This is not fp16 rounding
-noise; it indicates the producer and consumer were not operating on numerically identical weights.
-
-## Root cause (verified)
-
-The tinygrad producer GGUF is **quantized, not fp16**. Verified from GGUF metadata
-(`tinygrad.llm.gguf.gguf_load` on the cached file):
-
-- `general.name = "Llama 3.2 1B Instruct"`
-- `general.file_type = 18` (llama.cpp `LLM_FTYPE_MOSTLY_Q6_K`)
-- `quantize.imatrix.*` metadata present → produced via **imatrix calibration** (`/training_dir/calibration_datav3.txt`)
-- `tokenizer.ggml.bos_token_id = 128000`
-
-Meanwhile the mlx consumer loads **fp16** safetensors. So the producer's weights carry Q6_K
-quantization error (~0.1–1%) that compounds through the 16 layers, producing exactly the observed
-depth-graded deltas. **This failure is a weight-precision mismatch, not evidence of an interchange
-format defect.**
-
-## Decision — defer exact parity proof to Path C
-
-Per ROADMAP, the production engine is **Path C (native producer outside TinyGrad)**; TinyGrad is
-only the Path A stand-in to validate the interchange format, and "producer-swap inherits a
-Phase-0-style parity gate." Therefore we do not invest in tinygrad-specific GGUF tooling to force
-fp16 parity here. Instead:
-
-1. **Record this finding** (below) as the Phase 0 gate outcome with this precise diagnosis.
-2. **Downloaded + converted the official `meta-llama/Llama-3.2-1B-Instruct` fp16 safetensors** to
-   mlx at `mlx_models/meta-Llama-3.2-1B-Instruct/` (verified: hidden 2048, 16 layers, 8 KV heads,
-   head_dim 64, fp16) — the exact consumer baseline for the Path C parity gate.
-3. **Defer the `P == R` proof** to Path C's producer-swap parity gate, where the producer will use
-   the identical fp16 weights (no Q6_K confound). The interchange format + exporter are unchanged;
-   this is the intended durability hedge (ADR 0001).
+- Gate result: **PASS** (3/3 prompts token-exact).
+- Run log: `${HOME}/Development/ml/tools/egpu/.worktrees/tinygrad-kv-worker-phase0/logs/runs/20260816-191810-659350000_meta-f16-final.log`.
+- Producer weights: `mlx_models/meta-Llama-3.2-1B-Instruct.F16.gguf`.
+- Consumer weights: `mlx_models/meta-Llama-3.2-1B-Instruct`.
+- Source provenance: official fp16 `meta-llama/Llama-3.2-1B-Instruct` weights on both sides (F16 GGUF producer + mlx safetensors consumer).
+- MLX prompt-cache contract: export the `S-1` prefix cache and pass the final prompt token to `generate_step`; passing full `S` plus the full prompt duplicates the prompt.
+- Llama-3 RoPE scaling loaded from the MLX `config.json` sidecar and applied to tinygrad's RoPE precompute; the generated GGUF metadata records `rope.freq_base` but not `rope_scaling`.
 
 ## Prompt suite
 
 | # | Prompt | S (tokens) | P == R |
 |---|---|---|---|
-| 0 | `prompt-0` | 6 | False |
-| 1 | `prompt-1` | 222 | False |
-| 2 | `prompt-2` | 661 | False |
+| 0 | `prompt-0` | 6 | True |
+| 1 | `prompt-1` | 222 | True |
+| 2 | `prompt-2` | 661 | True |
 
 ## Per-layer numeric deltas (max|Δ| / mean|Δ| vs native KV)
 
 | Layer | K max|Δ| | K mean|Δ| | V max|Δ| | V mean|Δ| | > 1e-3? |
 |---|---|---|---|---|---|
-| 0 | 0.08318626880645752 | 0.009665203280746937 | 0.009744054637849331 | 0.0016021033516153693 | True |
-| 1 | 0.178509920835495 | 0.019384875893592834 | 0.0231306254863739 | 0.003925992175936699 | True |
-| 2 | 0.3467526435852051 | 0.03286830708384514 | 0.05208730697631836 | 0.007289104163646698 | True |
-| 3 | 0.5322937965393066 | 0.043850790709257126 | 0.09801572561264038 | 0.010559906251728535 | True |
-| 4 | 0.32104969024658203 | 0.042617928236722946 | 0.11346924304962158 | 0.012035715393722057 | True |
-| 5 | 0.46317625045776367 | 0.0456407256424427 | 0.07391834259033203 | 0.011452010832726955 | True |
-| 6 | 0.3865690231323242 | 0.04603302851319313 | 0.08697602897882462 | 0.013535626232624054 | True |
-| 7 | 0.45567798614501953 | 0.04608621075749397 | 0.10941597819328308 | 0.014997635968029499 | True |
-| 8 | 0.3373527526855469 | 0.05067242681980133 | 0.1183122992515564 | 0.0144770173355937 | True |
-| 9 | 0.2794532775878906 | 0.04055840149521828 | 0.08536648750305176 | 0.013166971504688263 | True |
-| 10 | 0.2741265296936035 | 0.039872877299785614 | 0.09294360876083374 | 0.012523413635790348 | True |
-| 11 | 0.26026955246925354 | 0.03874538838863373 | 0.08662194013595581 | 0.011217963881790638 | True |
-| 12 | 0.2775123119354248 | 0.03645211085677147 | 0.08097465336322784 | 0.011742617934942245 | True |
-| 13 | 0.3484201431274414 | 0.03641080483794212 | 0.0818067193031311 | 0.01393395196646452 | True |
-| 14 | 0.219427227973938 | 0.032876864075660706 | 0.09466403722763062 | 0.017109667882323265 | True |
-| 15 | 0.20839858055114746 | 0.030751192942261696 | 0.11488394439220428 | 0.01988946460187435 | True |
+| 0 | 0.0076389312744140625 | 0.00034630033769644797 | 0.00037539005279541016 | 2.0771845811395906e-05 | True |
+| 1 | 0.012783050537109375 | 0.0007303535821847618 | 0.0011725425720214844 | 9.534387208987027e-05 | True |
+| 2 | 0.020800083875656128 | 0.0009972760453820229 | 0.003493070602416992 | 0.00019622135732788593 | True |
+| 3 | 0.03212451934814453 | 0.0011345782550051808 | 0.0035077929496765137 | 0.00024412901257164776 | True |
+| 4 | 0.019255638122558594 | 0.0009987273951992393 | 0.003443121910095215 | 0.00026612283545546234 | True |
+| 5 | 0.023622244596481323 | 0.0011769216507673264 | 0.004047870635986328 | 0.00027579572633840144 | True |
+| 6 | 0.01784515380859375 | 0.0012270527658984065 | 0.003530248999595642 | 0.0003416658437345177 | True |
+| 7 | 0.019090652465820312 | 0.0011853931937366724 | 0.00464707612991333 | 0.00039114351966418326 | True |
+| 8 | 0.015564918518066406 | 0.0012953929835930467 | 0.0034224987030029297 | 0.0003630796854849905 | True |
+| 9 | 0.015559196472167969 | 0.0010691970819607377 | 0.005664646625518799 | 0.0003188189584761858 | True |
+| 10 | 0.014158546924591064 | 0.0010957547929137945 | 0.0030842944979667664 | 0.0002942346327472478 | True |
+| 11 | 0.01657867431640625 | 0.0010965528199449182 | 0.002843424677848816 | 0.00026680887094698846 | True |
+| 12 | 0.01378631591796875 | 0.001003173179924488 | 0.003891170024871826 | 0.00027916315593756735 | True |
+| 13 | 0.012420654296875 | 0.001003806246444583 | 0.0032302141189575195 | 0.00034421152668073773 | True |
+| 14 | 0.011698722839355469 | 0.001017598551698029 | 0.006541907787322998 | 0.0004919123603031039 | True |
+| 15 | 0.01645660400390625 | 0.0010221578413620591 | 0.0058591365814208984 | 0.0005629300139844418 | True |
 
 ## Notes
 
-- Gate ran with the cached tinygrad GGUF (Q6_K, imatrix) as producer vs fp16 mlx consumer — the
-  deltas below are attributable to that weight-precision mismatch (see Root cause), **not** to an
-  exporter/interchange defect.
-- Exporter core (`tinygrad_kv_worker.exporter.export_prompt_cache`) is unchanged and unit-tested
-  8/8; the geometry fix (head_dim derived from real tensors = 64) is applied and verified.
-- Interchange format + exporter are the durable boundary (ADR 0001/0002); exact `P == R` proof is
-  deferred to Path C's producer-swap parity gate on identical fp16 weights.
+- Flagged layers > 1e-3 fp16 probe tolerance: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]. These are diagnostic tinygrad-vs-MLX implementation deltas; the token gate passed.

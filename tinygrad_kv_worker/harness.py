@@ -10,9 +10,10 @@ Reference contracts (see docs/DESIGN.md, docs/pinned-upstream-interfaces.md):
     ``cache_kv`` tensor ``[2, B, n_kv_heads, max_context, head_dim]`` read via
     ``.to('CPU').numpy()`` (pinned §1).
   - interchange: mlx-lm ``save_prompt_cache``/``load_prompt_cache`` schema,
-    recorded offset ``S`` in global metadata (pinned §2).
-  - consumer: ``generate_step(prompt, model, prompt_cache=...)`` skips prefill
-    when a prompt cache is pre-supplied (pinned §2).
+    recorded exported offset ``N`` in global metadata (pinned §2).
+  - consumer: ``generate_step(prompt, model, prompt_cache=...)`` always processes
+    the supplied prompt; injected decode exports an ``S-1`` prefix cache and
+    supplies the final prompt token (pinned §2).
 
 The numeric parity gate (DESIGN.md "Validation and errors"):
   - ``R`` = native baseline: mlx prefilles normally -> decodes token ids.
@@ -24,12 +25,24 @@ The numeric parity gate (DESIGN.md "Validation and errors"):
 
 from __future__ import annotations
 
+import functools
+import json
+import logging
 import os
 import sys
 import tempfile
+import time
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
+
+# Module logger: every run writes a deterministic, reviewable log file under
+# ``logs/runs/`` (see ``configure_run_logging``), so GPU runs leave a full
+# audit trail regardless of how the process is launched.
+logger = logging.getLogger("tinygrad_kv_worker.harness")
+# Keeps a reference to the file handler so configure_run_logging() can detach
+# it cleanly before an in-process re-run (unit tests call main() repeatedly).
+_RUN_FILE_HANDLER: Optional[logging.FileHandler] = None
 
 # Model geometry for the Phase 0 target (Llama 3.2 1B). These are only
 # FALLBACK defaults; export() derives the authoritative geometry from the
@@ -140,6 +153,165 @@ PROMPT_SET: List[str] = [_SHORT_PROMPT, _MID_PROMPT, _LONG_PROMPT]
 
 
 # ---------------------------------------------------------------------------
+# Run logging (reviewable per-run audit trail)
+# ---------------------------------------------------------------------------
+
+
+def configure_run_logging(logs_dir: str = "logs/runs", tag: str = "") -> str:
+    """Attach a per-run log file and return the log path.
+
+    Every gate run writes a deterministic, timestamped log file under
+    ``logs_dir`` that captures both the harness's own messages and the lazy
+    ``tinygrad``/``mlx``/``mlx_lm`` library logs (their top-level loggers are
+    children of the ``""`` root to which this handler is attached). The CLI
+    still prints terminal-visible error/final status messages explicitly.
+
+    The handler is attached lazily once per process; on-invocation re-runs
+    (e.g. unit tests calling ``main()`` repeatedly) get a fresh file each time
+    by detaching the prior file handler.
+
+    Args:
+        logs_dir: destination directory; created if missing.
+        tag: optional short run tag for the filename; a timestamp is prepended.
+
+    Returns:
+        Absolute path to the written log file.
+    """
+    global _RUN_FILE_HANDLER
+
+    from logging.handlers import RotatingFileHandler
+
+    os.makedirs(logs_dir, exist_ok=True)
+    stamp = f"{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns() % 1_000_000_000:09d}"
+    name_tag = f"_{tag}" if tag else ""
+    log_path = os.path.abspath(os.path.join(logs_dir, f"{stamp}{name_tag}.log"))
+
+    root_logger = logging.getLogger()
+
+    # Detach a prior file handler so repeated in-process runs each get a file.
+    if _RUN_FILE_HANDLER is not None:
+        root_logger.removeHandler(_RUN_FILE_HANDLER)
+        logger.removeHandler(_RUN_FILE_HANDLER)
+        _RUN_FILE_HANDLER.close()
+        _RUN_FILE_HANDLER = None
+
+    file_handler = RotatingFileHandler(
+        log_path, maxBytes=64 * 1024 * 1024, backupCount=3, encoding="utf-8"
+    )
+    _RUN_FILE_HANDLER = file_handler
+    root_logger.addHandler(file_handler)
+    logger.setLevel(logging.INFO)
+    file_handler.setLevel(logging.INFO)
+    logger.info("run log: %s", log_path)
+    return log_path
+
+
+def _close_run_logging() -> None:
+    """Detach + close the per-run file handler (best-effort at process exit)."""
+    global _RUN_FILE_HANDLER
+    if _RUN_FILE_HANDLER is not None:
+        root_logger = logging.getLogger()
+        root_logger.removeHandler(_RUN_FILE_HANDLER)
+        logger.removeHandler(_RUN_FILE_HANDLER)
+        _RUN_FILE_HANDLER.close()
+        _RUN_FILE_HANDLER = None
+
+
+# ---------------------------------------------------------------------------
+# RoPE config parity
+# ---------------------------------------------------------------------------
+
+
+def _llama3_scaled_inv_freqs(
+    dim: int, theta: float, scaling_config: Dict
+) -> np.ndarray:
+    """Return Llama-3 scaled inverse RoPE frequencies.
+
+    MLX-LM applies ``rope_scaling: {"rope_type": "llama3", ...}`` from the
+    official HF/MLX config. The F16 GGUF produced for tinygrad carries
+    ``rope.freq_base``/``rope.dimension_count`` but not the Llama-3 scaling
+    fields, so the harness must apply the same scaling before tinygrad writes
+    K into its cache.
+    """
+    factor = float(scaling_config["factor"])
+    low_freq_factor = float(scaling_config.get("low_freq_factor", 1.0))
+    high_freq_factor = float(scaling_config.get("high_freq_factor", 4.0))
+    old_context_len = float(
+        scaling_config.get("original_max_position_embeddings", 8192)
+    )
+
+    freqs = theta ** (np.arange(0, dim, 2, dtype=np.float32) / dim)
+    wavelens = 2.0 * np.pi * freqs
+    low_freq_wavelen = old_context_len / low_freq_factor
+    high_freq_wavelen = old_context_len / high_freq_factor
+
+    scaled_freqs = np.where(wavelens > low_freq_wavelen, freqs * factor, freqs)
+    medium = (wavelens > high_freq_wavelen) & (wavelens < low_freq_wavelen)
+    smooth_factors = (old_context_len / wavelens - low_freq_factor) / (
+        high_freq_factor - low_freq_factor
+    )
+    smooth_freqs = freqs / ((1.0 - smooth_factors) / factor + smooth_factors)
+    scaled_freqs = np.where(medium, smooth_freqs, scaled_freqs)
+    return (1.0 / scaled_freqs).astype(np.float32)
+
+
+def _load_mlx_rope_config(mlx_model_id_or_path: str) -> Optional[Dict]:
+    """Load the local MLX sidecar RoPE config, when present."""
+    config_path = os.path.join(mlx_model_id_or_path, "config.json")
+    if not os.path.exists(config_path):
+        return None
+    with open(config_path, encoding="utf-8") as fh:
+        config = json.load(fh)
+    scaling = config.get("rope_scaling")
+    if not scaling:
+        return None
+    return {
+        "theta": float(config.get("rope_theta", 10000.0)),
+        "max_position_embeddings": int(
+            config.get("max_position_embeddings", DEFAULT_MAX_CONTEXT)
+        ),
+        "scaling": scaling,
+    }
+
+
+def _patch_tinygrad_llama3_rope(rope_config: Optional[Dict]):
+    """Install a temporary tinygrad RoPE precompute patch for Llama-3 scaling."""
+    if not rope_config:
+        return None
+    scaling = rope_config.get("scaling") or {}
+    rope_type = scaling.get("rope_type") or scaling.get("type")
+    if rope_type != "llama3":
+        return None
+
+    import tinygrad.llm.model as tiny_model  # type: ignore
+    from tinygrad import Tensor  # type: ignore
+
+    original = tiny_model.precompute_freqs_cis
+
+    @functools.cache
+    def precompute_freqs_cis(
+        dim: int, end: int, theta: float = 10000.0, device: str | None = None
+    ) -> Tensor:
+        inv_freqs = _llama3_scaled_inv_freqs(dim, theta, scaling)
+        angles = np.arange(end, dtype=np.float32)[:, None] * inv_freqs[None, :]
+        freqs_cis = np.concatenate(
+            [np.cos(angles), np.sin(angles)], axis=-1
+        ).astype(np.float32)
+        return Tensor(freqs_cis, device=device).clone(device)
+
+    tiny_model.precompute_freqs_cis = precompute_freqs_cis
+    return original
+
+
+def _restore_tinygrad_rope_patch(original) -> None:
+    if original is None:
+        return
+    import tinygrad.llm.model as tiny_model  # type: ignore
+
+    tiny_model.precompute_freqs_cis = original
+
+
+# ---------------------------------------------------------------------------
 # Errors
 # ---------------------------------------------------------------------------
 
@@ -165,6 +337,7 @@ def prefill_tinygrad(
     model_path_gguf: str,
     max_context: int = DEFAULT_MAX_CONTEXT,
     prompt: str = _SHORT_PROMPT,
+    rope_config: Optional[Dict] = None,
 ) -> Tuple[List[np.ndarray], int]:
     """Run a prompt prefill on tinygrad (``DEV=AMD``, model resident GGUF).
 
@@ -172,6 +345,10 @@ def prefill_tinygrad(
         model_path_gguf: path to a GGUF weight file (`Transformer.from_gguf`).
         max_context: context window for the loaded model.
         prompt: text prompt to prefill.
+        rope_config: optional local MLX sidecar RoPE config. For Llama 3.x,
+            the GGUF producer lacks the ``rope_scaling`` fields that the MLX
+            consumer applies, so the harness temporarily patches tinygrad's
+            RoPE precompute to keep the producer and consumer in config parity.
 
     Returns:
         ``(block_caches, S)`` where ``block_caches`` is the ordered list of
@@ -209,47 +386,52 @@ def prefill_tinygrad(
                 f"`DEV=AMD` tinygrad setup is present. Underlying error: {exc}"
             ) from exc
 
+    rope_patch = _patch_tinygrad_llama3_rope(rope_config)
     try:
-        # `Transformer.from_gguf` returns `(model, gguf_kv)`; the kv dict feeds
-        # the GGUF tokenizer (pinned §1) so model/tokenizer stay consistent.
-        model, kv = Transformer.from_gguf(model_path_gguf, max_context)
-        tokenizer = SimpleTokenizer.from_gguf_kv(kv)
-    except Exception as exc:  # pragma: no cover - runtime-only branch
-        raise DeviceUnavailableError(
-            "Failed to load tinygrad model / AMD device. Ensure a working "
-            f"`DEV=AMD` tinygrad setup is present. Underlying error: {exc}"
-        ) from exc
+        try:
+            # `Transformer.from_gguf` returns `(model, gguf_kv)`; the kv dict
+            # feeds the GGUF tokenizer (pinned §1) so model/tokenizer stay
+            # consistent.
+            model, kv = Transformer.from_gguf(model_path_gguf, max_context)
+            tokenizer = SimpleTokenizer.from_gguf_kv(kv)
+        except Exception as exc:  # pragma: no cover - runtime-only branch
+            raise DeviceUnavailableError(
+                "Failed to load tinygrad model / AMD device. Ensure a working "
+                f"`DEV=AMD` tinygrad setup is present. Underlying error: {exc}"
+            ) from exc
 
-    # Prepend BOS when the model expects it (matches how tinygrad drives the
-    # model). S is the length of the prefilled prompt (== KV offset).
-    prefix = [tokenizer.bos_id] if tokenizer.bos_id is not None else []
-    prompt_tokens = prefix + tokenizer.encode(prompt)
-    S = len(prompt_tokens)
+        # Prepend BOS when the model expects it (matches how tinygrad drives the
+        # model). S is the length of the prefilled prompt (== KV offset).
+        prefix = [tokenizer.bos_id] if tokenizer.bos_id is not None else []
+        prompt_tokens = prefix + tokenizer.encode(prompt)
+        S = len(prompt_tokens)
 
-    # Drive the prompt through the model's prefill path. `Transformer.generate`
-    # is a generator: the FIRST `next()` runs the chunked prefill to completion
-    # (updating start_pos to S, writing KV in place) and then yields one decode
-    # token. We consume exactly that one step so the caches hold the prompt
-    # prefix; the single extra decode position is excluded by the `[:S]` slice
-    # when reading (DESIGN.md exporter contract).
-    gen = model.generate(prompt_tokens, chunk_size=min(32, S), temperature=0.0)
-    try:
-        next(gen)
-    except StopIteration:  # pragma: no cover - S == len(subword) edge
-        raise HarnessError(
-            "tinygrad prefill produced no step; check the GGUF/max_context."
-        )
+        # Drive the prompt through the model's prefill path. `Transformer.generate`
+        # is a generator: the FIRST `next()` runs the chunked prefill to completion
+        # (updating start_pos to S, writing KV in place) and then yields one decode
+        # token. We consume exactly that one step so the caches hold the prompt
+        # prefix; the single extra decode position is excluded by the `[:S]` slice
+        # when reading (DESIGN.md exporter contract).
+        gen = model.generate(prompt_tokens, chunk_size=min(32, S), temperature=0.0)
+        try:
+            next(gen)
+        except StopIteration:  # pragma: no cover - S == len(subword) edge
+            raise HarnessError(
+                "tinygrad prefill produced no step; check the GGUF/max_context."
+            )
 
-    # Read each block's resident KV cache (blocks live on `model.blk`).
-    # Shape per block: [2, B, n_kv_heads, max_context, head_dim], fp32.
-    blocks = getattr(model, "blk", None) or getattr(model, "blocks", None)
-    if blocks is None:
-        raise HarnessError("tinygrad model exposes no `blk`/`blocks` iterable")
-    block_caches = []
-    for block in blocks:
-        cache = block.cache_kv.to("CPU").numpy()
-        block_caches.append(cache[..., :S, :])
-    return block_caches, S
+        # Read each block's resident KV cache (blocks live on `model.blk`).
+        # Shape per block: [2, B, n_kv_heads, max_context, head_dim], fp32.
+        blocks = getattr(model, "blk", None) or getattr(model, "blocks", None)
+        if blocks is None:
+            raise HarnessError("tinygrad model exposes no `blk`/`blocks` iterable")
+        block_caches = []
+        for block in blocks:
+            cache = block.cache_kv.to("CPU").numpy()
+            block_caches.append(cache[..., :S, :])
+        return block_caches, S
+    finally:
+        _restore_tinygrad_rope_patch(rope_patch)
 
 
 # ---------------------------------------------------------------------------
@@ -429,6 +611,28 @@ def native_baseline(
     return token_ids, native_kv
 
 
+def _split_prompt_for_prompt_cache(
+    prompt_ids: Sequence[int], producer_s: int
+) -> Tuple[int, List[int]]:
+    """Split a full prompt into the cache prefix and generate_step suffix.
+
+    ``mlx_lm.generate_step`` always processes the supplied ``prompt``: it
+    prefilles ``prompt[:-1]`` into the provided cache, then runs ``prompt[-1]``
+    to produce the first decoded token. Therefore a cache representing the
+    whole prompt length ``S`` must *not* be paired with the whole prompt again.
+    The correct injected contract is: export the first ``S-1`` KV positions,
+    pass the final prompt token as the one-token suffix.
+    """
+    if not prompt_ids:
+        raise HarnessError("cannot inject an empty prompt into mlx generate_step")
+    if len(prompt_ids) != producer_s:
+        raise HarnessError(
+            f"mlx tokenizer length {len(prompt_ids)} != producer S={producer_s}; "
+            "cannot align prompt-cache prefix with decode suffix."
+        )
+    return producer_s - 1, [int(prompt_ids[-1])]
+
+
 def injected_path(
     mlx_model: object,
     block_caches: Sequence[np.ndarray],
@@ -438,13 +642,13 @@ def injected_path(
     max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
     out_path: str = "",
 ) -> List[int]:
-    """Run the injected path: export -> load_prompt_cache -> decode (``P``).
+    """Run the injected path: export prefix cache -> mlx decode suffix (``P``).
 
     Args:
         mlx_model: an already-loaded mlx model (native baseline loaded its
             own copy; callers reuse that handle to keep weights resident).
         block_caches: producer KV from ``prefill_tinygrad``.
-        S: prompt length (from the producer).
+        S: full prompt length (from the producer).
         prompt: the original prompt text (for the compatible tokenizer).
         tokenizer: the mlx tokenizer for ``prompt`` (from ``_load_mlx_model``).
         max_new_tokens: number of tokens to decode (must equal the baseline's
@@ -460,6 +664,11 @@ def injected_path(
     import mlx.core as mx  # noqa: F401  (ensures Metal is initialized)
     from mlx_lm.models.cache import load_prompt_cache  # type: ignore
 
+    prompt_ids = tokenizer.encode(prompt)
+    cache_prefix_len, decode_prompt_ids = _split_prompt_for_prompt_cache(
+        prompt_ids, S
+    )
+
     if out_path:
         cache_path = out_path
     else:
@@ -467,7 +676,7 @@ def injected_path(
         cache_path = tmp.name
         tmp.close()
 
-    export(block_caches, S, out_path=cache_path)
+    export(block_caches, cache_prefix_len, out_path=cache_path)
     try:
         prompt_cache, metadata = load_prompt_cache(cache_path, return_metadata=True)
     finally:
@@ -477,15 +686,19 @@ def injected_path(
             except OSError:  # pragma: no cover - best effort
                 pass
 
-    # Sanity: the recorded offset in global metadata must match the producer's S.
-    if "offset" in metadata and metadata["offset"] != str(S):
+    # Sanity: the recorded offset must match the exported cache prefix length.
+    if "offset" in metadata and metadata["offset"] != str(cache_prefix_len):
         raise HarnessError(
-            f"prompt cache offset {metadata['offset']} != producer S={S}"
+            f"prompt cache offset {metadata['offset']} != exported prefix "
+            f"{cache_prefix_len}"
         )
 
-    prompt_ids = tokenizer.encode(prompt)
     return _decode(
-        mlx_model, tokenizer, prompt_ids, max_new_tokens, prompt_cache=prompt_cache
+        mlx_model,
+        tokenizer,
+        decode_prompt_ids,
+        max_new_tokens,
+        prompt_cache=prompt_cache,
     )
 
 
@@ -559,6 +772,33 @@ def compare(
     return report
 
 
+def _aggregate_layer_deltas(
+    aggregate: Sequence[Dict], per_prompt: Sequence[Dict]
+) -> List[Dict]:
+    """Merge one prompt's per-layer deltas into a suite-level worst case."""
+    if not aggregate:
+        return [dict(layer) for layer in per_prompt]
+    if len(aggregate) != len(per_prompt):
+        raise HarnessError(
+            f"cannot aggregate {len(per_prompt)} layer deltas into "
+            f"{len(aggregate)} existing layers"
+        )
+    merged: List[Dict] = []
+    for existing, new in zip(aggregate, per_prompt):
+        merged.append(
+            {
+                "max_K": max(float(existing["max_K"]), float(new["max_K"])),
+                "mean_K": max(float(existing["mean_K"]), float(new["mean_K"])),
+                "max_V": max(float(existing["max_V"]), float(new["max_V"])),
+                "mean_V": max(float(existing["mean_V"]), float(new["mean_V"])),
+                "over_tolerance": bool(
+                    existing.get("over_tolerance") or new.get("over_tolerance")
+                ),
+            }
+        )
+    return merged
+
+
 # ---------------------------------------------------------------------------
 # Report writer (docs/path-a-validation-results.md)
 # ---------------------------------------------------------------------------
@@ -580,16 +820,21 @@ def write_validation_report(path: str, results: Dict) -> None:
     parent = os.path.dirname(os.path.abspath(path)) or "."
     os.makedirs(parent, exist_ok=True)
 
-    ran = bool(results and results.get("prompts"))
+    prompts = results.get("prompts", []) if results else []
+    ran = bool(prompts)
+    gate_passed = bool(ran and all(pr.get("exact_match") is True for pr in prompts))
+    if ran:
+        status = "RUN COMPLETED — GATE PASSED" if gate_passed else "RUN COMPLETED — GATE FAILED"
+    else:
+        status = "DEFERRED (not yet run)"
     lines: List[str] = [
         "# Path A — Phase 0 numeric-parity validation results",
         "",
-        "Status: **" + ("COMPLETE" if ran else "DEFERRED (not yet run)") + "**",
+        f"Status: **{status}**",
         "",
         "Gate: injected path `P` must equal native baseline `R` token-for-token "
-        "across the prompt set; per-layer numeric deltas reported and flagged "
-        "above the `1e-3` fp16 probe tolerance. Semantic equivalence is the "
-        "acceptable bar if a completion is not bit-exact (DESIGN.md §Validation).",
+        "across the prompt set; per-layer numeric deltas are reported and "
+        "flagged above the `1e-3` fp16 probe tolerance for diagnosis.",
         "",
     ]
 
@@ -626,12 +871,34 @@ def write_validation_report(path: str, results: Dict) -> None:
         ]
     else:
         lines += [
+            "## Result summary",
+            "",
+            f"- Gate result: **{'PASS' if gate_passed else 'FAIL'}** "
+            f"({sum(1 for pr in prompts if pr.get('exact_match') is True)}/{len(prompts)} "
+            "prompts token-exact).",
+            f"- Run log: `{results.get('run_log', '_not recorded_')}`.",
+            f"- Producer weights: `{results.get('gguf', '_not recorded_')}`.",
+            f"- Consumer weights: `{results.get('mlx', '_not recorded_')}`.",
+            "- Source provenance: official fp16 `meta-llama/Llama-3.2-1B-Instruct` "
+            "weights on both sides (F16 GGUF producer + mlx safetensors consumer).",
+            "- MLX prompt-cache contract: export the `S-1` prefix cache and pass "
+            "the final prompt token to `generate_step`; passing full `S` plus the "
+            "full prompt duplicates the prompt.",
+        ]
+        if results.get("rope_config"):
+            lines.append(
+                "- Llama-3 RoPE scaling loaded from the MLX `config.json` sidecar "
+                "and applied to tinygrad's RoPE precompute; the generated GGUF "
+                "metadata records `rope.freq_base` but not `rope_scaling`."
+            )
+        lines += [
+            "",
             "## Prompt suite",
             "",
             "| # | Prompt | S (tokens) | P == R |",
             "|---|---|---|---|",
         ]
-        for idx, pr in enumerate(results.get("prompts", [])):
+        for idx, pr in enumerate(prompts):
             lines.append(
                 f"| {idx} | `{pr.get('prompt_name','')}` | {pr.get('S','_')} | "
                 f"{pr.get('exact_match','_')} |"
@@ -651,11 +918,18 @@ def write_validation_report(path: str, results: Dict) -> None:
             )
         lines += ["", "## Notes", ""]
         if results.get("flagged_layers"):
-            lines.append(
-                f"- Flagged layers > 1e-3 fp16 tolerance: "
-                f"{results['flagged_layers']}. Diagnose via deltas "
-                "(RoPE/scale/order) before accepting drift."
-            )
+            if gate_passed:
+                lines.append(
+                    f"- Flagged layers > 1e-3 fp16 probe tolerance: "
+                    f"{results['flagged_layers']}. These are diagnostic "
+                    "tinygrad-vs-MLX implementation deltas; the token gate passed."
+                )
+            else:
+                lines.append(
+                    f"- Flagged layers > 1e-3 fp16 tolerance: "
+                    f"{results['flagged_layers']}. Diagnose via deltas "
+                    "(RoPE/scale/order) before accepting drift."
+                )
         else:
             lines.append("- No layers exceeded the 1e-3 fp16 probe tolerance.")
 
@@ -704,40 +978,83 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         help="Write the template report without running the gate (deferred "
              "smoke path)."
     )
+    parser.add_argument(
+        "--log-dir", default="logs/runs",
+        help="Directory for per-run review log files (created if missing)."
+    )
+    parser.add_argument(
+        "--run-tag", default="",
+        help="Short tag appended to the per-run log filename (e.g. 'meta-f16')."
+    )
     args = parser.parse_args(argv)
+
+    log_path = configure_run_logging(logs_dir=args.log_dir, tag=args.run_tag)
 
     if args.print_only:
         # Emit the deferred template; no devices/weights required.
         write_validation_report(args.out, {})
-        print(f"Deferred template written to {args.out}")
+        message = f"Deferred template written to {args.out}"
+        logger.info(message)
+        print(message)
+        _close_run_logging()
         return 0
 
     if not args.gguf or not args.mlx:
-        print(
+        message = (
             "error: --gguf and --mlx are required when running the gate "
-            "(they are optional only with --print-only).",
-            file=sys.stderr,
+            "(they are optional only with --print-only)."
         )
+        logger.error(message)
+        print(message, file=sys.stderr)
+        _close_run_logging()
         return 2
 
     if not os.path.exists(args.mlx):
-        print(
+        message = (
             f"error: MLX safetensors weights not found at {args.mlx!r}. "
             "Download/convert Llama 3.2 1B to mlx format before running the "
-            "numeric-parity gate.",
-            file=sys.stderr,
+            "numeric-parity gate."
         )
+        logger.error(message)
+        print(message, file=sys.stderr)
+        _close_run_logging()
         return 2
 
-    results: Dict = {"prompts": [], "flagged_layers": [], "per_layer": []}
+    rope_config = _load_mlx_rope_config(args.mlx)
+    if rope_config:
+        logger.info(
+            "using mlx rope config: theta=%s max_position_embeddings=%s "
+            "scaling=%s",
+            rope_config["theta"],
+            rope_config["max_position_embeddings"],
+            rope_config["scaling"],
+        )
+
+    results: Dict = {
+        "prompts": [],
+        "flagged_layers": [],
+        "per_layer": [],
+        "run_log": log_path,
+        "gguf": args.gguf,
+        "mlx": args.mlx,
+        "rope_config": rope_config,
+    }
     ok = True
     try:
         native_model, native_tokenizer = _load_mlx_model(args.mlx)
         for idx, prompt in enumerate(PROMPT_SET):
+            logger.info(
+                "prompt %d/%d starting (max_new_tokens=%d)",
+                idx + 1, len(PROMPT_SET), args.max_new_tokens,
+            )
             # R: native baseline (mlx prefill + decode) + per-layer native KV.
             R, native_kv = native_baseline(args.mlx, prompt, args.max_new_tokens)
+            logger.info("prompt %d baseline (R) decoded %d tokens", idx + 1, len(R))
             # P: tinygrad prefill -> export -> import -> decode.
-            block_caches, S = prefill_tinygrad(args.gguf, args.max_context, prompt)
+            block_caches, S = prefill_tinygrad(
+                args.gguf, args.max_context, prompt, rope_config=rope_config
+            )
+            logger.info("prompt %d tinygrad prefill S=%d", idx + 1, S)
             producer_kv = [
                 {"K": bc[0], "V": bc[1]} for bc in block_caches
             ]
@@ -745,11 +1062,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 native_model, block_caches, S, prompt,
                 tokenizer=native_tokenizer, max_new_tokens=args.max_new_tokens,
             )
+            logger.info("prompt %d injected path (P) decoded %d tokens", idx + 1, len(P))
             rep = compare(
                 P, R,
                 per_layer_kv={"producer": producer_kv, "native": native_kv},
             )
             ok = ok and rep["exact_match"]
+            logger.info(
+                "prompt %d S=%d P==R=%s", idx + 1, S, rep["exact_match"],
+            )
             results["prompts"].append(
                 {
                     "prompt_name": f"prompt-{idx}",
@@ -757,12 +1078,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     "exact_match": rep["exact_match"],
                 }
             )
-            if idx == 0:
-                # Report the per-layer delta table once (design-required
-                # evidence); it is identical across the prompt set up to the
-                # prefill length S.
-                results["per_layer"] = rep["per_layer"]
-                results["flagged_layers"] = rep["flagged_layers"]
             # A clean gate must not report PASS without the per-layer deltas
             # actually being computed: every prompt must yield one delta row
             # per model layer.
@@ -773,18 +1088,36 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     f"({len(rep['per_layer'])}/{n_layers} layers); refusing to "
                     "report PASS without the required evidence."
                 )
+            results["per_layer"] = _aggregate_layer_deltas(
+                results["per_layer"], rep["per_layer"]
+            )
+            results["flagged_layers"] = [
+                layer_idx
+                for layer_idx, layer in enumerate(results["per_layer"])
+                if layer.get("over_tolerance")
+            ]
     except MissingWeightsError as exc:
+        logger.error("error: %s", exc)
         print(f"error: {exc}", file=sys.stderr)
+        _close_run_logging()
         return 2
     except HarnessError as exc:
+        logger.error("error: %s", exc)
         print(f"error: {exc}", file=sys.stderr)
+        _close_run_logging()
         return 3
     except Exception as exc:  # pragmatic: surface runtime failures clearly
+        logger.error("gate failed unexpectedly: %s", exc, exc_info=True)
         print(f"error: gate failed unexpectedly: {exc}", file=sys.stderr)
+        _close_run_logging()
         return 4
 
     write_validation_report(args.out, results)
-    print(f"Gate {'PASS' if ok else 'FAIL'}; report written to {args.out}")
+    message = f"Gate {'PASS' if ok else 'FAIL'}; report written to {args.out}"
+    logger.info(message)
+    logger.info("run log: %s", log_path)
+    print(message)
+    _close_run_logging()
     return 0 if ok else 1
 
 

@@ -56,17 +56,22 @@ The AI PRO R9700 is **RDNA4 / gfx12** — supported, consistent with `DEV=AMD` w
 mlx-lm's KV (prompt) cache is a cleanly serializable object:
 
 - `mlx_lm/models/cache.py` defines `KVCache` with:
-  - `keys`, `values`: `mx.array`, shape `(B, n_kv_heads, S, k_head_dim)` / `(B, n_kv_heads, S, v_head_dim)`.
+  - `keys`, `values`: `mx.array`, shape `(B, n_kv_heads, N, k_head_dim)` / `(B, n_kv_heads, N, v_head_dim)`.
   - `state` property → `(keys[..., :offset], values[..., :offset])`.
-  - `meta_state` → `str(offset)`.
+  - Standard `KVCache` per-layer `meta_state` is empty in mlx-lm 0.31.3; `offset` is reconstructed
+    from `state.keys.shape[2]`, and the exporter also records `offset=str(N)` in global safetensors
+    metadata.
   - `update_and_fetch(keys, values)`, `to_quantized()`, `from_state()`, `trim()`.
 - **`save_prompt_cache(path, cache)` / `load_prompt_cache(path)`** round-trip the whole cache to a
-  `.safetensors` file (each layer's arrays + class name + `meta_state`). This is a complete,
-  versioned, **cross-process KV interchange format that already exists in mlx-lm**.
+  `.safetensors` file (each layer's arrays + class name + empty per-layer `meta_state`, plus global
+  metadata). This is a complete, versioned, **cross-process KV interchange format that already exists
+  in mlx-lm**.
 - `generate_step` (`mlx_lm/generate.py`) prefilles in chunks of `prefill_step_size` via
   `model(prompt[:n][None], cache=prompt_cache)`, calls `mx.eval([c.state for c in prompt_cache])`,
-  then `mx.clear_cache()`. If a `prompt_cache` is **pre-supplied**, mlx-lm **skips prefill** and
-  starts from the final-token `_step` → decode. This is the exact seam to inject an offloaded prefill.
+  then `mx.clear_cache()`. A pre-supplied `prompt_cache` is **not** a skip-everything switch:
+  `generate_step` still processes the supplied `prompt`. Correct injection exports the `S-1`
+  prefix cache and passes only the final prompt token; full `S` cache + full prompt duplicates the
+  prompt.
 
 Llama 3.2 1B geometry (used later): 16 layers, 8 KV heads (`n_kv_heads=8`), `head_dim=64` →
 per-token KV = 2 × 16 × 8 × 64 × 2 B (fp16) = **32 KiB/token**. A 4k-token prompt = **128 MiB** of KV.
@@ -142,10 +147,11 @@ TinyGrad prefill daemon  (DEV=AMD, model resident in GGUF)
 KV safetensors (mlx-lm save_prompt_cache schema)
         │
         ▼
-mlx-lm: prompt_cache = load_prompt_cache(...)  →  generate_step(...) skips prefill, decodes on Metal
+mlx-lm: prompt_cache = load_prompt_cache(S-1 prefix)  →  generate_step(last_prompt_token, ...) decodes on Metal
 ```
 
-- **mlx-lm side:** ~zero code — `load_prompt_cache` + a pre-supplied `prompt_cache` already exist.
+- **mlx-lm side:** thin glue — `load_prompt_cache` + a pre-supplied `prompt_cache` already exist;
+  the injected prompt argument is the final token suffix, not the full prompt.
 - **oMLX side:** reuses the same seam; its `make_prompt_cache` / `extract`/`filter`/`extend`
   monkey-patches (`scheduler.py:901-912`) are the insertion point, and the `cluster/worker.py`
   protocol is the transport to mirror.
