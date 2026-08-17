@@ -1,10 +1,11 @@
 # tinygrad-kv-worker
 
-This repo is a limited experiment using `tinygrad` as a prefill worker for `mlx-lm`. eGPU suport on Apple Silicon Macs has historically not been supported but `tinygpu` is a reference implementation meant to enable CUDA/RDNA support over USB4/Thunderbolt
-for `tinygrad`. Here we create a hosted KV worker using `tinygrad` that can generate the prefill for on-device `mlx-lm` inference. The eventual goal is the ability to use discrete GPUs as prefill or pipeline parallel workers to compensate for the
-performance characteristics of Macs as inference devices. 
+This repo is a limited experiment using `tinygrad` as a prefill worker for `mlx-lm`. 
 
-In other words: can `mlx-lm` accept prefill generated off-device and still produce the same output tokens? (Yes.)
+eGPU suport on Apple Silicon Macs has historically not been supported but `tinygpu` is a reference implementation meant to enable CUDA/RDNA support over USB4/Thunderbolt
+for `tinygrad`. Here we create a hosted KV worker using `tinygrad` that can generate the prefill for on-device `mlx-lm` inference using a Radeon R9700 AI Pro over TB5. 
+
+In other words: can `mlx-lm` accept prefill generated on a discrete GPU off-device and still produce the same output tokens? (Yes, it can.)
 
 ## What was tested
 
