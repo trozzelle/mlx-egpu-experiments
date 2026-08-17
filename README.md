@@ -144,5 +144,7 @@ These files are local and are not committed:
 
 ## AI Use Disclosure
 
-Stealing the idea from https://github.com/antirez/ds4, this software is developed with strong assistance from GPT 5.5 and DeepSeek V4 Flash, with a human leading the ideas, testing, and debugging. I want to qualify this because it shapes how the project is designed, planned, and built. I have tried to include my planning and design documents, so that you (and your tools) can follow along with how this is built, step-by-step. If you are not happy with AI-developed code (and that's okay!), this software is not for you. The acknowledgement below is equally important: this would not exist without the pre-existing work done by the `mlx-lm`, `llama.cpp`, `GGML`, `tinygrad`, and `DwarfStar` teams, as well as the many people contributing to these projects.
+Stealing the idea from https://github.com/antirez/ds4, this software is developed with strong assistance from GPT 5.5 and DeepSeek V4 Flash, with a human leading the ideas, testing, and debugging. I want to qualify this because it shapes how the project is designed, planned, and built. I have tried to include my planning and design documents, so that you (and your tools) can follow along with how this is built, step-by-step. If you are not happy with AI-developed code (and that's okay!), this software is not for you. 
+
+This acknowledgement is equally important: this would not exist without the pre-existing work done by the `mlx-lm`, `llama.cpp`, `GGML`, `tinygrad`, and `DwarfStar` teams, as well as the many people contributing to these projects and building the models that enable this work.
 
