@@ -1,7 +1,8 @@
 # Using an AMD eGPU as a prefill device for MLX-LM / oMLX — Research Reference
 
 Date: 2026-08-16
-Status: Research reference. No code written. Roadmap for a build-out is defined in §8.
+Status: Research reference. Path A Phase 0 is implemented and validated; Path C roadmap is defined
+in §8/§9.
 
 ---
 
@@ -18,9 +19,9 @@ JITBEAM=2 DEV=AMD python3 -m tinygrad.llm
 Goal: use this card as a **prefill device** (and eventually a general inference device) for
 **MLX-LM** and **oMLX**, which decode on the Apple Silicon Metal GPU.
 
-**Stated endgame:** eventually build **outside TinyGrad** (a native/independent implementation —
-"Path C"). Before that, **validate the concept with Path A** (a TinyGrad prefill daemon feeding an
-MLX-LM `KVCache`). This document is the research base for both.
+**Stated endgame:** build **outside TinyGrad** (Path C). Path A has now validated the concept with
+a TinyGrad/R9700 producer feeding mlx-lm through the KV interchange format; Path C starts from that
+validated boundary rather than from the daemon plan. This document is the research base for both.
 
 ---
 
@@ -92,12 +93,13 @@ TinyGrad's KV is **not** mlx-lm-compatible out of the box:
 | Logits | `forward()` argmaxes internally → **token ids**, never logits/KV | prefill path retains logits |
 | Weights | **GGUF only** (`Transformer.from_gguf`) | MLX safetensors (same underlying weights) |
 
-Weight parity is guaranteed when both load the same Llama GGUF weights, so the KV each produces over
-a prompt should match up to float numerics (TinyGrad fp16 weights, fp32 KV vs mlx fp16 everywhere).
-Expect small drift; likely harmless for injected decode, **but must be validated (Phase 0).**
+Phase 0 proved exact token parity when both sides use the same official Meta Llama 3.2 1B fp16
+weights and matching RoPE configuration. The initial Q6_K-vs-fp16 run failed as expected and is kept
+as a negative control: weight precision mismatch is a parity confound, not an interchange defect.
 
-Required exporter work: read each block's `cache_kv`, transpose `[2, head, ctx, dim]` → per-K/V
-`(B, head, ctx, dim)`, cast to fp16, write safetensors in mlx-lm's `save_prompt_cache` schema.
+Required exporter work (implemented in Path A Phase 0): read each block's `cache_kv`, transpose
+`[2, head, ctx, dim]` → per-K/V `(B, head, ctx, dim)`, cast to fp16, write safetensors in
+mlx-lm's `save_prompt_cache` schema.
 
 ---
 
@@ -171,45 +173,59 @@ between. This validates the whole "prefill off the decode device" concept and th
 
 ---
 
-## 8. Path C — Build outside TinyGrad (endgame)
+## 8. Path C — Build outside TinyGrad (native producer first)
 
-Two viable directions once the concept is proven:
+Path C is no longer just a deferred "someday native backend." The accepted boundary is hybrid
+staged:
 
-1. **Native oMLX custom-kernel/engine integration** — a custom kernel package under
-   `omlx/custom_kernels/` (their existing `.metal` shader + `bindings.cpp` pattern), or direct
-   integration into `omlx/scheduler.py`'s `PromptProcessingBatch` pathable to a worker process.
-2. **Independent native implementation** — a purpose-built prefill/decoder that talks to the R9700
-   directly (HSA/ROCm-style, or a dedicated device backend), producing mlx-lm-format KV. This is a
-   larger standalone project.
+1. **Native R9700 producer first:** build a tinygrad-free prefill producer that runs model-forward
+   kernels on the R9700 and emits the same KV interchange format validated in Phase 0.
+2. **Native mlx-lm/oMLX backend later:** only after the native producer passes parity and the
+   runtime substrate is proven, consider direct scheduling from mlx-lm/oMLX into R9700 kernels.
 
-### 8.1 Hackintosh RDNA4 prior art — relevance (tangent, not a Path A gate)
+The first Path C phase is a **dual-track runtime spike**:
 
-There is substantial prior work making **RDNA4 cards work on macOS** in the hackintosh space
-(radeonsi/Mesa GFX stubs, MoltenVK Metal translation, etc.). For **Path A phases 0–2 it is not a
-needed reference**: this work never touches Apple's graphics stack. TinyGPU's AMD path is a
-**userspace driver extension talking directly to the card over USB/DMA** (tinygrad `USBIface` /
-`ops_amd.py`), kernels are HIP/COMGR-compiled, and nothing we build runs through Metal, MoltenVK, or
-Mesa. The hackintosh register/ISA-level knowledge only becomes load-bearing for **Path C** (a native
-implementation driving the card directly). Even then, the relevant body is the **Linux-side RDNA4
-ISA / Mesa** material — the macOS-specific graphics-stack half (Metal translation for display) does
-not apply to a compute-only, userspace-driver design. Capture it as Path C groundwork, not now.
+- **macOS eGPU path:** prove a minimal custom kernel launch and host/device transfer on the local
+  R9700 outside tinygrad, or document the blocker.
+- **Linux ROCm/HIP reference path:** build/run a minimal ROCm/HIP reference path. DwarfStar
+  (`antirez/ds4`) is useful prior art here because it has a narrow native engine, Metal kernels, and
+  a ROCm target, but its ROCm target is Strix Halo (`gfx1151`), not this local R9700 eGPU.
 
-Only pursue oMLX-specific integration if you need oMLX's pager / TurboQuant / SSD-tier KV features
-on the imported cache (adds codec reconstruction from `(head_dim, bits, seed)` complexity).
+### 8.1 DwarfStar / ds4 relevance
+
+User shorthand "fs4" should be read as **DwarfStar / `antirez/ds4`**. Source facts from upstream
+read on 2026-08-16:
+
+- DwarfStar is deliberately narrow and model-specific, not a general GGUF runner.
+- It supports Metal, CUDA, and ROCm backends; the current ROCm target is documented for Linux Strix
+  Halo / Radeon 8060S (`gfx1151`).
+- Its useful references are kernel organization (`metal/*.metal`, ROCm/HIP backend files),
+  tensor-resident GPU API shape, KV/session persistence discipline, SSD-streaming memory policy,
+  and "correctness before speed" quality gates.
+- It should **not** be adopted as this project's architecture, KV format, model scope, server/API
+  boundary, or dependency.
+
+### 8.2 Hackintosh RDNA4 prior art — relevance
+
+Hackintosh RDNA4 graphics-stack work remains a tangent for Path A. For Path C, use it only where it
+helps explain compute-visible register/ISA or userspace-driver behavior. Metal translation for
+display is not part of this compute-only design.
 
 ---
 
 ## 9. Recommended roadmap
 
-1. **Phase 0 (validate, highest risk):** TinyGrad KV exporter + injection unit test — prove that
-   TinyGrad-prefilled KV injected into mlx-lm reproduces a correct decode (the only genuinely
-   uncertain step is float numerics). Build the Path B CPU harness as the correctness baseline.
-2. **Phase 1:** wrap the exporter as the TinyGrad prefill daemon (JSON RPC; mirror oMLX's
-   `cluster/worker.py` transport spec).
-3. **Phase 2:** mlx-lm thin wrapper around `generate_step` (fetch + load cache when `prompt_len` is
-   large); optional oMLX patch at the `make_prompt_cache`/`PromptProcessingBatch` seam.
-4. **Phase 3 (Path C):** decouple from TinyGrad into a native implementation / oMLX custom kernel,
-   using Phase 0's exporter contract as the candidate KV interchange format.
+1. **Phase 0 (complete):** TinyGrad KV exporter + injection harness. Final fp16 run passed
+   token-exact `P == R` for all gate prompts.
+2. **Bridge Phase A1/A2 (optional):** wrap the validated tinygrad exporter as a local daemon and
+   consume it from mlx-lm/oMLX serving if a bridge is needed before Path C lands.
+3. **Phase C0:** dual-track native runtime discovery (macOS eGPU minimal kernel and Linux ROCm/HIP
+   reference path).
+4. **Phase C1:** native R9700 producer parity — tinygrad-free prefill, same KV interchange format,
+   same Phase-0-style token-exact gate.
+5. **Phase C2:** native producer serving integration through the imported-cache seam.
+6. **Phase C3:** direct native mlx-lm/oMLX backend decision/prototype only if measured evidence
+   justifies retiring the serialized prompt-cache fast path.
 
 ---
 
@@ -217,10 +233,10 @@ on the imported cache (adds codec reconstruction from `(head_dim, bits, seed)` c
 
 - GPU: AI PRO R9700 is RDNA4 / gfx12-class — the exact class TinyGrad's AMD backend targets. For a
   1B model the 32 GB card is overkill; the design pays off for 7B–14B prefills.
-- Models must be available in **GGUF** (TinyGrad's only loader) alongside the MLX safetensors copy.
-- Float drift between TinyGrad (fp16 weights / fp32 KV) and mlx (fp16) must be validated in Phase 0.
-- TinyGrad's `forward()` returns sampled token ids, never logits — a logits-out path requires a
-  forward wrapper that stops before `.argmax` (only needed if Path C decodes on the AMD card too).
+- Models must be available in matching producer/consumer formats for parity gates.
+- Tinygrad's `forward()` returns sampled token ids, never logits — still relevant only to Path A.
+- Path C's largest unknown is runtime substrate: local macOS eGPU custom-kernel launch vs Linux
+  ROCm/HIP reference path. Resolve this before model-kernel work.
 
 ---
 
@@ -236,4 +252,7 @@ on the imported cache (adds codec reconstruction from `(head_dim, bits, seed)` c
   `docs/distributed-cluster.md`.
 - Disaggregation prior art: llama.cpp issue #21266, NVIDIA Dynamo / SGLang PD, DistServe (OSDI '24),
   ROCm infinera PD docs.
+- DwarfStar / `antirez/ds4`: README (narrow engine, not general GGUF runner; Metal/CUDA/ROCm
+  backends), Makefile (`make strix-halo`, `ROCM_ARCH=gfx1151` default), `STRIXHALO.md`, `AGENT.md`,
+  `ds4_gpu.h`.
 - Hardware: AMD Radeon AI PRO R9700 (RDNA4 workstation); ASUS `TURBO AI PRO R9700 32G`.

@@ -1,0 +1,155 @@
+{
+  "descriptor_offset": 1920,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 6144,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 1044
+    },
+    {
+      "address": 1616,
+      "image_offset": 1616,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1712,
+      "image_offset": 1712,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1752,
+      "image_offset": 1752,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1792,
+      "image_offset": 1792,
+      "name": ".dynstr",
+      "size": 72
+    },
+    {
+      "address": 1920,
+      "image_offset": 1920,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 6144,
+      "image_offset": 6144,
+      "name": ".text",
+      "size": 1024
+    },
+    {
+      "address": 11264,
+      "image_offset": 11264,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 11376,
+      "image_offset": 11376,
+      "name": ".relro_padding",
+      "size": 912
+    },
+    {
+      "address": 15472,
+      "image_offset": 15472,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "qwen_affine4_linear.image",
+  "image_sha256": "566908454a51f4d17646759a8d6a4ad81207b26231a20fc3f8f56cbc871db428",
+  "image_size": 15473,
+  "kernarg_schema": {
+    "bytes": 88,
+    "fields": [
+      {
+        "name": "input",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "packed_weight",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "scales",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "biases",
+        "offset": 24,
+        "type": "uint64"
+      },
+      {
+        "name": "output",
+        "offset": 32,
+        "type": "uint64"
+      },
+      {
+        "name": "input_features",
+        "offset": 40,
+        "type": "uint64"
+      },
+      {
+        "name": "output_features",
+        "offset": 48,
+        "type": "uint64"
+      },
+      {
+        "name": "input_capacity_elements",
+        "offset": 56,
+        "type": "uint64"
+      },
+      {
+        "name": "packed_weight_capacity_bytes",
+        "offset": 64,
+        "type": "uint64"
+      },
+      {
+        "name": "affine_group_capacity",
+        "offset": 72,
+        "type": "uint64"
+      },
+      {
+        "name": "output_capacity_elements",
+        "offset": 80,
+        "type": "uint64"
+      }
+    ],
+    "name": "qwen-affine4-linear-v1"
+  },
+  "name": "qwen_affine4_linear",
+  "rsrc1": 3222208512,
+  "rsrc2": 132,
+  "rsrc3": 80,
+  "source_path": "native_r9700/kernels/qwen_affine4_linear.cpp",
+  "source_sha256": "bb78d543555621d6c5d5b4021211ab7cca3ab43f5ec0a43a9e31d8d6dc9bc246",
+  "target": "gfx1201"
+}

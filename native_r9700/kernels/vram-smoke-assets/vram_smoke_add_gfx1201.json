@@ -1,0 +1,40 @@
+{
+  "code_path": "vram_smoke_add_gfx1201.code",
+  "entry_offset": 0,
+  "entry_offset_provenance": "elf_symbol:vram_smoke_add",
+  "kernarg_bytes": 24,
+  "kernarg_schema": {
+    "bytes": 24,
+    "fields": [
+      {
+        "name": "a_va",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "b_va",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "out_va",
+        "offset": 16,
+        "type": "uint64"
+      }
+    ],
+    "name": "resident-vram-vector-add-v1"
+  },
+  "lds_bytes": 0,
+  "name": "vram_smoke_add",
+  "resource_metadata_provenance": "source_amdgpu_metadata",
+  "rsrc1": 3758882816,
+  "rsrc2": 132,
+  "rsrc3": 16,
+  "sgpr_count": 8,
+  "sha256": "7a3f2a21c612c2a6b32401b6129a59a8e08b497e5b17afad1133cac780a7601d",
+  "target": "gfx1201",
+  "vgpr_count": 3,
+  "workgroup_x": 64,
+  "workgroup_y": 1,
+  "workgroup_z": 1
+}

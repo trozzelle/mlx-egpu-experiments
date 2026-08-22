@@ -1,0 +1,125 @@
+{
+  "descriptor_offset": 1664,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 5888,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 796
+    },
+    {
+      "address": 1368,
+      "image_offset": 1368,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1464,
+      "image_offset": 1464,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1504,
+      "image_offset": 1504,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1544,
+      "image_offset": 1544,
+      "name": ".dynstr",
+      "size": 78
+    },
+    {
+      "address": 1664,
+      "image_offset": 1664,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 5888,
+      "image_offset": 5888,
+      "name": ".text",
+      "size": 768
+    },
+    {
+      "address": 10752,
+      "image_offset": 10752,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 10864,
+      "image_offset": 10864,
+      "name": ".relro_padding",
+      "size": 1424
+    },
+    {
+      "address": 14960,
+      "image_offset": 14960,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "llama_o_projection_f16.image",
+  "image_sha256": "683c31d0f63e120fc8806d83d7115e5e6d3fd7c46525226ef140da3f939df557",
+  "image_size": 14961,
+  "kernarg_schema": {
+    "bytes": 40,
+    "fields": [
+      {
+        "name": "context",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "o_projection_weight",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "residual",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "post_attention_hidden",
+        "offset": 24,
+        "type": "uint64"
+      },
+      {
+        "name": "sequence_length",
+        "offset": 32,
+        "type": "uint32"
+      }
+    ],
+    "name": "llama-o-projection-f16-v1"
+  },
+  "name": "llama_o_projection_f16",
+  "rsrc1": 3222208513,
+  "rsrc2": 132,
+  "rsrc3": 48,
+  "source_path": "native_r9700/kernels/llama_o_projection_f16.cpp",
+  "source_sha256": "ddfbf86580a858d814ff25ccdcaf4b48d47cdd510d20f86973f3ba1a89e74b7e",
+  "target": "gfx1201"
+}

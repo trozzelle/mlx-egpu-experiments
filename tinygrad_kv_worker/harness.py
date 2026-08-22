@@ -29,6 +29,7 @@ import functools
 import json
 import logging
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -937,6 +938,48 @@ def write_validation_report(path: str, results: Dict) -> None:
         fh.write("\n".join(lines) + "\n")
 
 
+
+def _argv_has_value(argv: Sequence[str], flag: str) -> bool:
+    prefix = f"{flag}="
+    return any(part == flag or part.startswith(prefix) for part in argv)
+
+
+def _append_c2_arg(cmd: List[str], flag: str, value: object | None) -> None:
+    if value is not None:
+        cmd.extend([flag, str(value)])
+
+
+def _build_c2_serving_argv(args, *, forward_max_new_tokens: bool) -> List[str]:
+    cmd = [sys.executable, "-m", "native_r9700.serving"]
+    for flag, value in (
+        ("--model", args.model),
+        ("--producer-model", args.producer_model),
+        ("--prompt", args.prompt),
+        ("--token-ids-json", args.token_ids_json),
+        ("--fixtures-dir", args.fixtures_dir),
+        ("--prompt-name", args.prompt_name),
+        ("--threshold-tokens", args.threshold_tokens),
+        ("--producer-timeout-s", args.producer_timeout_s),
+        ("--producer-kind", args.producer_kind),
+        ("--artifacts-dir", args.artifacts_dir),
+        ("--json", args.json),
+        ("--log", args.log),
+        ("--report", args.report),
+    ):
+        _append_c2_arg(cmd, flag, value)
+    if forward_max_new_tokens:
+        _append_c2_arg(cmd, "--max-new-tokens", args.max_new_tokens)
+    return cmd
+
+
+def _run_c2_serving(args, *, forward_max_new_tokens: bool) -> int:
+    completed = subprocess.run(
+        _build_c2_serving_argv(args, forward_max_new_tokens=forward_max_new_tokens),
+        check=False,
+    )
+    return int(completed.returncode)
+
+
 # ---------------------------------------------------------------------------
 # CLI gate
 # ---------------------------------------------------------------------------
@@ -986,7 +1029,34 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--run-tag", default="",
         help="Short tag appended to the per-run log filename (e.g. 'meta-f16')."
     )
+    parser.add_argument(
+        "--c2-serving", action="store_true",
+        help="Delegate to native_r9700.serving instead of running the Phase 0 Path A gate."
+    )
+    parser.add_argument("--model", help="C2 consumer mlx-lm model directory.")
+    parser.add_argument("--producer-model", help="C2 native producer model directory; defaults in native_r9700.serving.")
+    parser.add_argument("--prompt", help="C2 literal prompt text.")
+    parser.add_argument("--token-ids-json", help="C2 request token ids as JSON; forwarded only to native_r9700.serving.")
+    parser.add_argument("--fixtures-dir", help="C2 fixtures directory containing prompts.json.")
+    parser.add_argument("--prompt-name", help="C2 fixture prompt name.")
+    parser.add_argument("--threshold-tokens", help="C2 producer threshold; forwarded to native_r9700.serving.")
+    parser.add_argument("--producer-timeout-s", help="C2 producer subprocess timeout.")
+    parser.add_argument(
+        "--producer-kind", choices=("cpu_reference", "r9700_native"),
+        help="C2 producer identity; r9700_native remains fail-closed in native_r9700.serving."
+    )
+    parser.add_argument("--artifacts-dir", help="C2 producer artifact directory.")
+    parser.add_argument("--json", help="C2 machine-readable result JSON path.")
+    parser.add_argument("--log", help="C2 serving run log path.")
+    parser.add_argument("--report", help="C2 markdown report path.")
     args = parser.parse_args(argv)
+
+    if args.c2_serving:
+        raw_argv = list(sys.argv[1:] if argv is None else argv)
+        return _run_c2_serving(
+            args,
+            forward_max_new_tokens=_argv_has_value(raw_argv, "--max-new-tokens"),
+        )
 
     log_path = configure_run_logging(logs_dir=args.log_dir, tag=args.run_tag)
 

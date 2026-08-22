@@ -1,0 +1,150 @@
+{
+  "descriptor_offset": 1856,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 6144,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 980
+    },
+    {
+      "address": 1552,
+      "image_offset": 1552,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1648,
+      "image_offset": 1648,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1688,
+      "image_offset": 1688,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1728,
+      "image_offset": 1728,
+      "name": ".dynstr",
+      "size": 72
+    },
+    {
+      "address": 1856,
+      "image_offset": 1856,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 6144,
+      "image_offset": 6144,
+      "name": ".text",
+      "size": 1920
+    },
+    {
+      "address": 12160,
+      "image_offset": 12160,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 12272,
+      "image_offset": 12272,
+      "name": ".relro_padding",
+      "size": 16
+    },
+    {
+      "address": 16368,
+      "image_offset": 16368,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "qwen_full_attention.image",
+  "image_sha256": "7e2e4cd347a972a8b168379a596611b531962a37b7974db638ef2b7730d5c3ec",
+  "image_size": 16369,
+  "kernarg_schema": {
+    "bytes": 56,
+    "fields": [
+      {
+        "name": "query",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "k_cache",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "v_cache",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "output",
+        "offset": 24,
+        "type": "uint64"
+      },
+      {
+        "name": "query_heads",
+        "offset": 32,
+        "type": "uint32"
+      },
+      {
+        "name": "kv_heads",
+        "offset": 36,
+        "type": "uint32"
+      },
+      {
+        "name": "head_dimension",
+        "offset": 40,
+        "type": "uint32"
+      },
+      {
+        "name": "query_length",
+        "offset": 44,
+        "type": "uint32"
+      },
+      {
+        "name": "position",
+        "offset": 48,
+        "type": "uint32"
+      },
+      {
+        "name": "cache_capacity_tokens",
+        "offset": 52,
+        "type": "uint32"
+      }
+    ],
+    "name": "qwen-full-attention-v1"
+  },
+  "name": "qwen_full_attention",
+  "rsrc1": 3222208513,
+  "rsrc2": 132,
+  "rsrc3": 192,
+  "source_path": "native_r9700/kernels/qwen_full_attention.cpp",
+  "source_sha256": "1b556bd2d1e1f6083cde25968aaf37c8fee8c69de60386497ec6e1b7844368b5",
+  "target": "gfx1201"
+}

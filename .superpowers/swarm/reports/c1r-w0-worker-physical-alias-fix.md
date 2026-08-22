@@ -1,0 +1,1 @@
+Updated `run_native_prefill` to compare `os.path.realpath(os.fspath(...))` for both caller paths before `Path` conversion or command construction. The existing `output_path_conflict` return remains the early exit, so symlink aliases—including dangling log symlinks—are blocked before runner, cleanup, or log-write side effects.

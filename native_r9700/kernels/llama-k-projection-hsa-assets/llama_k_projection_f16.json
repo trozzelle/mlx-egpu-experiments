@@ -1,0 +1,120 @@
+{
+  "descriptor_offset": 1600,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 5888,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 728
+    },
+    {
+      "address": 1296,
+      "image_offset": 1296,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1392,
+      "image_offset": 1392,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1432,
+      "image_offset": 1432,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1472,
+      "image_offset": 1472,
+      "name": ".dynstr",
+      "size": 78
+    },
+    {
+      "address": 1600,
+      "image_offset": 1600,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 5888,
+      "image_offset": 5888,
+      "name": ".text",
+      "size": 768
+    },
+    {
+      "address": 10752,
+      "image_offset": 10752,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 10864,
+      "image_offset": 10864,
+      "name": ".relro_padding",
+      "size": 1424
+    },
+    {
+      "address": 14960,
+      "image_offset": 14960,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "llama_k_projection_f16.image",
+  "image_sha256": "9c2f584f4bd4c918f8c2a95a0a1f29a7102c19e8080b0d538b36f26e6e8fcc9b",
+  "image_size": 14961,
+  "kernarg_schema": {
+    "bytes": 32,
+    "fields": [
+      {
+        "name": "normalized",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "k_projection_weight",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "fresh_k",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "sequence_length",
+        "offset": 24,
+        "type": "uint32"
+      }
+    ],
+    "name": "llama-k-projection-f16-v1"
+  },
+  "name": "llama_k_projection_f16",
+  "rsrc1": 3222208513,
+  "rsrc2": 132,
+  "rsrc3": 48,
+  "source_path": "native_r9700/kernels/llama_k_projection_f16.cpp",
+  "source_sha256": "f0a150bcd951d2a5247187878ea832703a06da3630a2c4302bb9a296661a19c4",
+  "target": "gfx1201"
+}

@@ -1,0 +1,160 @@
+{
+  "descriptor_offset": 1984,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 6144,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 1136
+    },
+    {
+      "address": 1704,
+      "image_offset": 1704,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1800,
+      "image_offset": 1800,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1840,
+      "image_offset": 1840,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1880,
+      "image_offset": 1880,
+      "name": ".dynstr",
+      "size": 72
+    },
+    {
+      "address": 1984,
+      "image_offset": 1984,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 6144,
+      "image_offset": 6144,
+      "name": ".text",
+      "size": 1408
+    },
+    {
+      "address": 11648,
+      "image_offset": 11648,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 11760,
+      "image_offset": 11760,
+      "name": ".relro_padding",
+      "size": 528
+    },
+    {
+      "address": 15856,
+      "image_offset": 15856,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "qwen_deltanet_state.image",
+  "image_sha256": "2041a159fdead8560dd1ae51903a04887d50410049ca814733e3cc6679c78c6e",
+  "image_size": 15857,
+  "kernarg_schema": {
+    "bytes": 80,
+    "fields": [
+      {
+        "name": "q",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "k",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "v",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "decay",
+        "offset": 24,
+        "type": "uint64"
+      },
+      {
+        "name": "beta",
+        "offset": 32,
+        "type": "uint64"
+      },
+      {
+        "name": "state",
+        "offset": 40,
+        "type": "uint64"
+      },
+      {
+        "name": "output",
+        "offset": 48,
+        "type": "uint64"
+      },
+      {
+        "name": "value_heads",
+        "offset": 56,
+        "type": "uint32"
+      },
+      {
+        "name": "key_heads",
+        "offset": 60,
+        "type": "uint32"
+      },
+      {
+        "name": "key_dimension",
+        "offset": 64,
+        "type": "uint32"
+      },
+      {
+        "name": "value_dimension",
+        "offset": 68,
+        "type": "uint32"
+      },
+      {
+        "name": "state_capacity_elements",
+        "offset": 72,
+        "type": "uint64"
+      }
+    ],
+    "name": "qwen-deltanet-state-v1"
+  },
+  "name": "qwen_deltanet_state",
+  "rsrc1": 3222208513,
+  "rsrc2": 132,
+  "rsrc3": 128,
+  "source_path": "native_r9700/kernels/qwen_deltanet_state.cpp",
+  "source_sha256": "ec83131bfdb4a8ddea28df668141604c3b9c967278c31f14c70854e418c10e9b",
+  "target": "gfx1201"
+}

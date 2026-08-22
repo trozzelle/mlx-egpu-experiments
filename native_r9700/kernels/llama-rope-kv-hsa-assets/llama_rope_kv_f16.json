@@ -1,0 +1,135 @@
+{
+  "descriptor_offset": 1728,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 5888,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 860
+    },
+    {
+      "address": 1432,
+      "image_offset": 1432,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1528,
+      "image_offset": 1528,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1568,
+      "image_offset": 1568,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1608,
+      "image_offset": 1608,
+      "name": ".dynstr",
+      "size": 68
+    },
+    {
+      "address": 1728,
+      "image_offset": 1728,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 5888,
+      "image_offset": 5888,
+      "name": ".text",
+      "size": 1408
+    },
+    {
+      "address": 11392,
+      "image_offset": 11392,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 11504,
+      "image_offset": 11504,
+      "name": ".relro_padding",
+      "size": 784
+    },
+    {
+      "address": 15600,
+      "image_offset": 15600,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "llama_rope_kv_f16.image",
+  "image_sha256": "6731222d478581cbbda7bfa539bdbcc97906f7fea255a49438ece1453564de91",
+  "image_size": 15601,
+  "kernarg_schema": {
+    "bytes": 48,
+    "fields": [
+      {
+        "name": "fresh_k",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "fresh_v",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "k_cache",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "v_cache",
+        "offset": 24,
+        "type": "uint64"
+      },
+      {
+        "name": "sequence_length",
+        "offset": 32,
+        "type": "uint32"
+      },
+      {
+        "name": "position",
+        "offset": 36,
+        "type": "uint32"
+      },
+      {
+        "name": "cache_capacity_tokens",
+        "offset": 40,
+        "type": "uint32"
+      }
+    ],
+    "name": "llama-rope-kv-f16-v1"
+  },
+  "name": "llama_rope_kv_f16",
+  "rsrc1": 3222208513,
+  "rsrc2": 132,
+  "rsrc3": 128,
+  "source_path": "native_r9700/kernels/llama_rope_kv_f16.cpp",
+  "source_sha256": "3eb7c679097e4fea037e5c6b8b6a556ded0d798c28007a18ff85483f6dbdc95b",
+  "target": "gfx1201"
+}

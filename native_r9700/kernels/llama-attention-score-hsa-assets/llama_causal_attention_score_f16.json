@@ -1,0 +1,135 @@
+{
+  "descriptor_offset": 1792,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 6144,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 892
+    },
+    {
+      "address": 1464,
+      "image_offset": 1464,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1560,
+      "image_offset": 1560,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1600,
+      "image_offset": 1600,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1640,
+      "image_offset": 1640,
+      "name": ".dynstr",
+      "size": 97
+    },
+    {
+      "address": 1792,
+      "image_offset": 1792,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 6144,
+      "image_offset": 6144,
+      "name": ".text",
+      "size": 1152
+    },
+    {
+      "address": 11392,
+      "image_offset": 11392,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 11504,
+      "image_offset": 11504,
+      "name": ".relro_padding",
+      "size": 784
+    },
+    {
+      "address": 15600,
+      "image_offset": 15600,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "llama_causal_attention_score_f16.image",
+  "image_sha256": "08b174eb596d4f1f190bb41f6dbed419aec3432cae41400b3d3ec7caf0f704fa",
+  "image_size": 15601,
+  "kernarg_schema": {
+    "bytes": 48,
+    "fields": [
+      {
+        "name": "normalized",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "q_projection_weight",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "k_cache",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "attention_scores",
+        "offset": 24,
+        "type": "uint64"
+      },
+      {
+        "name": "sequence_length",
+        "offset": 32,
+        "type": "uint32"
+      },
+      {
+        "name": "position",
+        "offset": 36,
+        "type": "uint32"
+      },
+      {
+        "name": "cache_capacity_tokens",
+        "offset": 40,
+        "type": "uint32"
+      }
+    ],
+    "name": "llama-causal-attention-score-f16-v1"
+  },
+  "name": "llama_causal_attention_score_f16",
+  "rsrc1": 3222208513,
+  "rsrc2": 132,
+  "rsrc3": 96,
+  "source_path": "native_r9700/kernels/llama_causal_attention_score_f16.cpp",
+  "source_sha256": "ef1f2edf9e4453aa5ab13e45e90cca57bf07366ba36750badb8de6a332146736",
+  "target": "gfx1201"
+}

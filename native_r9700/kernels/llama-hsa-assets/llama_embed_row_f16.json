@@ -1,0 +1,115 @@
+{
+  "descriptor_offset": 1536,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 5888,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 684
+    },
+    {
+      "address": 1256,
+      "image_offset": 1256,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1352,
+      "image_offset": 1352,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1392,
+      "image_offset": 1392,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1432,
+      "image_offset": 1432,
+      "name": ".dynstr",
+      "size": 72
+    },
+    {
+      "address": 1536,
+      "image_offset": 1536,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 5888,
+      "image_offset": 5888,
+      "name": ".text",
+      "size": 640
+    },
+    {
+      "address": 10624,
+      "image_offset": 10624,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 10736,
+      "image_offset": 10736,
+      "name": ".relro_padding",
+      "size": 1552
+    },
+    {
+      "address": 14832,
+      "image_offset": 14832,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "llama_embed_row_f16.image",
+  "image_sha256": "389d8726a5a3e0d827f05680fb73b0d08e2dade34d8ae2ef79d5010c0bfdb53e",
+  "image_size": 14833,
+  "kernarg_schema": {
+    "bytes": 24,
+    "fields": [
+      {
+        "name": "embedding_rows",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "hidden_output",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "selected_row",
+        "offset": 16,
+        "type": "uint64"
+      }
+    ],
+    "name": "llama-embed-row-f16-v1"
+  },
+  "name": "llama_embed_row_f16",
+  "rsrc1": 3222208512,
+  "rsrc2": 132,
+  "rsrc3": 32,
+  "source_path": "native_r9700/kernels/llama_embed_row_f16.cpp",
+  "source_sha256": "a4c6be25193895d54549530beb9c3224addda22562999c8bc949a6d87153043f",
+  "target": "gfx1201"
+}

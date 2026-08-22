@@ -1,0 +1,135 @@
+{
+  "descriptor_offset": 1792,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 6144,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 920
+    },
+    {
+      "address": 1488,
+      "image_offset": 1488,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1584,
+      "image_offset": 1584,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1624,
+      "image_offset": 1624,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1664,
+      "image_offset": 1664,
+      "name": ".dynstr",
+      "size": 72
+    },
+    {
+      "address": 1792,
+      "image_offset": 1792,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 6144,
+      "image_offset": 6144,
+      "name": ".text",
+      "size": 1792
+    },
+    {
+      "address": 12032,
+      "image_offset": 12032,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 12144,
+      "image_offset": 12144,
+      "name": ".relro_padding",
+      "size": 144
+    },
+    {
+      "address": 16240,
+      "image_offset": 16240,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "llama_gated_mlp_f16.image",
+  "image_sha256": "2bca687f148135665fcf5afce4782bcb996a0a52d1fc96986e15e261a60c55fe",
+  "image_size": 16241,
+  "kernarg_schema": {
+    "bytes": 56,
+    "fields": [
+      {
+        "name": "post_attention_hidden",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "post_attention_layernorm_weight",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "gate_projection_weight",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "up_projection_weight",
+        "offset": 24,
+        "type": "uint64"
+      },
+      {
+        "name": "down_projection_weight",
+        "offset": 32,
+        "type": "uint64"
+      },
+      {
+        "name": "hidden",
+        "offset": 40,
+        "type": "uint64"
+      },
+      {
+        "name": "sequence_length",
+        "offset": 48,
+        "type": "uint32"
+      }
+    ],
+    "name": "llama-gated-mlp-f16-v1"
+  },
+  "name": "llama_gated_mlp_f16",
+  "rsrc1": 3222208513,
+  "rsrc2": 132,
+  "rsrc3": 176,
+  "source_path": "native_r9700/kernels/llama_gated_mlp_f16.cpp",
+  "source_sha256": "fe8d722f2380c908bccd8143b8db4e5b84e083211c4404194f680930923e176e",
+  "target": "gfx1201"
+}

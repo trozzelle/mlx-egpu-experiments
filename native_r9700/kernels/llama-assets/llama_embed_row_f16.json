@@ -1,0 +1,48 @@
+{
+  "code_path": "llama_embed_row_f16.code",
+  "descriptor": {
+    "group_segment_fixed_size": 0,
+    "kernarg_preload": 0,
+    "kernel_code_entry_byte_offset": 4352,
+    "kernel_code_properties": 1032,
+    "private_segment_fixed_size": 0
+  },
+  "elf_admission": {
+    "loadable_progbits": [
+      ".text",
+      ".rodata"
+    ],
+    "relocation_section_count": 0,
+    "symbol_count": 1
+  },
+  "entry_offset": 0,
+  "entry_symbol": "llama_embed_row_f16",
+  "kernarg_schema": {
+    "bytes": 24,
+    "fields": [
+      {
+        "name": "embedding_rows",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "hidden_output",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "selected_row",
+        "offset": 16,
+        "type": "uint64"
+      }
+    ],
+    "name": "llama-embed-row-f16-v1"
+  },
+  "name": "llama_embed_row_f16",
+  "sha256": "9dca19f64754efb4e6ff23fc346988ede757f13aeec6fdb9a1c15a5bbd61bfc6",
+  "source": {
+    "path": "llama_embed_row_f16.cpp",
+    "sha256": "82bb7530803a495c7a2dea9158379917c11f3557eb4bb2ff1cfef0857ec64e42"
+  },
+  "target": "gfx1201"
+}

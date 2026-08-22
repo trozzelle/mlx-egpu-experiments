@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 mlx_models/
 logs/
+build/
+artifacts/
+*.o
+.DS_Store
+.idea/
