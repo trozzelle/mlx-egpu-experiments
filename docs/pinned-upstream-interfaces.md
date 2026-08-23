@@ -251,3 +251,34 @@ pointer, entry alignment); (9) then one-operation sqrt/reciprocal/rsqrt microker
 - The transcendental intrinsics (`__builtin_amdgcn_rsqf`/`rcpf`/`sqrtf`) are not enumerated in this
   document (they live in the LLVM AMDGPU intrinsic reference), but it pins the RSRC3 prefetch field
   that changed between the old image (0xa0) and the new images (0x80 rsqrt, 0x40 epsilon).
+
+---
+
+## 10. ChatGPT R9700 diagnosis #2 — MQD address-domain mismatch (2026-08-23)
+
+`docs/ChatGPT-Diagnose R9700 Mapping Issues-20260823-1936.pdf`.
+
+Corrects the fault-register decode from `7abca9f` and reframes the blocker as a command-processor
+address-domain problem, not a shader/RMSNorm arithmetic fault:
+
+- **`GCVM_L2_PROTECTION_FAULT_STATUS_LO32=0x933` correct decode:** `more_faults=1`, `walker_error=1`
+  (not 3 — `(0x933>>1)&0x7`), `permission_faults=3` (PTE invalid + no read permission), `mapping_error=1`,
+  `cid=4` = **CPF (Command Processor Frontend)**, `rw=0` (read), `vmid=0`.
+- **`GCVM_L2_PROTECTION_FAULT_ADDR=0x2003` is a GPU virtual page, not a physical address.** The
+  faulting **GPU VA = 0x02003000** (page 0x2003 << 12), under VMID 0. Its numerical equality to
+  `kMqdPaddr = am_vm::kPtableArenaBase + 3·4096 = 0x02003000` is the smoking gun for an
+  **address-domain mismatch**, not "the walker read the MQD as a page table".
+- **Leading hypothesis:** `CP_MQD_BASE_ADDR` (or another CP-visible pointer) is programmed with the
+  raw VRAM/BAR0 physical offset `0x02003000`, which CPF then consumes as a GPU VA. Linux programs
+  `mqd->cp_mqd_base_addr_lo = prop->mqd_gpu_addr` — a GPU-visible/MC address, not the raw offset.
+  The MC address, BAR0 offset, and high GPU-VA alias must not be treated as interchangeable.
+
+Two controls were missing in the prior runs: (a) `--stage hidden` (embed) uses the legacy image path
+(`hsa_image_sha256: not_dispatched`), so it is **not** a valid resident-dispatch sentinel; (b) no
+pre-dispatch fault baseline — the fault may be sticky from a prior failure (`more_faults=1`, same
+`0xc67a` across runs). Decisive experiments, in order: (1) correct the recorded conclusion; (2) a
+true resident sentinel sandwich; (3) log every MQD address representation (BAR0 offset, physical, MC,
+GPU VA, tinygrad `mqd_mc`/`ring_addr`/`rptr_addr`/`wptr_addr`); (4) **MQD relocation canary** (move
+the MQD physical allocation to an unmistakably different page and observe whether the fault VA
+follows); (5) GPU-VA alias diagnostic; (6) dump live VMID 0 context and walk the faulting VA; (7)
+PM4 A/B/C/D markers; (8) salvage candidate output on timeout.
