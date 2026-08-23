@@ -19,7 +19,7 @@ Repair exactly one proven stage defect at a time, prove layer-0 recurrence throu
 ## Progress ledger
 | Task set | Status | Owner | Notes |
 |---|---|---|---|
-| LN-2 Stage repair | Blocked | TBD | Await LN-1C first-stage report. |
+| LN-2 Stage repair | In progress | TBD | `normalized` localized to RMSNorm transcendental `1/sqrt`. rsqrt fix produced timeout (not finite). Replanned: `phase-ln-2-rmsnorm-transcendental-diagnosis.md`. |
 | LN-3 Layer-0 recurrence | Blocked | TBD | Await all nine stage gates. |
 | LN-4 All-layer recurrence | Blocked | TBD | Await LN-3 16-token pass. |
 | LN-5 C1R/C2R | Blocked | TBD | Await LN-4 native K/V pass. |
