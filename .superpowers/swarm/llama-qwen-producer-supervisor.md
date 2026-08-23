@@ -89,3 +89,26 @@
 - Inspect reports and current source, then review K/V/Qwen lanes in parallel.
 - Quality bar: direct device-only arithmetic, exact ABI, bounded windows, no fixture/CPU path, no generic quantization/runtime layer.
 - Focused verification: `test_llama_kv_projection_asset.py`, `test_llama_v_projection_asset.py`, and `test_qwen_hsa_kernel_assets.py`.
+
+## Wave LN-1: bounded numerical localization
+
+### Shared context
+
+- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on `feature/native-r9700-producer`.
+- Source plans: `2026-08-23-llama-numerical-debug-plan.md`, `phase-llama-numerical-trace.md`, `phase-llama-numerical-remediation.md`.
+- Native two-token prefill is structurally accepted but prompt-0 C1R decodes zero tokens and reports NaN K/V comparisons. No native parity/cache acceptance is claimed.
+- Oracle and native trace JSON schema: `token_index`, `layer_index`, `stage`, `buffer`, `shape`, `dtype`, `byte_count`, `sha256`, `finite_count`, optional `raw_path`; native adds `kernarg_hex`, image digest, GPU VA, scalars.
+- Executors do not run tests, hardware, formatters, linters, package managers, or git. Reports go in `.superpowers/swarm/reports/`.
+
+### Agents
+
+| Agent | Ledger row | Target | Depends on | Report | Status |
+|---|---|---|---|---|---|
+| LlamaStageOracle | LN-1A | Python layer-0/token-0 oracle and tests | Schema frozen | `ln-1a-oracle.md` | In progress |
+| LlamaNativeTrace | LN-1B | C++ bounded resident trace and tests | Schema frozen | `ln-1b-native-trace.md` | In progress |
+
+### Supervisor gates
+
+- Inspect reports/diffs, then dispatch independent reviews for LN-1A and LN-1B.
+- Quality bar: request-scoped/bounded artifacts, no CPU values into accepted outputs, no generic trace framework, unchanged K/V cache/serving.
+- Focused verification: oracle test, trace runtime contracts, C0 kernel proof, VRAM smoke, then one layer-0/token-0 `hidden` trace comparison.

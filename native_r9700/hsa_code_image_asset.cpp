@@ -574,6 +574,10 @@ bool load_asset(const std::filesystem::path& root, HsaCodeImageAsset* candidate)
 
 }  // namespace
 
+std::string sha256_hex(const std::vector<std::uint8_t>& bytes) {
+  return hex_digest(bytes);
+}
+
 bool load_llama_embed_hsa_image(const std::filesystem::path& root, HsaCodeImageAsset* out,
                                 std::string* error) {
   if (out == nullptr) {

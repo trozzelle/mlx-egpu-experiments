@@ -47,66 +47,50 @@ Gate: injected path `P` must equal native baseline `R` token-for-token across th
 
 - Flagged layers > 1e-3 fp16 probe tolerance: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]. These are diagnostic tinygrad-vs-MLX implementation deltas; the token gate passed.
 
-## Path C – C1 CPU reference / prompt-cache ABI results (reclassified)
+## Path C — C1 Native R9700 producer parity results
 
-Status: **REFERENCE PASS; NATIVE R9700 C1 OPEN**
+Status: **FAIL**
 
-The `gate_result` / `status` values below describe CPU/NumPy reference parity only. Per ADR 0005,
-they do not satisfy Native R9700 producer acceptance because model-forward tensor work did not run on
-the R9700/eGPU.
-
+producer_kind: r9700_native
+gate_result: fail
+status: fail
 r_source: both
 model: ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct
 fixtures: tests/native_r9700/fixtures
-log_path: logs/c1-parity/run.log
-json_path: logs/c1-parity/result.json
+log_path: logs/c1r-native-parity/run.log
+json_path: logs/c1r-native-parity/result.json
 config_path: ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct/config.json
 weight_provenance: official fp16 meta-llama/Llama-3.2-1B-Instruct MLX safetensors
 rope_config_note: Llama-3 rope_scaling loaded from the MLX config.json sidecar
-artifacts: logs/c1-parity
+artifacts: logs/c1r-native-parity
 runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface
 pci_id: 1002:7551
 arch: gfx1201
 
-Native C1 acceptance blocker: no completed run proves Llama 3.2 1B prefill model-forward tensor work
-executed on the R9700/eGPU and emitted the accepted prompt-cache artifact.
-
-### C1R hardware primitive evidence (does not close C1)
-
-- `fp32_add_scalar`, `fp16_to_fp32_cast`, `fp32_to_fp16_cast`, and `fp16_matmul_8x16x8` hardware primitive proofs ran through `TinyGPU.app/APLRemotePCIDevice/PCIIface` on `pci_id: 1002:7551`, `arch: gfx1201`, and exited `0` with `host_device_transfer_status: pass`.
-- C1R-6b `fp16_matmul_8x16x8` proved a source-grounded RDNA4 `v_dot2_f32_f16` 8x16x8 kernel with fp32 output bytes: `kernel_blob_sha256: 56e4faa6c8fa01ca6d9ea97ac5857ee9fc074d1cd51a883313c97c2fbb6cb28f`, `kernel_text_byte_count: 2508`, `input_layout: a_row_major_then_b_kpair_col_packed`, `output_byte_count: 256`, `tolerance: exact_bytes`, `mismatch_count: 0`.
-- C1R-6d `fp32_to_fp16_cast` proved the cast-back primitive needed for fp16 tensor materialization: `kernel_blob_sha256: dc5dd58390142a22d249986d015be589ea62732d36303b68b8528e09a010735d`, `kernel_text_byte_count: 64`, `input_byte_count: 32`, `output_byte_count: 16`, `tolerance: exact_bytes`, `mismatch_count: 0`.
-- C1R-6c `fp16_matmul_8x16x8_layer0_k_tile` proved the same kernel on a real Llama layer-0 K-projection partial tile from `tests/native_r9700/fixtures/layer_trace_fixtures.npz` (`fixture_sha256: b13e1c8b5651b638787a0c5061a7cb8f7a0483482aafc1c1041ae7770e2159b3`): `acceptance_scope: hardware_primitive_tile_only`, `model_forward_scope: layer0_k_proj_partial_tile`, `native_prefill_acceptance: open`, `rows_valid: 5`, `tile_rows: 8`, `tile_inner: 16`, `tile_cols: 8`, `tolerance: fp32_ulp<=1`, `max_ulp_diff: 1`, `mismatch_count: 0`, `byte_mismatch_count: 1`.
-- C1R-6e `layer0_k_tile_matmul_to_fp16_chain` proved resident on-device chaining for the same real Llama K-projection partial tile: stage 0 wrote fp32 `(8,8)` into a resident intermediate, stages 1-8 cast each row to fp16 without CPU readback between stages, and only the final fp16 tile was downloaded. The final fp16 output VRAM region is explicitly cleared before the compute chain so stale bytes cannot satisfy the proof. Hardware/wrapper evidence: `chain_stage_count: 9`, `chain_readback_between_stages: no`, `kernarg_rewrite_count: 9`, `compute_dispatch_count: 9`, `output_byte_count: 128`, `final_fp16_sha256: 7d8818f895f3e51bce24da8580fb10d76bffa457cba2c061ef2c7c1c0f5ee027`, `tolerance: exact_fp16_bytes`, `mismatch_count: 0`, `byte_mismatch_count: 0`, `final_output_clear_status: pass`, `host_device_transfer_status: pass`, `primitive_chain_proof_wrapper_status: pass`, `failure_stage: none`, `native_prefill_acceptance: open`.
-- C1R-6f `fp16_residual_add_layer0_attention_slice8` proved a real Llama layer-0 attention residual-add slice from the same fixture: input packs `layer0_hidden_in_fp16[0,0:8]` then `layer0_o_proj_output_fp16[0,0:8]`, output matches `layer0_attention_residual_fp16[0,0:8]`, `kernel_blob_sha256: 57309c2e2441d96284b716ad71e5612e4b689055fc4e6d8a9be8aebb76764122`, `kernel_text_byte_count: 128`, `acceptance_scope: hardware_primitive_slice_only`, `model_forward_scope: layer0_attention_residual_partial_slice`, `native_prefill_acceptance: open`, `source_arrays: layer0_hidden_in_fp16,layer0_o_proj_output_fp16,layer0_attention_residual_fp16`, `fixture_slice: token=0,hidden_dim=0:8`, `full_fixture_shape: 2x16`, `covered_element_count: 8`, `full_element_count: 32`, `tolerance: exact_fp16_bytes`, `mismatch_count: 0`, `byte_mismatch_count: 0`, and wrapper/hardware exit 0.
-- This evidence proves hardware kernel execution, a real layer-0 GEMM tile, stale-output-protected final-only readback, a resident primitive chain, and a real layer-0 residual-add slice; it is still not an accepted `r9700_native` prefill/prompt-cache producer route.
-
 | Prompt | S | N prefix | P tokens | R tokens | Exact | Mismatches | Cache |
 |---|---:|---:|---|---|---|---|---|
-| prompt-0 | 6 | 5 | `[12366, 13, 578, 469]` | `[12366, 13, 578, 469]` | True | `[]` | `logs/c1-parity/prompt-0-prompt-cache.safetensors` |
-| prompt-1 | 222 | 221 | `[128009, 128006, 78191, 271]` | `[128009, 128006, 78191, 271]` | True | `[]` | `logs/c1-parity/prompt-1-prompt-cache.safetensors` |
-| prompt-2 | 661 | 660 | `[128009, 128006, 128006, 128006]` | `[128009, 128006, 128006, 128006]` | True | `[]` | `logs/c1-parity/prompt-2-prompt-cache.safetensors` |
+| prompt-0 | 6 | 5 | `[0, 0, 0, 0]` | `[12366, 13, 578, 469]` | False | `[0, 1, 2, 3]` | `logs/c1r-native-parity/prompt-0-prompt-cache.safetensors` |
 
-flagged_layers_over_1e-3: `[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]`
+flagged_layers_over_1e-3: `[]`
 
 | Layer | max K | mean K | max V | mean V | >1e-3 |
 |---:|---:|---:|---:|---:|---|
-| 0 | 0.0078125 | 0.00017515558 | 0.00048828125 | 2.0148847e-05 | True |
-| 1 | 0.015625 | 0.00067116303 | 0.0012207031 | 0.00010435124 | True |
-| 2 | 0.025390625 | 0.0010470577 | 0.0035400391 | 0.00022782081 | True |
-| 3 | 0.015625 | 0.00099507486 | 0.0046386719 | 0.0002902229 | True |
-| 4 | 0.015625 | 0.0010966347 | 0.0036621094 | 0.00031915866 | True |
-| 5 | 0.0390625 | 0.0013487824 | 0.0031738281 | 0.00032265516 | True |
-| 6 | 0.0234375 | 0.0013403689 | 0.00390625 | 0.00039757355 | True |
-| 7 | 0.015625 | 0.0013509322 | 0.005859375 | 0.00044677936 | True |
-| 8 | 0.016601562 | 0.0014306575 | 0.0048828125 | 0.00039588293 | True |
-| 9 | 0.016601562 | 0.0011877895 | 0.0049743652 | 0.00037250351 | True |
-| 10 | 0.017822266 | 0.0012244057 | 0.0043945312 | 0.00035624945 | True |
-| 11 | 0.015625 | 0.0012250248 | 0.0037841797 | 0.00032808041 | True |
-| 12 | 0.018310547 | 0.0011188368 | 0.0043945312 | 0.00034460862 | True |
-| 13 | 0.015625 | 0.0011248104 | 0.005859375 | 0.00042447503 | True |
-| 14 | 0.014648438 | 0.0011601 | 0.0087890625 | 0.00061878149 | True |
-| 15 | 0.015625 | 0.0011586983 | 0.0083007812 | 0.00070930121 | True |
+| 0 | 0 | 0 | 0 | 0 | False |
+| 1 | 0 | 0 | 0 | 0 | False |
+| 2 | 0 | 0 | 0 | 0 | False |
+| 3 | 0 | 0 | 0 | 0 | False |
+| 4 | 0 | 0 | 0 | 0 | False |
+| 5 | 0 | 0 | 0 | 0 | False |
+| 6 | 0 | 0 | 0 | 0 | False |
+| 7 | 0 | 0 | 0 | 0 | False |
+| 8 | 0 | 0 | 0 | 0 | False |
+| 9 | 0 | 0 | 0 | 0 | False |
+| 10 | 0 | 0 | 0 | 0 | False |
+| 11 | 0 | 0 | 0 | 0 | False |
+| 12 | 0 | 0 | 0 | 0 | False |
+| 13 | 0 | 0 | 0 | 0 | False |
+| 14 | 0 | 0 | 0 | 0 | False |
+| 15 | 0 | 0 | 0 | 0 | False |
 
 ## Path C2 – CPU reference serving integration results (reclassified)
 

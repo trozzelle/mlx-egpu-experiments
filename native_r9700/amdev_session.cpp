@@ -974,8 +974,8 @@ bool run_vram_smoke(VramSmokeResult* result, std::string* error_text) {
         layout.page_table_pool_bytes > log.bar0.size - layout.page_table_pool_base) {
       return fail("vram_layout", "small BAR0 page-table pool is missing or invalid");
     }
-    page_table_layout.allocatable_base = layout.page_table_pool_base;
-    page_table_layout.allocatable_bytes = layout.page_table_pool_bytes;
+    page_table_layout.allocatable_base = layout.page_table_pool_base + kPageSize;
+    page_table_layout.allocatable_bytes = layout.page_table_pool_bytes - kPageSize;
   }
   VramAllocator page_table_allocator(page_table_layout);
   C0DynamicPageTableBackend pte_backend(client, &log, result);
@@ -1245,7 +1245,9 @@ bool run_vram_smoke(VramSmokeResult* result, std::string* error_text) {
     if (observed_value != expected_value) {
       result->cpu_comparison_status = "fail";
       return fail_after_compute_queue_setup(
-          "readback_mismatch", "vector-add mismatch at element " + std::to_string(index));
+          "readback_mismatch", "vector-add mismatch at element " + std::to_string(index) +
+                                   " expected=" + std::to_string(expected_value) +
+                                   " observed=" + std::to_string(observed_value));
     }
   }
   result->cpu_comparison_status = "pass";
@@ -2071,8 +2073,8 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
   }
   state.payload_allocator = std::make_unique<VramAllocator>(state.layout);
   VramLayout page_table_layout = state.layout;
-  page_table_layout.allocatable_base = state.layout.page_table_pool_base;
-  page_table_layout.allocatable_bytes = state.layout.page_table_pool_bytes;
+  page_table_layout.allocatable_base = state.layout.page_table_pool_base + kPageSize;
+  page_table_layout.allocatable_bytes = state.layout.page_table_pool_bytes - kPageSize;
   state.page_table_allocator = std::make_unique<VramAllocator>(page_table_layout);
   state.pte_backend =
       std::make_unique<C0DynamicPageTableBackend>(*state.client, &state.log, &state.pte_result);

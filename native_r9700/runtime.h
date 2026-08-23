@@ -6269,6 +6269,47 @@ struct NativePrefillResult {
 int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult* result,
                        std::string* error_text);
 
+// Request-scoped numerical diagnostic for one layer-0/token-0 resident Llama
+// boundary. This is intentionally separate from NativePrefillRequest: no trace
+// invocation can select an NPZ path or become an accepted cache producer.
+struct LlamaStageTraceRequest {
+  std::string model_dir;
+  uint32_t token_id = 0;
+  uint32_t layer_index = 0;
+  uint32_t position = 0;
+  std::string stage;
+  std::string trace_dir;
+};
+
+struct LlamaStageTraceResult {
+  uint32_t token_index = 0;
+  uint32_t layer_index = 0;
+  std::string stage;
+  std::string buffer;
+  std::string shape_json;
+  std::string dtype;
+  uint64_t byte_count = 0;
+  std::string sha256;
+  uint64_t finite_count = 0;
+  std::string raw_path;
+  std::string json_path;
+  std::string kernarg_hex;
+  std::string hsa_image_sha256;
+  uint64_t gpu_va = 0;
+  std::string scalars_json;
+  std::string failure_stage = "not_run";
+  std::string failure_text = "not_run";
+  int exit_status = 1;
+};
+
+// Dispatches only the prefix ending at the requested shared boundary, reads
+// back that boundary's sole declared resident buffer, and atomically emits raw
+// bytes plus JSON beneath trace_dir. Any failure, including non-finite output,
+// leaves no trace artifact and never invokes prefill serialization.
+int run_llama_stage_trace(const LlamaStageTraceRequest& request,
+                          LlamaStageTraceResult* result,
+                          std::string* error_text);
+
 // Selected-row hardware slice: it proves exactly one model-sourced F16
 // embedding row transfers through the generated HSA image. It is intentionally
 // not a prefill or model-forward acceptance path.

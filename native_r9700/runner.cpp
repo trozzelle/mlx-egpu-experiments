@@ -44,6 +44,9 @@ void print_help(const char* argv0) {
   std::printf("                         (requires NATIVE_R9700_C1_PRIMITIVE_BRIDGE; not a product proof)\n");
   std::printf("  --native-prefill-proof --model <mlx-model-dir> --token-ids-json '[...]' --out <npz> --log <path>\n");
   std::printf("                         16-layer streamed HSA Llama prefill (fail-closed until accepted)\n");
+  std::printf("  --llama-stage-trace --model <dir> --token-id <uint32> --layer 0 --position 0 \\\n");
+  std::printf("      --stage <boundary> --trace-dir <dir>\n");
+  std::printf("                         trace one layer-0/token-0 resident boundary; never writes an NPZ/cache\n");
   std::printf("  --help                show this message\n");
 }
 
@@ -204,6 +207,25 @@ void print_native_prefill_result(const native_r9700::NativePrefillResult& result
   std::printf("%s%s", key_value.c_str(), json.c_str());
 }
 
+void print_llama_stage_trace_result(const native_r9700::LlamaStageTraceResult& result) {
+  std::printf("{\"token_index\":%u,\"layer_index\":%u,\"stage\":\"%s\",\"buffer\":\"%s\","
+              "\"shape\":%s,\"dtype\":\"%s\",\"byte_count\":%llu,\"sha256\":\"%s\","
+              "\"finite_count\":%llu,\"raw_path\":\"%s\",\"kernarg_hex\":\"%s\","
+              "\"hsa_image_sha256\":\"%s\",\"gpu_va\":%llu,\"scalars\":%s,"
+              "\"failure_stage\":\"%s\",\"failure_text\":\"%s\",\"exit_status\":%d}\n",
+              result.token_index, result.layer_index, json_escape(result.stage).c_str(),
+              json_escape(result.buffer).c_str(),
+              result.shape_json.empty() ? "[]" : result.shape_json.c_str(),
+              json_escape(result.dtype).c_str(),
+              static_cast<unsigned long long>(result.byte_count), json_escape(result.sha256).c_str(),
+              static_cast<unsigned long long>(result.finite_count), json_escape(result.raw_path).c_str(),
+              json_escape(result.kernarg_hex).c_str(), json_escape(result.hsa_image_sha256).c_str(),
+              static_cast<unsigned long long>(result.gpu_va),
+              result.scalars_json.empty() ? "{}" : result.scalars_json.c_str(),
+              json_escape(result.failure_stage).c_str(), json_escape(result.failure_text).c_str(),
+              result.exit_status);
+}
+
 }  // namespace
 bool parse_u64(const char* text, uint64_t* out) {
   if (text == nullptr || text[0] == '\0') return false;
@@ -287,6 +309,39 @@ int main(int argc, char** argv) {
     std::string log_path;
     const int status = session.vram_smoke(&text, &log_path);
     std::printf("%s", text.c_str());
+    return status;
+  }
+
+  if (std::strcmp(argv[1], "--llama-stage-trace") == 0) {
+    if (argc != 14 || std::strcmp(argv[2], "--model") != 0 ||
+        std::strcmp(argv[4], "--token-id") != 0 || std::strcmp(argv[6], "--layer") != 0 ||
+        std::strcmp(argv[8], "--position") != 0 || std::strcmp(argv[10], "--stage") != 0 ||
+        std::strcmp(argv[12], "--trace-dir") != 0) {
+      std::fprintf(stderr,
+                   "error: --llama-stage-trace expects --model <dir> --token-id <uint32> "
+                   "--layer 0 --position 0 --stage <boundary> --trace-dir <dir>\n");
+      return 2;
+    }
+    native_r9700::LlamaStageTraceRequest request;
+    if (!parse_u32_strict(argv[5], &request.token_id)) {
+      std::fprintf(stderr, "error: --token-id must be a strict uint32\n");
+      return 2;
+    }
+    if (!parse_u32_strict(argv[7], &request.layer_index) ||
+        !parse_u32_strict(argv[9], &request.position)) {
+      std::fprintf(stderr, "error: --layer and --position must be strict uint32 values\n");
+      return 2;
+    }
+    if (request.layer_index != 0 || request.position != 0) {
+      std::fprintf(stderr, "error: --llama-stage-trace supports only layer 0 and position 0\n");
+      return 2;
+    }
+    request.model_dir = argv[3];
+    request.stage = argv[11];
+    request.trace_dir = argv[13];
+    native_r9700::LlamaStageTraceResult result;
+    const int status = native_r9700::run_llama_stage_trace(request, &result, nullptr);
+    print_llama_stage_trace_result(result);
     return status;
   }
 

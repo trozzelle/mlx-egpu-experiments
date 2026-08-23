@@ -863,3 +863,20 @@ Supervisor artifact: `.superpowers/swarm/gx1202-compute-dispatch-supervisor.md`
 | LQ-W4 Complete native state producers | Blocked | Main / EopControlCorrection | LQ-W3 | `.superpowers/swarm/reports/lq-persistent-dispatch-review.md`; `lq-persistent-fix-rereview.md` | Persistent streamed-weight lifecycle fixes reviewed; focused executor/runtime contracts → 13 passed. | Requires external R9700/TinyGPU queue recovery: HQD stays active and Tinygrad/native recovery both fail. |
 | LQ-W5 Consumer parity and serving | Blocked | — | LQ-W4 | | Requires accepted native Llama NPZ and Qwen hybrid artifact. | Hardware producer artifact unavailable while HQD remains stuck. |
 | LQ-W6 Final review and verification | Blocked | — | LQ-W5 | | Layer-0 evidence and focused contracts remain recorded. | Requires full native artifacts and exact parity. |
+
+## 2026-08-23 Llama numerical localization swarm
+
+- Source plan: `docs/tasks/native-r9700-producer/2026-08-23-llama-numerical-debug-plan.md`.
+- Task packets: `phase-llama-numerical-trace.md`, `phase-llama-numerical-remediation.md`.
+- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Current fact: dedicated staging PTB fixes the runtime; two-token native prefill has 288 device dispatches and schema-valid NPZ, but native C1R prompt-0 has P `[0,0,0,0]` vs R `[12366,13,578,469]` and NaN K/V comparisons. C2R/Qwen remain blocked.
+
+| Task | Status | Owner | Dependencies | Report | Evidence | Blocker |
+|---|---|---|---|---|---|---|
+| LN-1A Layer-0/token-0 oracle | Done | Main / LlamaTraceContractFix / LlamaTraceValidationFix / TraceCoverageFix | Schema frozen | `.superpowers/swarm/reports/ln-1a-oracle.md`; `ln-1-fix.md`; `ln-1-validation-fix.md`; `ln-1-coverage-fix.md` | Focused LN-1 validation passed; `hidden` oracle is finite and byte-exact against native. A local synthetic `fresh_k` two-run determinism contract now compares serialized metadata, digest, finite count, and raw bytes; not rerun in this coverage-only assignment. | |
+| LN-1B Bounded native stage trace | Done | Main / LlamaTraceContractFix / LlamaTracePublicationFix / ParentFsyncCoverageFix / LlamaTraceValidationFix / TraceCoverageFix | Schema frozen | `.superpowers/swarm/reports/ln-1b-native-trace.md`; `ln-1-fix.md`; `ln-1-publication-fix.md`; `ln-1-parent-fsync-fix.md`; `ln-1-validation-fix.md`; `ln-1-coverage-fix.md` | 32 focused tests passed; kernel proof and VRAM smoke passed; hidden trace is finite/byte-exact. The focused publication harness now exercises literal scalar JSON outputs for native scalar stage indices 0–7; not rerun in this coverage-only assignment. | |
+| LN-1C Comparator / first-stage report | Done | Main / TraceCoverageFix | LN-1A, LN-1B | `.superpowers/swarm/reports/ln-1c-first-stage.md`; `ln-1-final-review.md`; `ln-1-coverage-fix.md` | Hidden SHA-256 matches exactly; native normalized trace fails closed with `trace_nonfinite`. Final-review P1/P2 test-coverage remediation is recorded; validation remains delegated. | |
+| LN-2 First failed-stage repair | In progress | RMSNormRepair | LN-1C | | First failure is layer-0 RMSNorm normalized output. | |
+| LN-3 Layer-0 recurrence 2/6/16/64/128 | Blocked | — | LN-2 | | | Await all nine stage gates. |
+| LN-4 All-layer recurrence | Blocked | — | LN-3 | | | Await layer-0 16-token pass. |
+| LN-5 Native C1R/C2R | Blocked | — | LN-4 | | | Await finite native K/V. |

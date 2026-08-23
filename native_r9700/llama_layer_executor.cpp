@@ -217,6 +217,7 @@ bool build_llama_stage_dispatch(const LlamaLayer0WeightSpans& weights, uint32_t 
     HsaCodeImageAsset image;
     image.image = std::move(descriptor.code);
     image.entry_offset = config.entry_offset;
+    image.image_sha256 = descriptor.sha256;
     image.rsrc1 = descriptor.rsrc1;
     image.rsrc2 = descriptor.rsrc2;
     image.rsrc3 = descriptor.rsrc3;
@@ -359,6 +360,18 @@ bool build_llama_layer_weight_table(const std::string& model_dir,
   return true;
 }
 
+bool build_llama_layer0_stage_trace_dispatch(const std::string& model_dir, uint32_t token_id,
+                                             std::vector<HsaCodeImageAsset>* images,
+                                             ResidentHsaDispatch* dispatch,
+                                             std::string* error_text) {
+  if (token_id >= kLlama32OneBGeometry.vocab_size) {
+    return fail(error_text, "token id is outside the supported Llama vocabulary");
+  }
+  LlamaLayer0WeightSpans weights;
+  if (!bind_real_layer0_weights(model_dir, &weights, error_text)) return false;
+  return build_llama_stage_dispatch(weights, token_id, images, dispatch, error_text);
+}
+
 
 bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
                                      uint32_t token_count,
@@ -439,6 +452,7 @@ bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
     HsaCodeImageAsset image;
     image.image = std::move(descriptor.code);
     image.entry_offset = config.entry_offset;
+    image.image_sha256 = descriptor.sha256;
     image.rsrc1 = descriptor.rsrc1;
     image.rsrc2 = descriptor.rsrc2;
     image.rsrc3 = descriptor.rsrc3;

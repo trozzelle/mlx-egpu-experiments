@@ -2,12 +2,20 @@
 
 #include "runtime.h"
 
+#include <array>
 #include <cerrno>
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
+#include <fcntl.h>
 #include <fstream>
+#include <iterator>
+#include <limits>
 #include <string>
-
+#include <unistd.h>
+#include <vector>
 
 #include "amdev_session.h"
 #include "device_memory.h"
@@ -58,6 +66,343 @@ void log_progress(const std::string& text) {
   std::fflush(stderr);
 }
 
+enum class TraceBufferKind {
+  EmbeddingRow,
+  Normalized,
+  FreshK,
+  FreshV,
+  KCache,
+  VCache,
+  AttentionScores,
+  AttentionProbabilities,
+  Context,
+  PostAttentionHidden,
+};
+
+struct LlamaStageTraceSpec {
+  const char* stage;
+  const char* buffer;
+  const char* shape_json;
+  const char* dtype;
+  uint64_t byte_count;
+  int stage_index;
+  TraceBufferKind buffer_kind;
+};
+
+constexpr std::array<LlamaStageTraceSpec, 10> kLlamaStageTraceStages = {{
+    {"hidden", "layer0.embedding_row", "[1,2048]", "float16", 4096, -1,
+     TraceBufferKind::EmbeddingRow},
+    {"normalized", "layer0.normalized", "[1,2048]", "float16", 4096, 0,
+     TraceBufferKind::Normalized},
+    {"fresh_k", "layer0.fresh_k", "[1,8,64]", "float16", 1024, 1,
+     TraceBufferKind::FreshK},
+    {"fresh_v", "layer0.fresh_v", "[1,8,64]", "float16", 1024, 2,
+     TraceBufferKind::FreshV},
+    {"k_cache", "layer0.k_cache", "[1,8,1,64]", "float16", 1024, 3,
+     TraceBufferKind::KCache},
+    {"v_cache", "layer0.v_cache", "[1,8,1,64]", "float16", 1024, 3,
+     TraceBufferKind::VCache},
+    {"attention_scores", "layer0.attention_scores", "[1,32,128]", "float32", 16384, 4,
+     TraceBufferKind::AttentionScores},
+    {"attention_probabilities", "layer0.attention_probabilities", "[1,32,128]", "float32",
+     16384, 5, TraceBufferKind::AttentionProbabilities},
+    {"context", "layer0.context", "[1,32,64]", "float16", 4096, 6, TraceBufferKind::Context},
+    {"post_attention_hidden", "layer0.post_attention_hidden", "[1,2048]", "float16", 4096,
+     7, TraceBufferKind::PostAttentionHidden},
+}};
+
+const LlamaStageTraceSpec* find_trace_stage(const std::string& stage) {
+  for (const LlamaStageTraceSpec& spec : kLlamaStageTraceStages) {
+    if (stage == spec.stage) return &spec;
+  }
+  return nullptr;
+}
+
+bool trace_buffer_index(const ResidentHsaDispatch& dispatch, TraceBufferKind kind,
+                        uint32_t* buffer_index, std::string* error_text) {
+  const uint32_t indices[] = {0, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+  const uint32_t index = indices[static_cast<uint32_t>(kind)];
+  if (index >= dispatch.buffers.size()) {
+    if (error_text != nullptr) *error_text = "layer-0 trace dispatch has incomplete buffer layout";
+    return false;
+  }
+  *buffer_index = index;
+  return true;
+}
+
+bool count_finite_values(const std::vector<uint8_t>& bytes, const std::string& dtype,
+                         uint64_t* finite_count) {
+  const size_t element_size = dtype == "float16" ? 2U : dtype == "float32" ? 4U : 0U;
+  if (element_size == 0U || bytes.size() % element_size != 0U) return false;
+  uint64_t count = 0;
+  for (size_t offset = 0; offset < bytes.size(); offset += element_size) {
+    bool finite = false;
+    if (element_size == 2U) {
+      const uint16_t bits = static_cast<uint16_t>(bytes[offset]) |
+                            (static_cast<uint16_t>(bytes[offset + 1U]) << 8U);
+      finite = (bits & 0x7c00U) != 0x7c00U;
+    } else {
+      const uint32_t bits = static_cast<uint32_t>(bytes[offset]) |
+                            (static_cast<uint32_t>(bytes[offset + 1U]) << 8U) |
+                            (static_cast<uint32_t>(bytes[offset + 2U]) << 16U) |
+                            (static_cast<uint32_t>(bytes[offset + 3U]) << 24U);
+      finite = (bits & 0x7f800000U) != 0x7f800000U;
+    }
+    if (finite) ++count;
+  }
+  *finite_count = count;
+  return true;
+}
+
+std::string hex_bytes(const std::vector<uint8_t>& bytes) {
+  constexpr char kHex[] = "0123456789abcdef";
+  std::string text(bytes.size() * 2U, '\0');
+  for (size_t index = 0; index < bytes.size(); ++index) {
+    text[index * 2U] = kHex[bytes[index] >> 4U];
+    text[index * 2U + 1U] = kHex[bytes[index] & 0x0fU];
+  }
+  return text;
+}
+
+void store_u64_le(std::vector<uint8_t>* bytes, size_t offset, uint64_t value) {
+  for (size_t index = 0; index < sizeof(value); ++index) {
+    (*bytes)[offset + index] = static_cast<uint8_t>(value >> (index * 8U));
+  }
+}
+
+bool materialize_trace_kernargs(const ResidentHsaStage& stage,
+                                const ResidentHsaDispatchResult& dispatch_result,
+                                std::vector<uint8_t>* kernargs, std::string* error_text) {
+  if (dispatch_result.buffer_gpu_vas.empty()) {
+    if (error_text != nullptr) *error_text = "trace dispatch did not expose resident buffer VAs";
+    return false;
+  }
+  *kernargs = stage.kernargs;
+  for (const ResidentHsaKernargBinding& binding : stage.kernarg_bindings) {
+    if (binding.buffer_index >= dispatch_result.buffer_gpu_vas.size() ||
+        binding.kernarg_byte_offset + sizeof(uint64_t) > kernargs->size()) {
+      if (error_text != nullptr) *error_text = "trace stage has invalid resident kernarg binding";
+      return false;
+    }
+    store_u64_le(kernargs, binding.kernarg_byte_offset,
+                 dispatch_result.buffer_gpu_vas[binding.buffer_index]);
+  }
+  return true;
+}
+
+uint32_t load_u32_le(const std::vector<uint8_t>& bytes, size_t offset) {
+  return static_cast<uint32_t>(bytes[offset]) |
+         (static_cast<uint32_t>(bytes[offset + 1U]) << 8U) |
+         (static_cast<uint32_t>(bytes[offset + 2U]) << 16U) |
+         (static_cast<uint32_t>(bytes[offset + 3U]) << 24U);
+}
+
+bool trace_scalars_json(int stage_index, const std::vector<uint8_t>& kernargs,
+                        std::string* scalars, std::string* error_text) {
+  struct ScalarField {
+    const char* name;
+    size_t offset;
+  };
+  static constexpr ScalarField kRmsNorm[] = {{"epsilon", 24U}};
+  static constexpr ScalarField kSequenceLength24[] = {{"sequence_length", 24U}};
+  static constexpr ScalarField kSequenceLength32[] = {{"sequence_length", 32U}};
+  static constexpr ScalarField kCache32[] = {
+      {"sequence_length", 32U}, {"position", 36U}, {"cache_capacity_tokens", 40U}};
+  static constexpr ScalarField kCache16[] = {
+      {"sequence_length", 16U}, {"position", 20U}, {"cache_capacity_tokens", 24U}};
+  static constexpr ScalarField kCache24[] = {
+      {"sequence_length", 24U}, {"position", 28U}, {"cache_capacity_tokens", 32U}};
+
+  const ScalarField* fields = nullptr;
+  size_t count = 0;
+  switch (stage_index) {
+    case 0:
+      fields = kRmsNorm;
+      count = std::size(kRmsNorm);
+      break;
+    case 1:
+    case 2:
+      fields = kSequenceLength24;
+      count = std::size(kSequenceLength24);
+      break;
+    case 3:
+    case 4:
+      fields = kCache32;
+      count = std::size(kCache32);
+      break;
+    case 5:
+      fields = kCache16;
+      count = std::size(kCache16);
+      break;
+    case 6:
+      fields = kCache24;
+      count = std::size(kCache24);
+      break;
+    case 7:
+      fields = kSequenceLength32;
+      count = std::size(kSequenceLength32);
+      break;
+    default:
+      *scalars = "{}";
+      return true;
+  }
+  std::string json = "{";
+  for (size_t index = 0; index < count; ++index) {
+    if (fields[index].offset + sizeof(uint32_t) > kernargs.size()) {
+      if (error_text != nullptr) *error_text = "trace scalar field is outside kernarg block";
+      return false;
+    }
+    if (index != 0U) json += ",";
+    json += "\"";
+    json += fields[index].name;
+    json += "\":";
+    const uint32_t value = load_u32_le(kernargs, fields[index].offset);
+    if (stage_index == 0) {
+      float epsilon = 0.0F;
+      std::memcpy(&epsilon, &value, sizeof(epsilon));
+      json += std::to_string(epsilon);
+    } else {
+      json += std::to_string(value);
+    }
+  }
+  json += "}";
+  *scalars = std::move(json);
+  return true;
+}
+
+struct TracePublicationOps {
+  void* context;
+  bool (*write_file)(void* context, const std::filesystem::path& path, const char* data,
+                     size_t size, std::string* error_text);
+  bool (*sync_path)(void* context, const std::filesystem::path& path, bool directory,
+                    std::string* error_text);
+  bool (*rename_path)(void* context, const std::filesystem::path& from,
+                      const std::filesystem::path& to, std::string* error_text);
+  bool (*remove_tree)(void* context, const std::filesystem::path& path,
+                      std::string* error_text);
+};
+
+bool write_trace_file(void*, const std::filesystem::path& path, const char* data, size_t size,
+                      std::string* error_text) {
+  std::ofstream output(path, std::ios::binary | std::ios::trunc);
+  output.write(data, static_cast<std::streamsize>(size));
+  output.close();
+  if (output) return true;
+  if (error_text != nullptr) *error_text = "cannot write " + path.filename().string();
+  return false;
+}
+
+bool sync_trace_path(void*, const std::filesystem::path& path, bool directory,
+                     std::string* error_text) {
+  const int descriptor = ::open(path.c_str(), O_RDONLY | (directory ? O_DIRECTORY : 0));
+  if (descriptor < 0) {
+    if (error_text != nullptr) {
+      *error_text = "cannot open " + path.string() + " for sync: " + std::strerror(errno);
+    }
+    return false;
+  }
+  const int sync_error = ::fsync(descriptor);
+  const int sync_errno = errno;
+  const int close_error = ::close(descriptor);
+  const int close_errno = errno;
+  if (sync_error == 0 && close_error == 0) return true;
+  if (error_text != nullptr) {
+    const int failure_errno = sync_error != 0 ? sync_errno : close_errno;
+    *error_text = "cannot sync " + path.string() + ": " + std::strerror(failure_errno);
+  }
+  return false;
+}
+
+bool rename_trace_path(void*, const std::filesystem::path& from, const std::filesystem::path& to,
+                       std::string* error_text) {
+  std::error_code error;
+  std::filesystem::rename(from, to, error);
+  if (!error) return true;
+  if (error_text != nullptr) {
+    *error_text = "cannot publish staged trace artifact: " + error.message();
+  }
+  return false;
+}
+
+bool remove_trace_tree(void*, const std::filesystem::path& path, std::string* error_text) {
+  std::error_code error;
+  std::filesystem::remove_all(path, error);
+  if (!error) return true;
+  if (error_text != nullptr) {
+    *error_text = "cannot remove trace artifact " + path.string() + ": " + error.message();
+  }
+  return false;
+}
+
+const TracePublicationOps kTracePublicationOps = {
+    nullptr, write_trace_file, sync_trace_path, rename_trace_path, remove_trace_tree};
+
+bool remove_trace_artifact(const std::filesystem::path& path,
+                           const std::filesystem::path& trace_root,
+                           const TracePublicationOps& ops, std::string* error_text) {
+  std::string detail;
+  if (!ops.remove_tree(ops.context, path, &detail)) {
+    if (error_text != nullptr) *error_text = detail;
+    return false;
+  }
+  if (!ops.sync_path(ops.context, trace_root, true, &detail)) {
+    if (error_text != nullptr) *error_text = detail;
+    return false;
+  }
+  return true;
+}
+
+bool publish_trace_artifact(const std::filesystem::path& trace_staging,
+                            const std::filesystem::path& trace_artifact,
+                            const std::filesystem::path& trace_root,
+                            const std::string& raw_filename, const std::string& json_filename,
+                            const std::string& raw, const std::string& json,
+                            const TracePublicationOps& ops, std::string* error_text) {
+  const std::filesystem::path staged_raw = trace_staging / raw_filename;
+  const std::filesystem::path staged_json = trace_staging / json_filename;
+  auto fail_with_cleanup = [&](const std::filesystem::path& path, const std::string& cause) {
+    std::string cleanup_detail;
+    if (!remove_trace_artifact(path, trace_root, ops, &cleanup_detail)) {
+      if (error_text != nullptr) {
+        *error_text = cause + "; cleanup failed: " + cleanup_detail;
+      }
+    } else if (error_text != nullptr) {
+      *error_text = cause;
+    }
+    return false;
+  };
+  std::string detail;
+  if (!ops.write_file(ops.context, staged_raw, raw.data(), raw.size(), &detail)) {
+    return fail_with_cleanup(trace_staging, detail);
+  }
+  if (!ops.sync_path(ops.context, staged_raw, false, &detail)) {
+    return fail_with_cleanup(trace_staging, detail);
+  }
+  if (!ops.write_file(ops.context, staged_json, json.data(), json.size(), &detail)) {
+    return fail_with_cleanup(trace_staging, detail);
+  }
+  if (!ops.sync_path(ops.context, staged_json, false, &detail)) {
+    return fail_with_cleanup(trace_staging, detail);
+  }
+  if (!ops.sync_path(ops.context, trace_staging, true, &detail)) {
+    return fail_with_cleanup(trace_staging, detail);
+  }
+  if (!ops.rename_path(ops.context, trace_staging, trace_artifact, &detail)) {
+    return fail_with_cleanup(trace_staging, detail);
+  }
+  if (!ops.sync_path(ops.context, trace_root, true, &detail)) {
+    return fail_with_cleanup(trace_artifact, detail);
+  }
+  return true;
+}
+
+void fail_trace(LlamaStageTraceResult* result, const char* stage, const std::string& text,
+                std::string* error_text) {
+  result->failure_stage = stage;
+  result->failure_text = text;
+  result->exit_status = 1;
+  if (error_text != nullptr) *error_text = text;
+}
 }  // namespace
 
 int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult* result,
@@ -301,6 +646,176 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
   result->native_prefill_full_layer_loop_status = "pass";
   result->native_prefill_acceptance = "pass";
   result->native_prefill_blocker_source = "none";
+  result->exit_status = 0;
+  return 0;
+}
+
+int run_llama_stage_trace(const LlamaStageTraceRequest& request, LlamaStageTraceResult* result,
+                          std::string* error_text) {
+  if (result == nullptr) {
+    if (error_text != nullptr) *error_text = "Llama stage trace result is required";
+    return 1;
+  }
+  *result = LlamaStageTraceResult{};
+  result->token_index = request.position;
+  result->layer_index = request.layer_index;
+  result->stage = request.stage;
+
+  const LlamaStageTraceSpec* spec = find_trace_stage(request.stage);
+  if (spec == nullptr) {
+    fail_trace(result, "trace_request", "unknown layer-0 trace stage", error_text);
+    return 1;
+  }
+  if (request.layer_index != 0 || request.position != 0) {
+    fail_trace(result, "trace_request", "Llama trace supports only layer 0 and position 0", error_text);
+    return 1;
+  }
+  if (blank(request.model_dir) || blank(request.trace_dir)) {
+    fail_trace(result, "trace_request", "model directory and trace directory must be nonempty", error_text);
+    return 1;
+  }
+
+  const std::filesystem::path trace_root = resolve_path_for_comparison(request.trace_dir);
+  std::error_code filesystem_error;
+  if (std::filesystem::exists(trace_root, filesystem_error) &&
+      (!std::filesystem::is_directory(trace_root, filesystem_error) || filesystem_error)) {
+    fail_trace(result, "trace_output", "trace directory is not a directory", error_text);
+    return 1;
+  }
+  if (filesystem_error) {
+    fail_trace(result, "trace_output", "cannot inspect trace directory", error_text);
+    return 1;
+  }
+  const std::string file_stem = "layer0-token0-" + request.stage;
+  const std::string raw_filename = file_stem + ".bin";
+  const std::string json_filename = file_stem + ".json";
+  const std::filesystem::path trace_artifact = trace_root / file_stem;
+  const std::filesystem::path trace_staging = trace_root / ("." + file_stem + ".staging");
+  const std::filesystem::path legacy_raw_output = trace_root / raw_filename;
+  const std::filesystem::path legacy_json_output = trace_root / json_filename;
+  if (std::filesystem::exists(trace_artifact, filesystem_error) ||
+      std::filesystem::exists(trace_staging, filesystem_error) ||
+      std::filesystem::exists(legacy_raw_output, filesystem_error) ||
+      std::filesystem::exists(legacy_json_output, filesystem_error) || filesystem_error) {
+    fail_trace(result, "trace_output", "trace output already exists or cannot be inspected", error_text);
+    return 1;
+  }
+
+  std::vector<HsaCodeImageAsset> images;
+  ResidentHsaDispatch dispatch;
+  std::string detail;
+  if (!build_llama_layer0_stage_trace_dispatch(request.model_dir, request.token_id, &images, &dispatch,
+                                               &detail)) {
+    fail_trace(result, "trace_prepare", detail, error_text);
+    return 1;
+  }
+  uint32_t output_buffer_index = 0;
+  if (!trace_buffer_index(dispatch, spec->buffer_kind, &output_buffer_index, &detail) ||
+      dispatch.buffers[output_buffer_index].name != spec->buffer) {
+    fail_trace(result, "trace_prepare", "trace stage output buffer does not match its declaration",
+               error_text);
+    return 1;
+  }
+  dispatch.buffers[output_buffer_index].readback_byte_count = spec->byte_count;
+
+  ResidentHsaSession resident;
+  ResidentHsaDispatchResult dispatch_result;
+  if (!resident.prepare(dispatch, &dispatch_result, &detail)) {
+    fail_trace(result, "resident_prepare",
+               "backend_failure_stage=" + dispatch_result.failure_stage + ": " + detail, error_text);
+    return 1;
+  }
+  auto close_on_failure = [&]() {
+    std::string close_error;
+    resident.close(&close_error);
+  };
+  for (int stage_index = 0; stage_index <= spec->stage_index; ++stage_index) {
+    if (!resident.dispatch(dispatch.stages[static_cast<size_t>(stage_index)], &dispatch_result,
+                           &detail)) {
+      close_on_failure();
+      fail_trace(result, "resident_dispatch",
+                 "backend_failure_stage=" + dispatch_result.failure_stage + ": " + detail, error_text);
+      return 1;
+    }
+  }
+  if (!resident.readback({spec->buffer}, &dispatch_result, &detail)) {
+    close_on_failure();
+    fail_trace(result, "resident_readback",
+               "backend_failure_stage=" + dispatch_result.failure_stage + ": " + detail, error_text);
+    return 1;
+  }
+  if (dispatch_result.readback_bytes.size() != 1U ||
+      dispatch_result.readback_bytes.front().size() != spec->byte_count) {
+    close_on_failure();
+    fail_trace(result, "resident_readback", "trace readback does not match declared output size",
+               error_text);
+    return 1;
+  }
+
+  const std::vector<uint8_t>& bytes = dispatch_result.readback_bytes.front();
+  uint64_t finite_count = 0;
+  if (!count_finite_values(bytes, spec->dtype, &finite_count) ||
+      finite_count != spec->byte_count / (std::string(spec->dtype) == "float16" ? 2U : 4U)) {
+    close_on_failure();
+    fail_trace(result, "trace_nonfinite", "trace output contains NaN or infinity", error_text);
+    return 1;
+  }
+  if (!resident.close(&detail)) {
+    fail_trace(result, "resident_close", detail, error_text);
+    return 1;
+  }
+
+  result->buffer = spec->buffer;
+  result->shape_json = spec->shape_json;
+  result->dtype = spec->dtype;
+  result->byte_count = spec->byte_count;
+  result->sha256 = sha256_hex(bytes);
+  result->finite_count = finite_count;
+  result->raw_path = (std::filesystem::path(file_stem) / raw_filename).generic_string();
+  result->json_path = (trace_artifact / json_filename).string();
+  result->gpu_va = dispatch_result.buffer_gpu_vas[output_buffer_index];
+  if (spec->stage_index >= 0) {
+    const ResidentHsaStage& stage = dispatch.stages[static_cast<size_t>(spec->stage_index)];
+    std::vector<uint8_t> kernargs;
+    if (!materialize_trace_kernargs(stage, dispatch_result, &kernargs, &detail) ||
+        !trace_scalars_json(spec->stage_index, kernargs, &result->scalars_json, &detail)) {
+      fail_trace(result, "trace_metadata", detail, error_text);
+      return 1;
+    }
+    result->kernarg_hex = hex_bytes(kernargs);
+    result->hsa_image_sha256 = images[stage.hsa_image_index].image_sha256;
+  } else {
+    result->kernarg_hex = "not_dispatched";
+    result->hsa_image_sha256 = "not_dispatched";
+    result->scalars_json = "{}";
+  }
+
+  std::filesystem::create_directories(trace_root, filesystem_error);
+  if (filesystem_error) {
+    fail_trace(result, "trace_output", "cannot create trace directory", error_text);
+    return 1;
+  }
+  if (!std::filesystem::create_directory(trace_staging, filesystem_error) || filesystem_error) {
+    fail_trace(result, "trace_output", "cannot create staged trace artifact", error_text);
+    return 1;
+  }
+  const std::string raw(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+  const std::string json =
+      "{\"token_index\":" + std::to_string(result->token_index) + ",\"layer_index\":" +
+      std::to_string(result->layer_index) + ",\"stage\":\"" + result->stage + "\",\"buffer\":\"" +
+      result->buffer + "\",\"shape\":" + result->shape_json + ",\"dtype\":\"" + result->dtype +
+      "\",\"byte_count\":" + std::to_string(result->byte_count) + ",\"sha256\":\"" +
+      result->sha256 + "\",\"finite_count\":" + std::to_string(result->finite_count) +
+      ",\"raw_path\":\"" + result->raw_path + "\",\"kernarg_hex\":\"" + result->kernarg_hex +
+      "\",\"hsa_image_sha256\":\"" + result->hsa_image_sha256 + "\",\"gpu_va\":" +
+      std::to_string(result->gpu_va) + ",\"scalars\":" + result->scalars_json + "}\n";
+  if (!publish_trace_artifact(trace_staging, trace_artifact, trace_root, raw_filename, json_filename,
+                              raw, json, kTracePublicationOps, &detail)) {
+    fail_trace(result, "trace_output", detail, error_text);
+    return 1;
+  }
+  result->failure_stage = "none";
+  result->failure_text = "none";
   result->exit_status = 0;
   return 0;
 }

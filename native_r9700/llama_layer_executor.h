@@ -122,6 +122,14 @@ bool set_llama_token_hidden_buffer(
 bool select_llama_embedding_row(const Fp16WeightSpan& embed_tokens, uint32_t token_id,
                                 Fp16WeightSpan* selected_row, std::string* error_text);
 
+// Builds the real-weight, single-token layer-0 resident dispatch used solely
+// by the numerical trace. Unlike the persistent prefill builder, it owns no
+// other layers and callers choose a bounded stage prefix to dispatch.
+bool build_llama_layer0_stage_trace_dispatch(const std::string& model_dir, uint32_t token_id,
+                                             std::vector<HsaCodeImageAsset>* images,
+                                             ResidentHsaDispatch* dispatch,
+                                             std::string* error_text);
+
 // Rewrites the dynamic RoPE and attention scalar fields for a single-token
 // stage group. Cache capacity stays at the resident 128-token stride.
 bool set_llama_token_stage_scalars(std::vector<ResidentHsaStage>* stages, uint32_t position,

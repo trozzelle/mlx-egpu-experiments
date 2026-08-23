@@ -24,7 +24,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 from .config import (
     ConfigError,
@@ -49,6 +49,50 @@ class ModelData:
     weight_index_path: Optional[str]
     weight_shards: List[str]
     weight_dtype: str  # safetensors dtype string, e.g. "F16"
+
+
+def resolve_tensor_shards(data: ModelData, tensor_names: Sequence[str]) -> Dict[str, str]:
+    """Resolve required tensor names through the validated model container.
+
+    This public strict-loader seam intentionally owns index parsing for narrow
+    consumers that need individual tensors without coupling to prefill.
+    """
+    names = tuple(tensor_names)
+    if not names or any(not isinstance(name, str) or not name for name in names):
+        raise ConfigError("required tensor names must be nonempty strings")
+    if data.weight_index_path is None or not data.weight_index_path.endswith(".index.json"):
+        if len(data.weight_shards) != 1:
+            raise ConfigError("single-file model metadata must name exactly one weight shard")
+        shard = data.weight_shards[0]
+        if not os.path.isfile(shard):
+            raise ConfigError(f"declared weight shard missing: {shard!r}")
+        return {name: shard for name in names}
+
+    try:
+        with open(data.weight_index_path, encoding="utf-8") as fh:
+            weight_map = json.load(fh).get("weight_map")
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ConfigError(
+            f"failed to parse safetensors index {data.weight_index_path!r}: {exc}"
+        ) from exc
+    if not isinstance(weight_map, dict):
+        raise ConfigError(
+            f"safetensors index {data.weight_index_path!r} has no weight_map object"
+        )
+
+    resolved: Dict[str, str] = {}
+    for name in names:
+        shard_name = weight_map.get(name)
+        if not isinstance(shard_name, str) or not shard_name:
+            raise ConfigError(
+                f"required tensor {name!r} missing from safetensors index "
+                f"{data.weight_index_path!r}"
+            )
+        shard = os.path.join(data.model_dir, shard_name)
+        if not os.path.isfile(shard):
+            raise ConfigError(f"declared weight shard missing for {name!r}: {shard!r}")
+        resolved[name] = shard
+    return resolved
 
 
 def _find_weight_index(model_dir: str) -> Optional[str]:

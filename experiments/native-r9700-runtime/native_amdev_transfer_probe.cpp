@@ -97,10 +97,11 @@ constexpr uint64_t kTransferProofBufferSize = kPageSize;
 // The staging window spans 256 fixed PTB entries (1 MiB) so streamed model
 // weights pay one SDMA submission per MiB instead of one per 4 KiB page.
 constexpr uint64_t kStagingPageCount = 256ULL;
-constexpr uint64_t kTransferProofVmStagingVa = 0x200000000000ULL;
-constexpr uint64_t kTransferProofVmVramVa = kTransferProofVmStagingVa + (256ULL * kPageSize);
-constexpr uint64_t kTransferProofVmReadbackVa =
-    kTransferProofVmStagingVa + (257ULL * kPageSize);
+constexpr uint64_t kDedicatedStagingPdb0Index = 511ULL;
+constexpr uint64_t kTransferProofVmStagingVa =
+    0x200000000000ULL + (kDedicatedStagingPdb0Index << 21U);
+constexpr uint64_t kTransferProofVmVramVa = 0x200000001000ULL;
+constexpr uint64_t kTransferProofVmReadbackVa = 0x200000002000ULL;
 constexpr uint32_t kSdmaOpCopy = 1U;
 constexpr uint32_t kSdmaSubopCopyLinear = 0U;
 constexpr std::size_t kSdmaLinearCopyPacketDwords = 7;
@@ -202,10 +203,11 @@ constexpr uint64_t kPtePaddrMask = 0x0000FFFFFFFFF000ULL;
 // tinygrad/runtime/support/am/amdev.py:137-143 uses a global VA allocator base of 0x200000000000.
 
 constexpr uint64_t kVaBase = 0x0000200000000000ULL;
-constexpr uint64_t kStagingVa = kVaBase;
+constexpr uint64_t kStagingVa =
+    kVaBase + (kDedicatedStagingPdb0Index * 512ULL * kPageSize);
 constexpr uint64_t kStagingByteCount = kStagingPageCount * kPageSize;
-constexpr uint64_t kVramVa = kVaBase + (kStagingPageCount * kPageSize);
-constexpr uint64_t kReadbackVa = kVaBase + ((kStagingPageCount + 1ULL) * kPageSize);
+constexpr uint64_t kVramVa = kVaBase + kPageSize;
+constexpr uint64_t kReadbackVa = kVaBase + (2ULL * kPageSize);
 // tinygrad/runtime/support/memory.py:175-183 derives VA shifts [12,21,30,39] and reserves page-table arena after boot.
 constexpr uint32_t kVaShiftPtb = 12U;
 constexpr uint32_t kVaShiftPdb0 = 21U;
@@ -280,7 +282,7 @@ constexpr const char* kTeardownOrder =
 // tinygrad/runtime/autogen/am/regs.py:5538 gc_12_0_0 defines regGRBM_SOFT_RESET.soft_reset_sdma0 at bit 23.
 constexpr uint32_t kSoftResetSdma0Bit = 23U;
 
-constexpr uint64_t kControlVa = am_vm::kVaBase + (258ULL * kPageSize);
+constexpr uint64_t kControlVa = am_vm::kVaBase + (3ULL * kPageSize);
 constexpr uint64_t kRingSize = 0x800ULL;
 constexpr uint64_t kRptrOffset = 0x800ULL;
 constexpr uint64_t kWptrOffset = 0x808ULL;
@@ -306,14 +308,14 @@ constexpr uint64_t kMecDoorbellBar2ByteOffset =
     static_cast<uint64_t>(kMecDoorbellIndex) * sizeof(uint64_t);
 
 constexpr uint64_t kInputVramVa = am_vm::kVramVa;
-constexpr uint64_t kOutputVramVa = am_vm::kVaBase + (259ULL * kPageSize);
-constexpr uint64_t kCodeVramVa = am_vm::kVaBase + (260ULL * kPageSize);
-constexpr uint64_t kKernargsVa = am_vm::kVaBase + (261ULL * kPageSize);
-constexpr uint64_t kRingVa = am_vm::kVaBase + (262ULL * kPageSize);
-constexpr uint64_t kRptrVa = am_vm::kVaBase + (270ULL * kPageSize);
+constexpr uint64_t kOutputVramVa = am_vm::kVaBase + (4ULL * kPageSize);
+constexpr uint64_t kCodeVramVa = am_vm::kVaBase + (5ULL * kPageSize);
+constexpr uint64_t kKernargsVa = am_vm::kVaBase + (6ULL * kPageSize);
+constexpr uint64_t kRingVa = am_vm::kVaBase + (7ULL * kPageSize);
+constexpr uint64_t kRptrVa = am_vm::kVaBase + (15ULL * kPageSize);
 constexpr uint64_t kWptrVa = kRptrVa + 8ULL;
 constexpr uint64_t kTimelineVa = kRptrVa + 16ULL;
-constexpr uint64_t kEopVa = am_vm::kVaBase + (271ULL * kPageSize);
+constexpr uint64_t kEopVa = am_vm::kVaBase + (16ULL * kPageSize);
 // All fixed mappings must stay inside the first PDB0 2 MiB span (512 PTB
 // entries); resident payloads own PDB0 index 1 and beyond.
 static_assert(kEopVa + kPageSize <= am_vm::kVaBase + (512ULL * kPageSize),
@@ -1232,26 +1234,25 @@ int run_am_vm_page_table_plan_self_test() {
   constexpr am_vm::VmIndices kNonzeroPdb2Indices =
       am_vm::vm_indices_for_va(am_vm::kVaBase + (64ULL << am_vm::kVaShiftPdb2));
 
-  if (kStagingIndices.pdb2 != 0 || kStagingIndices.pdb1 != 0 || kStagingIndices.pdb0 != 0 ||
-      kStagingIndices.ptb != 0) {
+  if (kStagingIndices.pdb2 != 0 || kStagingIndices.pdb1 != 0 ||
+      kStagingIndices.pdb0 != kDedicatedStagingPdb0Index || kStagingIndices.ptb != 0) {
     return self_test_failure("am-vm-page-table-plan", "staging VA indices mismatch");
   }
-
   if (kVramIndices.pdb2 != 0 || kVramIndices.pdb1 != 0 || kVramIndices.pdb0 != 0 ||
-      kVramIndices.ptb != 256) {
+      kVramIndices.ptb != 1) {
     return self_test_failure("am-vm-page-table-plan", "VRAM VA indices mismatch");
   }
   if (kReadbackIndices.pdb2 != 0 || kReadbackIndices.pdb1 != 0 || kReadbackIndices.pdb0 != 0 ||
-      kReadbackIndices.ptb != 257) {
+      kReadbackIndices.ptb != 2) {
     return self_test_failure("am-vm-page-table-plan", "readback VA indices mismatch");
   }
   if (kSdmaControlIndices.pdb2 != 0 || kSdmaControlIndices.pdb1 != 0 ||
-      kSdmaControlIndices.pdb0 != 0 || kSdmaControlIndices.ptb != 258) {
+      kSdmaControlIndices.pdb0 != 0 || kSdmaControlIndices.ptb != 3) {
     return self_test_failure("am-vm-page-table-plan", "SDMA control VA indices mismatch");
   }
-  if (kComputeOutputIndices.ptb != 259 || kComputeCodeIndices.ptb != 260 ||
-      kComputeKernargsIndices.ptb != 261 || kComputeRingIndices.ptb != 262 ||
-      kComputeRptrIndices.ptb != 270 || kComputeEopIndices.ptb != 271) {
+  if (kComputeOutputIndices.ptb != 4 || kComputeCodeIndices.ptb != 5 ||
+      kComputeKernargsIndices.ptb != 6 || kComputeRingIndices.ptb != 7 ||
+      kComputeRptrIndices.ptb != 15 || kComputeEopIndices.ptb != 16) {
     return self_test_failure("am-vm-page-table-plan", "compute VA PTB indices mismatch");
   }
   if (kNonzeroPdb2Indices.pdb2 != 64) {
@@ -1350,8 +1351,8 @@ int run_sdma_ring_setup_self_test() {
 
 int run_sdma_fence_packet_encoding_self_test() {
 
-  constexpr char kExpectedFenceAddressLe[] = "1028100000200000";
-  constexpr char kExpectedPacketHex[] = "05000300102810000020000001000000";
+  constexpr char kExpectedFenceAddressLe[] = "1038000000200000";
+  constexpr char kExpectedPacketHex[] = "05000300103800000020000001000000";
   const auto packet = build_sdma_fence_packet(am_sdma::kFenceVa, am_sdma::kFenceValue);
   std::vector<uint8_t> bytes;
   bytes.reserve(packet.size() * sizeof(uint32_t));
@@ -1899,6 +1900,7 @@ struct FixedVmPageTables {
   uint64_t child_pdb1_paddr = 0x0000000002000000ULL;
   uint64_t child_pdb0_paddr = 0x0000000002001000ULL;
   uint64_t child_ptb_paddr = 0x0000000002002000ULL;
+  uint64_t staging_ptb_paddr = 0x0000000002004000ULL;
   uint64_t device_buffer_paddr = am_vm::kFixedVramBufferPaddr;
 };
 
@@ -3347,9 +3349,10 @@ bool write_fixed_page_tables(const RemoteClient& client, DiscoveryLog* log, cons
                              const VmBufferLog& readback, const VmBufferLog& sdma_control,
                              const VmBufferLog* compute_control, std::string* error_text) {
   const FixedVmPageTables& t = log->vm.tables;
-  if (log->bar0.size <= t.child_ptb_paddr + kPageSize) {
-    *error_text = "BAR0 too small for child PTB: bar0_size_bytes=" + std::to_string(log->bar0.size) +
-                  " required_gt=" + std::to_string(t.child_ptb_paddr + kPageSize);
+  if (log->bar0.size <= t.staging_ptb_paddr + kPageSize ||
+      log->bar0.size <= t.child_ptb_paddr + kPageSize) {
+    *error_text = "BAR0 too small for fixed PTBs: bar0_size_bytes=" +
+                  std::to_string(log->bar0.size);
     return false;
   }
   uint64_t required_vram_end = t.device_buffer_paddr + kPageSize;
@@ -3395,8 +3398,10 @@ bool write_fixed_page_tables(const RemoteClient& client, DiscoveryLog* log, cons
     *error_text = "MAP_SYSMEM_FD readback page list does not cover the requested readback window";
     return false;
   }
-  if (staging.gpu_va != kTransferProofVmStagingVa ||
-      staging.gpu_va + staging_page_count * kPageSize > kTransferProofVmVramVa) {
+  const uint64_t staging_end = staging.gpu_va + staging_page_count * kPageSize;
+  const uint64_t proof_end = kTransferProofVmVramVa + kTransferProofBufferSize;
+  if (staging.gpu_va != kTransferProofVmStagingVa || staging_end < staging.gpu_va ||
+      !(staging_end <= kTransferProofVmVramVa || proof_end <= staging.gpu_va)) {
     *error_text = "staging window overlaps the fixed VRAM proof mapping";
     return false;
   }
@@ -3405,8 +3410,9 @@ bool write_fixed_page_tables(const RemoteClient& client, DiscoveryLog* log, cons
   const uint64_t vram_flags = am_vm::gfx12_leaf_pte_flags(false, false, false);
   const uint64_t table_flags = am_vm::table_pte_flags();
 
-  const std::array<uint64_t, 6> zero_pages{{t.root_pdb2_paddr, t.memscratch_paddr, t.dummy_page_paddr,
-                                            t.child_pdb1_paddr, t.child_pdb0_paddr, t.child_ptb_paddr}};
+  const std::array<uint64_t, 7> zero_pages{{t.root_pdb2_paddr, t.memscratch_paddr, t.dummy_page_paddr,
+                                            t.child_pdb1_paddr, t.child_pdb0_paddr, t.child_ptb_paddr,
+                                            t.staging_ptb_paddr}};
   for (uint64_t page : zero_pages) {
     if (!zero_bar0_page(client, page, error_text)) {
       *error_text = "zero BAR0 page " + format_hex64(page) + " failed: " + *error_text;
@@ -3419,12 +3425,18 @@ bool write_fixed_page_tables(const RemoteClient& client, DiscoveryLog* log, cons
   }
 
 
+  const am_vm::VmIndices staging_indices = am_vm::vm_indices_for_va(staging.gpu_va);
   const am_vm::VmIndices vram_indices = am_vm::vm_indices_for_va(kTransferProofVmVramVa);
   const am_vm::VmIndices sdma_control_indices = am_vm::vm_indices_for_va(sdma_control.gpu_va);
+  if (staging_indices.pdb0 != kDedicatedStagingPdb0Index ||
+      staging_indices.ptb + staging_page_count > 512ULL) {
+    *error_text = "staging window does not fit the dedicated PTB";
+    return false;
+  }
 
   struct QwordWrite { uint64_t paddr; uint64_t value; };
   std::vector<QwordWrite> writes;
-  writes.reserve(staging_page_count + readback_page_count + 24);
+  writes.reserve(staging_page_count + readback_page_count + 25);
   auto add_write = [&](uint64_t paddr, uint64_t value) {
     writes.push_back(QwordWrite{paddr, value});
   };
@@ -3435,10 +3447,13 @@ bool write_fixed_page_tables(const RemoteClient& client, DiscoveryLog* log, cons
   };
 
   add_write(t.root_pdb2_paddr + 0ULL, am_vm::encode_pte(t.child_pdb1_paddr, table_flags));
-  add_write(t.child_pdb1_paddr + 0ULL, am_vm::encode_pte(t.child_pdb0_paddr, table_flags));
   add_write(t.child_pdb0_paddr + 0ULL, am_vm::encode_pte(t.child_ptb_paddr, table_flags));
+  add_write(t.child_pdb1_paddr + 0ULL, am_vm::encode_pte(t.child_pdb0_paddr, table_flags));
+  add_write(t.child_pdb0_paddr + kDedicatedStagingPdb0Index * sizeof(uint64_t),
+            am_vm::encode_pte(t.staging_ptb_paddr, table_flags));
   for (uint64_t page = 0; page < staging_page_count; ++page) {
-    add_ptb_pte(staging.gpu_va + page * kPageSize, staging.sys_pages[page], sysmem_flags);
+    add_write(t.staging_ptb_paddr + ((staging_indices.ptb + page) * sizeof(uint64_t)),
+              am_vm::encode_pte(staging.sys_pages[page], sysmem_flags));
   }
   add_write(t.child_ptb_paddr + (vram_indices.ptb * sizeof(uint64_t)),
             am_vm::encode_pte(t.device_buffer_paddr, vram_flags));
