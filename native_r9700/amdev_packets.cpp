@@ -31,12 +31,15 @@ constexpr uint32_t kEventTypeCacheFlushAndInvTs = 20U;
 constexpr uint32_t kReleaseMemEventIndexEndOfPipe = 5U;
 constexpr uint32_t kReleaseMemDataSelSend32BitLow = 1U;
 constexpr uint32_t kReleaseMemIntSelNone = 0U;
+constexpr uint32_t kAcquireMemGcrCntlGliInvShift = 0U;   // instruction-cache invalidate
 constexpr uint32_t kAcquireMemGcrCntlGlmWbShift = 4U;
 constexpr uint32_t kAcquireMemGcrCntlGlmInvShift = 5U;
 constexpr uint32_t kAcquireMemGcrCntlGlkWbShift = 6U;
 constexpr uint32_t kAcquireMemGcrCntlGlkInvShift = 7U;
 constexpr uint32_t kAcquireMemGcrCntlGlvInvShift = 8U;
 constexpr uint32_t kAcquireMemGcrCntlGl1InvShift = 9U;
+constexpr uint32_t kAcquireMemGcrCntlGl2InvShift = 14U;  // L2 invalidate
+constexpr uint32_t kAcquireMemGcrCntlGl2WbShift = 15U;   // L2 writeback
 constexpr uint32_t kReleaseMemGcrGlmWb = 1U << 12;
 constexpr uint32_t kReleaseMemGcrGlmInv = 1U << 13;
 constexpr uint32_t kReleaseMemGcrGlvInv = 1U << 14;
@@ -96,9 +99,11 @@ uint32_t pm4_packet3(uint32_t opcode, uint32_t count) {
 uint32_t encode_dispatch_initiator() { return (1U << 0) | (1U << 2); }
 
 uint32_t encode_acquire_mem_gcr_cntl_for_dispatch() {
-  return (1U << kAcquireMemGcrCntlGlmWbShift) | (1U << kAcquireMemGcrCntlGlmInvShift) |
-         (1U << kAcquireMemGcrCntlGlkWbShift) | (1U << kAcquireMemGcrCntlGlkInvShift) |
-         (1U << kAcquireMemGcrCntlGlvInvShift) | (1U << kAcquireMemGcrCntlGl1InvShift);
+  return (1U << kAcquireMemGcrCntlGliInvShift) | (1U << kAcquireMemGcrCntlGlmWbShift) |
+         (1U << kAcquireMemGcrCntlGlmInvShift) | (1U << kAcquireMemGcrCntlGlkWbShift) |
+         (1U << kAcquireMemGcrCntlGlkInvShift) | (1U << kAcquireMemGcrCntlGlvInvShift) |
+         (1U << kAcquireMemGcrCntlGl1InvShift) | (1U << kAcquireMemGcrCntlGl2InvShift) |
+         (1U << kAcquireMemGcrCntlGl2WbShift);
 }
 
 uint32_t encode_event_write_cs_partial_flush() {
