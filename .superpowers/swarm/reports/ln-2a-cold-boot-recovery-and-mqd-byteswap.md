@@ -38,34 +38,26 @@ cp_mec_rs64_instr_pntr=0x00007784
 cp_mec_rs64_prgrm_cntr_start_hi=0x0001c000
 ```
 
-## Root cause (revised)
+## Root cause (A/B corrected)
 
-The rsqrt kernel is **exonerated**. The fault is the resident-dispatch queue's MQD ring-base readback
-being byte-swapped: correct `cp_hqd_pq_base = kRingVa>>8 = 0x20000070 / hi=0x00000000`, but the HQD
-register reads back `0x00000070 / 0x00000020`. The kernel is dispatched at the byte-swapped ring
-address, faults (`0xc67a` = page-fault + misaligned-address), and the timeline never advances.
+The byte-swap readback was a **red herring** (a diagnostic readback artifact, not the dispatch
+address). Decisive A/B evidence:
 
-This is the same MQD byte-swap class the prior session documented (`2026-08-23-c0-mqd-byteswap-finding.md`),
-but in the resident-dispatch path. Key facts:
+- `--stage hidden` (embed kernel, rsrc3=32): completes byte-exact (SHA-256 `4d2c5ce…`). The
+  resident-dispatch queue is healthy.
+- Reverted sqrt kernel (rsrc3=160): completes with NaN (`failure_stage: trace_nonfinite`). The
+  original transcendental bug is reproducible.
+- rsqrt kernel (rsrc3=128): faults (`0xc67a`). The rsqrt "fix" is dead — it replaces NaN with a
+  fault.
+- epsilon-arithmetic probe (rsrc3=64): times out (`compute_fence_poll`) — the probe itself is an
+  unproven/broken diagnostic kernel, not a valid isolation result.
 
-- Both `--kernel-proof` and `--llama-stage-trace` call the same `setup_compute_ring0()` →
-  `build_compute_mqd()` (`amdev_session.cpp:2227`, probe `:5202`/`:677`). Encoding is identical.
-- The C0 queue's byte-swap cleared after warm-up (run 2 passes); the resident-dispatch queue's
-  byte-swap does NOT clear (3 runs).
-- The resident-dispatch arms `TerminalComputeQueue0Retirement` (`amdev_session.cpp:2224-2226`)
-  immediately before `setup_compute_ring0` — the one ordering difference from the C0 path.
+So the blocker is the `1/sqrt` transcendental lowering (NaN), not the queue, not the byte-swap, not
+the rsqrt ISA. Both transcendental formulations tested so far are broken: the `1/sqrt` lowering
+produces NaN, and `rsqf` faults.
 
-## Next step (revised plan)
+## Next step
 
-The transcendental decomposition (plan Steps 1-2) is blocked until the queue dispatches correctly —
-the kernel faults before executing. Revised immediate target: root-cause why the resident-dispatch
-queue's MEC byte-swap does not clear while the C0 queue's does. Candidates:
-
-1. `TerminalComputeQueue0Retirement::arm()` ordering vs `setup_compute_ring0`'s
-   `reset_compute_queue0`/`replay_mec_rs64_pipe_activation` — whether the resident-dispatch skips or
-   reorders the dequeue/MEC-reset that clears residual state.
-2. Whether the resident-dispatch's persistent queue is re-activated without the HQD_ACTIVE=0 dequeue
-   the C0 one-shot path performs each run.
-
-Once the resident-dispatch queue is healthy (kernel completes), resume plan Steps 1-2 (epsilon probe
-+ transcendental decomposition) on the original `1/sqrt` NaN.
+Decompose `1/sqrt` into minimal, correctly-registered kernels (sqrt / rcp / 1/sqrt / rsqrt), name
+the exact broken instruction, then apply a non-faulting, non-NaN formulation. The working set
+(embed, zero-store) proves dispatch/store is sound; the NaN is isolated to the transcendental.

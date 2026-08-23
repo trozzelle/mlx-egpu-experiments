@@ -21,7 +21,7 @@
 | LN-1A Layer-0/token-0 oracle | Done | `reports/ln-1a-oracle.md`; oracle and validation coverage reports | — |
 | LN-1B Bounded native trace | Done | `reports/ln-1b-native-trace.md`; publication and validation reports | — |
 | LN-1C First-stage comparison | Done | `reports/ln-1c-first-stage.md`; `reports/ln-1-final-review.md` | First failure is normalized RMSNorm output. |
-| LN-2 RMSNorm repair | In progress | `reports/ln-2a-cold-boot-recovery-and-mqd-byteswap.md` | C0 gate restored. Blocker is resident-dispatch MQD byte-swap (`0xc67a` fault at byte-swapped ring base), not the rsqrt ISA; transcendental work blocked until the queue dispatches. |
+| LN-2 RMSNorm repair | In progress | `reports/ln-2a-cold-boot-recovery-and-mqd-byteswap.md` | C0 gate restored; queue healthy (embed byte-exact). A/B: sqrt completes NaN (original bug), rsqrt faults (dead), epsilon probe times out (unproven). Next: decompose `1/sqrt`. |
 | LN-3 Layer-0 recurrence | Blocked | — | Await finite, validated LN-2 output. |
 | LN-4 All-layer recurrence | Blocked | — | Await LN-3 16-token pass. |
 | LN-5 Native C1R/C2R | Blocked | — | Await finite native K/V and token-exact C1R parity. |
