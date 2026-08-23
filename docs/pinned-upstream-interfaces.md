@@ -197,3 +197,57 @@ Load-bearing facts:
 
 Recommendation (adopted): do not change BAR sizing / SIP / ReBAR / TinyGPU install while fixing the
 compute fault; treat the MQD/HQD address problem as a separate Class C bug.
+
+---
+
+## 8. ChatGPT R9700 diagnosis — launch reliability + transcendental re-frame (2026-08-23)
+
+`docs/ChatGPT-Diagnose R9700 Mapping Issues-20260823-1619.pdf`.
+
+Separates three failure domains the RMSNorm debugging had conflated: (1) cold-start/queue-lifecycle
+state, (2) program-image launch reliability (the original RMSNorm image executes; newly generated
+images stall), (3) RMSNorm numerical correctness (NaN). Load-bearing corrections:
+
+- **Instruction-cache coherency (top suspect for the new-image stalls).** Uploading a replacement
+  code image at a reused GPU VA and dispatching it does not prove the GPU instruction fetch sees the
+  new bytes; `acquire_mem(gli=0, gl2=0)` is not sufficient for overwrite-then-execute. Needs a
+  code-install barrier (GLI_INV + GLK_INV/WB + GL1_INV + GL2_INV/WB + GLM_INV/WB + GLV_INV) and/or a
+  fresh-VA/fresh-page code slot. This re-explains the rsqrt/epsilon stalls as stale-cache execution,
+  not a rsqrt-ISA or transcendental fault.
+- **Queue poisoning.** A faulting/timing-out compute queue must be fully torn down (dequeue request,
+  SPI queue reset, `CP_HQD_ACTIVE==0`, 64-bit RPTR/WPTR carrier reset) before the next test; otherwise
+  later results are not independent ("sentinel sandwich" around each candidate image).
+- **`CP_MEC_RS64_EXCEPTION_STATUS` is MEC CP-firmware state, not the shader PC.** Low bits: bit 0
+  illegal-instruction, bit 1 misaligned-address, bit 2 unaligned-instruction, bit 3 page-fault, bits
+  26:4 = RS64 exception instruction address. `0xc67a` ⇒ RS64 addr `0x0c67` + misaligned + page-fault;
+  it is not a `.text` offset. Correlate with GCVM L2 protection-fault state and SQ wave/trap status.
+- **`COMPUTE_PGM_RSRC3` does not encode VGPR/SGPR on GFX12.** The changing field across the 32/64/
+  128/160 values is `INST_PREF_SIZE` (bits 11:4), not register allocation (see §9).
+- **The `V_S_SQRT_F32` + `V_DIV_SCALE` + `V_RCP` + Newton FMAs + `V_DIV_FMAS` + `V_DIV_FIXUP` sequence
+  is the normal LLVM precise-division lowering**, not proof of a compiler bug; splitting a C expression
+  into locals does not stop LLVM recombining it. Isolate the NaN only after launch and code visibility
+  are deterministic.
+
+Recommended order before any more RMSNorm math: (1) deterministic queue teardown + fresh-start
+asserts; (2) code-upload GLI/GLK/GL1/GL2/GLM/GLV invalidation; (3) fresh-VA code-image allocation;
+(4) `--override-rsrc3` (0x00 vs generated vs old); (5) PM4 word-by-word packet annotation + A/B/C/D
+markers; (6) salvage output + fault registers after every timeout; (7) verify code via a GPUVM-mediated
+copy, not just BAR0; (8) compare complete old/new descriptors (wave32, scratch, user-SGPR, dispatch
+pointer, entry alignment); (9) then one-operation sqrt/reciprocal/rsqrt microkernels.
+
+---
+
+## 9. LLVM AMDGPU backend reference (gfx1201 target + RSRC3)
+
+`https://llvm.org/docs/AMDGPUUsage.html`.
+
+- gfx1201 = target triple `amdgpu12.01` (major subarch `amdgpu12`, generic processor `gfx12-generic`).
+- **`COMPUTE_PGM_RSRC3` for GFX12** (authoritative field layout):
+  - bits 3:0 — RESERVED (must be 0);
+  - **bits 11:4 — `INST_PREF_SIZE`** (8 bits): instruction bytes to prefetch from the kernel entry
+    before wavefront start, 0..255 × 128-byte granularity — `0x40`⇒512 B, `0x80`⇒1024 B, `0xa0`⇒1280 B;
+  - bit 13 — `GLG_EN` (group launch guarantee);
+  - bits 16:14, 17, 20:18 — RESERVED on GFX120*.
+- The transcendental intrinsics (`__builtin_amdgcn_rsqf`/`rcpf`/`sqrtf`) are not enumerated in this
+  document (they live in the LLVM AMDGPU intrinsic reference), but it pins the RSRC3 prefetch field
+  that changed between the old image (0xa0) and the new images (0x80 rsqrt, 0x40 epsilon).
