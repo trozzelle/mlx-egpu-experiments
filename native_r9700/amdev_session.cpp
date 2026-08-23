@@ -2282,9 +2282,15 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
     return fail("kernarg_bind", detail);
   }
   const Impl::Image& image = state.images[stage.hsa_image_index];
+  // Diagnostic: override COMPUTE_PGM_RSRC3 (INST_PREF_SIZE on GFX12) without
+  // changing the image or its digest (PDF step 4, --override-rsrc3).
+  const char* rsrc3_override_env = std::getenv("NATIVE_RSRC3_OVERRIDE");
+  const uint32_t rsrc3 = (rsrc3_override_env != nullptr && rsrc3_override_env[0] != '\0')
+                             ? static_cast<uint32_t>(std::strtoul(rsrc3_override_env, nullptr, 0))
+                             : image.rsrc3;
   const Pm4DispatchConfig pm4{state.image_buffers[stage.hsa_image_index].gpu_va + stage.entry_offset,
                               am_compute::kKernargsVa, am_compute::kTimelineVa,
-                              image.rsrc1, image.rsrc2, image.rsrc3, stage.workgroup_x,
+                              image.rsrc1, image.rsrc2, rsrc3, stage.workgroup_x,
                               stage.workgroup_y, stage.workgroup_z, stage.global_x,
                               stage.global_y, stage.global_z};
   const std::vector<uint32_t> pm4_words = build_pm4_dispatch_words(pm4);
