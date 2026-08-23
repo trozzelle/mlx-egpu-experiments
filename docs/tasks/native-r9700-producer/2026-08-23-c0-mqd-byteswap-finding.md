@@ -55,3 +55,21 @@ already right. The bug is gfx1201 MEC MQD-load endianness. Fix options:
    the on-VRAM MQD format vs the 32-bit register copy format).
 3. **Match tinygrad's queue setup exactly** (write HQD registers via MMIO only;
    drop the VRAM MQD write for the active-queue path).
+## Sourcing verification (complete)
+
+- **Layout correct**: `struct_v12_compute_mqd` (tinygrad `am.py:1821`) field offsets
+  match the native runner's indices exactly (`cp_hqd_pq_base_lo` = byte 0x220/dword
+  0x88, `_hi` = 0x224/0x89, rptr/wptr report/poll = 0x22c/0x230/0x234/0x238).
+- **Encoding correct**: amdgpu gfx12 KFD MQD manager
+  (`kfd_mqd_manager_v12.c`) sets `cp_hqd_pq_base_lo = lower_32_bits(queue_address >> 8)`,
+  no byte swap. Identical to the native runner and tinygrad.
+- **RPC frame correct**: `build_remote_cmd_frame` emits `<BIIQQQ` little-endian,
+  33 bytes — identical to tinygrad `system.py:367`.
+- **Large write byte-faithful**: live probe wrote a 2048-byte buffer with a
+  sentinel u32 at offset 0x220 via the same bridge; round-trip exact, no swap.
+
+Conclusion: every CPU-side layer is verified correct. The corruption is the
+**gfx1201 MEC MQD-load endianness** — the MEC reads the address fields
+byte-swapped (non-trivial permutation, not a clean 32-bit swap). This requires
+empirical calibration to determine the exact permutation, then compensation in the
+VRAM MQD write.
