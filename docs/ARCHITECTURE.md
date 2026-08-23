@@ -126,6 +126,13 @@ R9700/eGPU and emits the accepted prompt-cache artifact.
   spike.
 - Hackintosh RDNA4 graphics-stack prior art is not a Path A constraint. It may inform native Path C
   device/runtime work only where it explains compute-visible register/ISA behavior.
+- mac-amdgpu (`${HOME}/Development/ml/tools/mac-amdgpu`, `lemonade-sdk/mac-amdgpu`,
+  v0.1.48) is a **behavioral/init reference, not a substrate switch.** ADR 0004 keeps
+  TinyGPU/AMDev as the C1 substrate. mac-amdgpu's SIP-disabled + paid-entitlement setup is its own
+  dev/signing arrangement, not a requirement here; and it has not yet reached GFX compute-kernel
+  execution (its compute path stops at KIQ NOP/fence + SDMA copy), so it is behind the C0A25
+  `--kernel-proof` gate. Its durable value is init/GART/PTE/PSP/SMU sequence reference. See
+  `docs/pinned-upstream-interfaces.md` §6–§7 and the PCIe BAR diagnostic PDF.
 
 ## Architecture decisions
 

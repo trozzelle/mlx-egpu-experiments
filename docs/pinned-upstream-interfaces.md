@@ -125,3 +125,75 @@ All line numbers above were captured from the referenced upstream `main` on 2026
 phase's implementation, re-read the pinned upstream files and update this capture if APIs drifted.
 The single most load-bearing contract for Phases 0–2 and Path C is **§2 (mlx-lm KV cache ABI)** —
 keep it green.
+---
+
+## 6. mac-amdgpu — native DriverKit reference driver (behavioral control)
+
+Reference clone: `${HOME}/Development/ml/tools/mac-amdgpu` (cloned 2026-08-23,
+`https://github.com/lemonade-sdk/mac-amdgpu`, v0.1.48 @ `3bdeed2`).
+
+A third-party native PCIDriverKit driver extension — a **dext**, not a kext, not TinyGPU — that
+ports Linux `amdgpu` kernel-driver slices into a DriverKit system extension and talks to the GPU
+directly over PCIe, bypassing Metal. Target: AMD Radeon AI PRO R9700 (`1002:7551`, gfx1201, rev C0)
+over Thunderbolt 5.
+
+- **Bringup state:** all 15 IP-block stages green — `IPDiscovery → IHInit → GMCInit → PSPInit →
+  PSPLoadSOS → PSPRingCreate → TMRSetup → PSPFwLoad → SMUInit → IMUInit → RLCInit → CPInit →
+  MESInit → GFXInit → SDMAInit`; SDMA VRAM→VRAM copy running (MMIO WPTR mode); KIQ PM4 NOP+fence
+  smoke test; command-stream ABI (`CSCreate/CSWriteDwords/CSDestroy`).
+- **Not yet done:** GFX compute-kernel execution — no MES GFX queue with a real compute kernel, no
+  register-allocated kernel ISA run. (Our C0A25 `--kernel-proof` is ahead of this on the compute
+  path.)
+- **Requirements:** macOS Tahoe 26.2+, **SIP disabled** (dev entitlements), Xcode 26 + DriverKit SDK
+  25.4+, paid Apple Developer membership with granted `…driverkit.transport.pci` and
+  `allow-any-userclient-access` entitlements. These are that project's dev/signing setup, not
+  TinyGPU requirements.
+
+Facts worth reusing for native init/GART/PTE work:
+
+- BAR0 maps the **bottom** of VRAM (low 256 MiB) on this hardware; their VRAM bump allocator is
+  pinned to `[vram_start + 24MB, vram_start + 256MB)` to stay inside the visible aperture.
+- GART page table in VRAM at `vram_start + 0x700000` (upstream `amdgpu_gart_table_vram_alloc`),
+  GFX12 PTE format with the `IS_PTE` bit, NBIO HDP `remap_hdp_registers`.
+- SMU mailbox handshake (`SetDriverDramAddr → RunDcBtc → EnableAllSmuFeatures`) unblocks the IMU
+  autoload; without it `BOOTLOAD_STATUS` stays 0 even after PSP signs off.
+- Firmware: `psp_14_0_3_sos.bin`, `smu_14_0_3.bin`, `sdma_7_0_1.bin`,
+  `gc_12_0_1_{rlc,imu,pfp,me,mec,uni_mes}.bin`.
+
+Role here: **behavioral control, not a substrate.** It independently confirms 256 MiB BAR0 +
+indirect VRAM IP discovery is correct, and its init/GART/PTE/PSP/SMU sequences are a source
+reference for any future native-init work. It is not a drop-in for the compute path (no GFX kernel
+execution yet).
+
+---
+
+## 7. PCIe BAR / I/O-memory diagnostic analysis (three-failure-class model)
+
+`docs/Diagnosing and Resolving PCIe BAR and I_O-Memory Mapping Failures for an AMD Radeon AI PRO
+R9700 eGP.pdf` (2026-08-23).
+
+Core correction: the observed session failure is **not** one generic "PCIe BAR mapping bug". Three
+classes:
+
+1. **Class A — host/DriverKit PCI resource failure:** BAR missing/zero-size, `GetBARInfo` fails,
+   Memory Space Enable clear, all-ones from every register.
+2. **Class B — GPU indirect-VRAM/init failure after BAR mapping succeeds:** BAR0/2/5 valid and BAR5
+   register reads work, but the GPU-internal indirect VRAM (RSMU/MM_INDEX) path returns garbage.
+   This is the post-power-cycle state the session hit; a cold cable disconnect repaired it.
+3. **Class C — GPU VM/queue-programming failure after BAR + firmware work:** BARs/discovery/VRAM/
+   SDMA/queue setup succeed, but compute fails on GPU-VA or MQD/HQD address encoding. This is where
+   the session ended (the live blocker).
+
+Load-bearing facts:
+
+- **256 MiB BAR0 is normal, not a bug.** `large_bar=False` is expected; indirect VRAM via BAR5/RSMU
+  is the correct path. mac-amdgpu and Linux both treat BAR0 as the visible aperture, not all VRAM.
+- **TinyGPU is a DriverKit dext, not a kext.** SIP / AuxKC rebuild / Reduced Security / kext signing
+  are not normal runtime prerequisites for the released TinyGPU dext.
+- **`GetBARInfo(barIndex, &memoryIndex, …)` never assumes `barIndex == memoryIndex`.** `MemoryRead*`
+  take the returned memoryIndex; a read error sets the value to `-1` (`0xffffffff`), so an isolated
+  all-ones read needs supporting metadata before it means "unassigned BAR".
+- Endpoint driver must re-enable **Memory Space Enable + Bus Master Enable** on every configure.
+
+Recommendation (adopted): do not change BAR sizing / SIP / ReBAR / TinyGPU install while fixing the
+compute fault; treat the MQD/HQD address problem as a separate Class C bug.
