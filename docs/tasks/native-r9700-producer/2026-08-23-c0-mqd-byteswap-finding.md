@@ -1,3 +1,10 @@
+> **CORRECTION (2026-08-23):** the "byte-swap" was a transient cold-boot / residual
+> MEC-state anomaly, not a real endianness bug. After the queue was exercised
+> (one sentinel-calibration run + revert), `--kernel-proof` and `--vram-smoke` both
+> pass (`cpu_comparison_status: pass`, `exit_status: 0`). The sentinel calibration
+> proved the MQD write, MEC load, and readback are all byte-faithful. This finding
+> is retained for the record only; no MQD code change was required.
+
 # C0 MQD Address-Field Byte-Swap — Re-derivation Result
 
 Date: 2026-08-23
