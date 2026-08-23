@@ -124,8 +124,12 @@ bool select_llama_embedding_row(const Fp16WeightSpan& embed_tokens, uint32_t tok
 
 // Builds the real-weight, single-token layer-0 resident dispatch used solely
 // by the numerical trace. Unlike the persistent prefill builder, it owns no
-// other layers and callers choose a bounded stage prefix to dispatch.
+// other layers and callers choose a bounded stage prefix to dispatch. The
+// mutually exclusive diagnostics replace only the trace dispatch's stage-0
+// image with an ABI-compatible probe asset.
 bool build_llama_layer0_stage_trace_dispatch(const std::string& model_dir, uint32_t token_id,
+                                             bool rmsnorm_zero_store,
+                                             bool rmsnorm_epsilon_arithmetic,
                                              std::vector<HsaCodeImageAsset>* images,
                                              ResidentHsaDispatch* dispatch,
                                              std::string* error_text);

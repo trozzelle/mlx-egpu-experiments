@@ -950,8 +950,8 @@ def test_publication_rename_error_after_moving_stage_preserves_moved_final_pair(
     assert (output_dir / f"{KERNEL_NAME}.json").is_file()
 
 
-def test_generator_admits_frozen_llama_projection_and_qwen_affine_sources() -> None:
-    """Each new device source has a closed reviewed identity and exact ABI schema."""
+def test_generator_admits_frozen_gpu_sources_with_exact_abi_schema() -> None:
+    """Each device source has a closed reviewed identity and exact ABI schema."""
     generator = _load_generator_module()
 
     expected = (
@@ -968,6 +968,20 @@ def test_generator_admits_frozen_llama_projection_and_qwen_affine_sources() -> N
             32,
             ("normalized", "v_projection_weight", "fresh_v"),
             (("sequence_length", "unsigned int"),),
+        ),
+        (
+            Path("native_r9700/kernels/llama_rmsnorm_zero_store_f16.cpp"),
+            "llama_rmsnorm_zero_store_f16",
+            32,
+            ("hidden_input", "scale", "hidden_output"),
+            (("epsilon", "float"),),
+        ),
+        (
+            Path("native_r9700/kernels/llama_rmsnorm_epsilon_arithmetic_f16.cpp"),
+            "llama_rmsnorm_epsilon_arithmetic_f16",
+            32,
+            ("hidden_input", "scale", "hidden_output"),
+            (("epsilon", "float"),),
         ),
         (
             Path("native_r9700/kernels/qwen_affine4_linear.cpp"),

@@ -6279,6 +6279,26 @@ struct LlamaStageTraceRequest {
   uint32_t position = 0;
   std::string stage;
   std::string trace_dir;
+  // Diagnostic-only override: replace the resident RMSNorm scale upload with
+  // 2048 F16 1.0 values. It is accepted only at the normalized trace boundary.
+  bool rmsnorm_unit_scale = false;
+  // Diagnostic-only override: replace the resident RMSNorm input upload with
+  // 2048 F16 0.0 values. It requires the normalized unit-scale trace probe.
+  bool rmsnorm_zero_input = false;
+  // Diagnostic-only output-store probe: initialize the normalized output with
+  // 2048 F16 1.0 values before dispatch. It requires the zero-input,
+  // unit-scale normalized RMSNorm trace probe.
+  bool rmsnorm_output_sentinel = false;
+  // Diagnostic-only code override: replace only trace RMSNorm stage 0 with
+  // the ABI-compatible zero-store asset. It requires the fully constrained
+  // zero-input, unit-scale, sentinel normalized trace probe.
+  bool rmsnorm_zero_store = false;
+  // Diagnostic-only code override: replace only trace RMSNorm stage 0 with
+  // the ABI-compatible epsilon/sqrt/reciprocal arithmetic probe. It requires
+  // the fully constrained zero-input, unit-scale, sentinel normalized trace
+  // probe and is mutually exclusive with the zero-store diagnostic.
+  bool rmsnorm_epsilon_arithmetic = false;
+
 };
 
 struct LlamaStageTraceResult {
@@ -6296,7 +6316,13 @@ struct LlamaStageTraceResult {
   std::string kernarg_hex;
   std::string hsa_image_sha256;
   uint64_t gpu_va = 0;
+  std::string rmsnorm_kernel = "llama_rmsnorm_f16";
   std::string scalars_json;
+  std::string scale_source = "model_f16";
+  std::string input_source = "model_f16";
+  std::string output_initialization = "none";
+  // Metadata for the epsilon arithmetic probe's repeated expected F16 value.
+  std::string rmsnorm_expected_output = "none";
   std::string failure_stage = "not_run";
   std::string failure_text = "not_run";
   int exit_status = 1;
@@ -6304,8 +6330,9 @@ struct LlamaStageTraceResult {
 
 // Dispatches only the prefix ending at the requested shared boundary, reads
 // back that boundary's sole declared resident buffer, and atomically emits raw
-// bytes plus JSON beneath trace_dir. Any failure, including non-finite output,
-// leaves no trace artifact and never invokes prefill serialization.
+// bytes plus JSON beneath trace_dir only for finite output. A non-finite
+// dispatched output atomically emits metadata-only failure JSON and never
+// invokes prefill serialization.
 int run_llama_stage_trace(const LlamaStageTraceRequest& request,
                           LlamaStageTraceResult* result,
                           std::string* error_text);

@@ -270,6 +270,189 @@ bool trace_scalars_json(int stage_index, const std::vector<uint8_t>& kernargs,
   return true;
 }
 
+// am_compute::kKernargsVa in the frozen C0 fixed-VM mapping.
+constexpr uint64_t kResidentHsaKernargsVa = 0x0000200000006000ULL;
+
+constexpr uint32_t kTraceRmsnormInputBufferIndex = 0U;
+constexpr uint32_t kTraceRmsnormScaleBufferIndex = 1U;
+constexpr uint32_t kTraceRmsnormOutputBufferIndex = 11U;
+constexpr size_t kTraceRmsnormElementCount = 2048U;
+constexpr uint16_t kFp16OneBits = 0x3c00U;
+constexpr uint16_t kRmsnormEpsilonArithmeticExpectedF16Bits = 0x5cf1U;
+constexpr const char* kRmsnormEpsilonArithmeticExpectedOutput = "f16_0x5cf1_316.25";
+
+bool is_repeated_fp16_value(const std::vector<uint8_t>& bytes, uint16_t value) {
+  if (bytes.size() != kTraceRmsnormElementCount * sizeof(value)) return false;
+  for (size_t offset = 0; offset < bytes.size(); offset += sizeof(value)) {
+    if (bytes[offset] != static_cast<uint8_t>(value) ||
+        bytes[offset + 1U] != static_cast<uint8_t>(value >> 8U)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+
+bool replace_trace_rmsnorm_input_with_zeroes(ResidentHsaDispatch* dispatch,
+                                             std::string* error_text) {
+  if (dispatch == nullptr ||
+      dispatch->buffers.size() <= kTraceRmsnormInputBufferIndex) {
+    if (error_text != nullptr) *error_text = "trace dispatch lacks an RMSNorm input buffer";
+    return false;
+  }
+  ResidentHsaBuffer& input = dispatch->buffers[kTraceRmsnormInputBufferIndex];
+  constexpr size_t kZeroInputBytes = kTraceRmsnormElementCount * sizeof(uint16_t);
+  if (input.name != "layer0.embedding_row" ||
+      input.allocation_byte_count != kZeroInputBytes ||
+      input.upload_bytes.size() != kZeroInputBytes) {
+    if (error_text != nullptr) *error_text = "trace RMSNorm input buffer does not match 2048 F16 values";
+    return false;
+  }
+  input.upload_bytes.assign(kZeroInputBytes, 0U);
+  return true;
+}
+
+bool replace_trace_rmsnorm_scale_with_ones(ResidentHsaDispatch* dispatch,
+                                           std::string* error_text) {
+  if (dispatch == nullptr ||
+      dispatch->buffers.size() <= kTraceRmsnormScaleBufferIndex) {
+    if (error_text != nullptr) *error_text = "trace dispatch lacks an RMSNorm scale buffer";
+    return false;
+  }
+  ResidentHsaBuffer& scale = dispatch->buffers[kTraceRmsnormScaleBufferIndex];
+  constexpr size_t kUnitScaleBytes = kTraceRmsnormElementCount * sizeof(uint16_t);
+  if (scale.name != "model.layers.0.input_layernorm.weight" ||
+      scale.allocation_byte_count != kUnitScaleBytes ||
+      scale.upload_bytes.size() != kUnitScaleBytes) {
+    if (error_text != nullptr) *error_text = "trace RMSNorm scale buffer does not match 2048 F16 values";
+    return false;
+  }
+  std::vector<uint8_t> unit_scale(kUnitScaleBytes);
+  for (size_t offset = 0; offset < unit_scale.size(); offset += sizeof(uint16_t)) {
+    unit_scale[offset] = static_cast<uint8_t>(kFp16OneBits);
+    unit_scale[offset + 1U] = static_cast<uint8_t>(kFp16OneBits >> 8U);
+  }
+  scale.upload_bytes = std::move(unit_scale);
+  return true;
+}
+
+bool initialize_trace_rmsnorm_output_with_ones(ResidentHsaDispatch* dispatch,
+                                               std::string* error_text) {
+  if (dispatch == nullptr ||
+      dispatch->buffers.size() <= kTraceRmsnormOutputBufferIndex) {
+    if (error_text != nullptr) *error_text = "trace dispatch lacks an RMSNorm output buffer";
+    return false;
+  }
+  ResidentHsaBuffer& output = dispatch->buffers[kTraceRmsnormOutputBufferIndex];
+  constexpr size_t kSentinelOutputBytes = kTraceRmsnormElementCount * sizeof(uint16_t);
+  if (output.name != "layer0.normalized" ||
+      output.allocation_byte_count != kSentinelOutputBytes || !output.upload_bytes.empty()) {
+    if (error_text != nullptr) {
+      *error_text = "trace RMSNorm output buffer does not match an uninitialized 2048 F16 output";
+    }
+    return false;
+  }
+  std::vector<uint8_t> sentinel(kSentinelOutputBytes);
+  for (size_t offset = 0; offset < sentinel.size(); offset += sizeof(uint16_t)) {
+    sentinel[offset] = static_cast<uint8_t>(kFp16OneBits);
+    sentinel[offset + 1U] = static_cast<uint8_t>(kFp16OneBits >> 8U);
+  }
+  output.upload_bytes = std::move(sentinel);
+  return true;
+}
+
+constexpr const char* trace_output_initialization(bool rmsnorm_output_sentinel) {
+  return rmsnorm_output_sentinel ? "sentinel_f16_one" : "none";
+}
+
+constexpr const char* trace_scale_source(bool rmsnorm_unit_scale) {
+  return rmsnorm_unit_scale ? "unit_f16_one" : "model_f16";
+}
+
+constexpr const char* trace_input_source(bool rmsnorm_zero_input) {
+  return rmsnorm_zero_input ? "zero_f16" : "model_f16";
+}
+
+std::string json_escape_trace_metadata(const std::string& value) {
+  std::string escaped;
+  escaped.reserve(value.size());
+  for (char character : value) {
+    if (character == '\\' || character == '"') escaped += '\\';
+    escaped += character;
+  }
+  return escaped;
+}
+
+struct TraceFailureDiagnostic {
+  std::string json;
+};
+
+bool capture_trace_failure_diagnostic(const ResidentHsaDispatch& dispatch,
+                                      const ResidentHsaDispatchResult& dispatch_result,
+                                      const std::vector<HsaCodeImageAsset>& images,
+                                      const ResidentHsaStage& stage,
+                                      const std::vector<uint8_t>& kernargs,
+                                      const std::string& scale_source,
+                                      const std::string& input_source,
+                                      const std::string& output_initialization,
+                                      const std::string& rmsnorm_kernel,
+                                      const std::string& rmsnorm_expected_output,
+                                      TraceFailureDiagnostic* diagnostic,
+                                      std::string* error_text) {
+  if (diagnostic == nullptr || stage.hsa_image_index >= images.size() ||
+      stage.hsa_image_index >= dispatch_result.hsa_image_gpu_vas.size()) {
+    if (error_text != nullptr) *error_text = "trace failure diagnostic lacks HSA image metadata";
+    return false;
+  }
+  constexpr uint32_t kBufferIndices[] = {0U, 1U, 11U};
+  for (uint32_t index : kBufferIndices) {
+    if (index >= dispatch.buffers.size() || index >= dispatch_result.buffer_names.size() ||
+        index >= dispatch_result.buffer_gpu_vas.size() ||
+        index >= dispatch_result.buffer_physical_offsets.size() ||
+        dispatch.buffers[index].name != dispatch_result.buffer_names[index]) {
+      if (error_text != nullptr) {
+        *error_text = "trace failure diagnostic lacks matching resident buffer metadata";
+      }
+      return false;
+    }
+  }
+
+  const HsaCodeImageAsset& image = images[stage.hsa_image_index];
+  std::string json =
+      "{\"failure_stage\":\"trace_nonfinite\",\"failure_text\":\"trace output contains NaN or "
+      "infinity\",\"scale_source\":\"" +
+      json_escape_trace_metadata(scale_source) + "\",\"input_source\":\"" +
+      json_escape_trace_metadata(input_source) + "\",\"output_initialization\":\"" +
+      json_escape_trace_metadata(output_initialization) + "\",\"rmsnorm_kernel\":\"" +
+      json_escape_trace_metadata(rmsnorm_kernel) + "\",\"rmsnorm_expected_output\":\"" +
+      json_escape_trace_metadata(rmsnorm_expected_output) + "\",\"kernarg_hex\":\"" +
+      hex_bytes(kernargs) + "\",\"buffers\":[";
+  for (size_t position = 0; position < std::size(kBufferIndices); ++position) {
+    const uint32_t index = kBufferIndices[position];
+    if (position != 0U) json += ",";
+    json += "{\"index\":" + std::to_string(index) + ",\"name\":\"" +
+            dispatch_result.buffer_names[index] + "\",\"requested_bytes\":" +
+            std::to_string(dispatch.buffers[index].allocation_byte_count) + ",\"gpu_va\":" +
+            std::to_string(dispatch_result.buffer_gpu_vas[index]) + ",\"physical_offset\":" +
+            std::to_string(dispatch_result.buffer_physical_offsets[index]) + "}";
+  }
+  json += "],\"pm4\":{\"image_va\":" +
+          std::to_string(dispatch_result.hsa_image_gpu_vas[stage.hsa_image_index]) +
+          ",\"entry_offset\":" + std::to_string(stage.entry_offset) +
+          ",\"entry_va\":" +
+          std::to_string(dispatch_result.hsa_image_gpu_vas[stage.hsa_image_index] +
+                         stage.entry_offset) +
+          ",\"kernargs_va\":" + std::to_string(kResidentHsaKernargsVa) +
+          ",\"rsrc1\":" + std::to_string(image.rsrc1) + ",\"rsrc2\":" +
+          std::to_string(image.rsrc2) + ",\"rsrc3\":" + std::to_string(image.rsrc3) +
+          ",\"local\":[" + std::to_string(stage.workgroup_x) + "," +
+          std::to_string(stage.workgroup_y) + "," + std::to_string(stage.workgroup_z) +
+          "],\"global\":[" + std::to_string(stage.global_x) + "," +
+          std::to_string(stage.global_y) + "," + std::to_string(stage.global_z) + "]}}\n";
+  diagnostic->json = std::move(json);
+  return true;
+}
+
 struct TracePublicationOps {
   void* context;
   bool (*write_file)(void* context, const std::filesystem::path& path, const char* data,
@@ -352,6 +535,39 @@ bool remove_trace_artifact(const std::filesystem::path& path,
   return true;
 }
 
+bool publish_trace_failure_diagnostic(const std::filesystem::path& staging_path,
+                                      const std::filesystem::path& diagnostic_path,
+                                      const std::filesystem::path& trace_root,
+                                      const std::string& json,
+                                      const TracePublicationOps& ops,
+                                      std::string* error_text) {
+  auto fail_with_cleanup = [&](const std::filesystem::path& path, const std::string& cause) {
+    std::string cleanup_detail;
+    if (!remove_trace_artifact(path, trace_root, ops, &cleanup_detail)) {
+      if (error_text != nullptr) {
+        *error_text = cause + "; cleanup failed: " + cleanup_detail;
+      }
+    } else if (error_text != nullptr) {
+      *error_text = cause;
+    }
+    return false;
+  };
+  std::string detail;
+  if (!ops.write_file(ops.context, staging_path, json.data(), json.size(), &detail)) {
+    return fail_with_cleanup(staging_path, detail);
+  }
+  if (!ops.sync_path(ops.context, staging_path, false, &detail)) {
+    return fail_with_cleanup(staging_path, detail);
+  }
+  if (!ops.rename_path(ops.context, staging_path, diagnostic_path, &detail)) {
+    return fail_with_cleanup(staging_path, detail);
+  }
+  if (!ops.sync_path(ops.context, trace_root, true, &detail)) {
+    return fail_with_cleanup(diagnostic_path, detail);
+  }
+  return true;
+}
+
 bool publish_trace_artifact(const std::filesystem::path& trace_staging,
                             const std::filesystem::path& trace_artifact,
                             const std::filesystem::path& trace_root,
@@ -402,6 +618,34 @@ void fail_trace(LlamaStageTraceResult* result, const char* stage, const std::str
   result->failure_text = text;
   result->exit_status = 1;
   if (error_text != nullptr) *error_text = text;
+}
+
+bool complete_nonfinite_trace(const std::filesystem::path& trace_root,
+                              const std::filesystem::path& trace_failure_staging,
+                              const std::filesystem::path& trace_failure,
+                              const std::string& diagnostic_json,
+                              const TracePublicationOps& ops,
+                              LlamaStageTraceResult* result,
+                              std::string* error_text) {
+  std::error_code filesystem_error;
+  std::filesystem::create_directories(trace_root, filesystem_error);
+  if (filesystem_error) {
+    fail_trace(result, "trace_nonfinite_diagnostic",
+               "trace nonfinite diagnostic publication failed: cannot create trace directory: " +
+                   filesystem_error.message(),
+               error_text);
+    return false;
+  }
+
+  std::string detail;
+  if (!publish_trace_failure_diagnostic(trace_failure_staging, trace_failure, trace_root,
+                                        diagnostic_json, ops, &detail)) {
+    fail_trace(result, "trace_nonfinite_diagnostic",
+               "trace nonfinite diagnostic publication failed: " + detail, error_text);
+    return false;
+  }
+  fail_trace(result, "trace_nonfinite", "trace output contains NaN or infinity", error_text);
+  return true;
 }
 }  // namespace
 
@@ -660,6 +904,18 @@ int run_llama_stage_trace(const LlamaStageTraceRequest& request, LlamaStageTrace
   result->token_index = request.position;
   result->layer_index = request.layer_index;
   result->stage = request.stage;
+  result->scale_source = trace_scale_source(request.rmsnorm_unit_scale);
+  result->input_source = trace_input_source(request.rmsnorm_zero_input);
+  result->output_initialization =
+      trace_output_initialization(request.rmsnorm_output_sentinel);
+  result->rmsnorm_kernel =
+      request.rmsnorm_epsilon_arithmetic ? "llama_rmsnorm_epsilon_arithmetic_f16"
+                                         : (request.rmsnorm_zero_store
+                                                ? "llama_rmsnorm_zero_store_f16"
+                                                : "llama_rmsnorm_f16");
+  result->rmsnorm_expected_output =
+      request.rmsnorm_epsilon_arithmetic ? kRmsnormEpsilonArithmeticExpectedOutput : "none";
+
 
   const LlamaStageTraceSpec* spec = find_trace_stage(request.stage);
   if (spec == nullptr) {
@@ -670,6 +926,84 @@ int run_llama_stage_trace(const LlamaStageTraceRequest& request, LlamaStageTrace
     fail_trace(result, "trace_request", "Llama trace supports only layer 0 and position 0", error_text);
     return 1;
   }
+  if (request.rmsnorm_unit_scale && request.stage != "normalized") {
+    fail_trace(result, "trace_request",
+               "RMSNorm unit-scale trace supports only the normalized boundary", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_zero_input && !request.rmsnorm_unit_scale) {
+    fail_trace(result, "trace_request",
+               "RMSNorm zero-input trace requires the unit-scale trace probe", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_zero_input && request.stage != "normalized") {
+    fail_trace(result, "trace_request",
+               "RMSNorm zero-input trace supports only the normalized boundary", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_output_sentinel && !request.rmsnorm_zero_input) {
+    fail_trace(result, "trace_request",
+               "RMSNorm output sentinel trace requires the zero-input trace probe", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_output_sentinel && !request.rmsnorm_unit_scale) {
+    fail_trace(result, "trace_request",
+               "RMSNorm output sentinel trace requires the unit-scale trace probe", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_output_sentinel && request.stage != "normalized") {
+    fail_trace(result, "trace_request",
+               "RMSNorm output sentinel trace supports only the normalized boundary", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_zero_store && !request.rmsnorm_output_sentinel) {
+    fail_trace(result, "trace_request",
+               "RMSNorm zero-store trace requires the output sentinel trace probe", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_zero_store && !request.rmsnorm_zero_input) {
+    fail_trace(result, "trace_request",
+               "RMSNorm zero-store trace requires the zero-input trace probe", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_zero_store && !request.rmsnorm_unit_scale) {
+    fail_trace(result, "trace_request",
+               "RMSNorm zero-store trace requires the unit-scale trace probe", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_zero_store && request.stage != "normalized") {
+    fail_trace(result, "trace_request",
+               "RMSNorm zero-store trace supports only the normalized boundary", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_epsilon_arithmetic && !request.rmsnorm_output_sentinel) {
+    fail_trace(result, "trace_request",
+               "RMSNorm epsilon arithmetic trace requires the output sentinel trace probe",
+               error_text);
+    return 1;
+  }
+  if (request.rmsnorm_epsilon_arithmetic && !request.rmsnorm_zero_input) {
+    fail_trace(result, "trace_request",
+               "RMSNorm epsilon arithmetic trace requires the zero-input trace probe", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_epsilon_arithmetic && !request.rmsnorm_unit_scale) {
+    fail_trace(result, "trace_request",
+               "RMSNorm epsilon arithmetic trace requires the unit-scale trace probe", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_epsilon_arithmetic && request.stage != "normalized") {
+    fail_trace(result, "trace_request",
+               "RMSNorm epsilon arithmetic trace supports only the normalized boundary", error_text);
+    return 1;
+  }
+  if (request.rmsnorm_zero_store && request.rmsnorm_epsilon_arithmetic) {
+    fail_trace(result, "trace_request",
+               "RMSNorm zero-store and epsilon arithmetic trace probes are mutually exclusive",
+               error_text);
+    return 1;
+  }
+
   if (blank(request.model_dir) || blank(request.trace_dir)) {
     fail_trace(result, "trace_request", "model directory and trace directory must be nonempty", error_text);
     return 1;
@@ -691,10 +1025,16 @@ int run_llama_stage_trace(const LlamaStageTraceRequest& request, LlamaStageTrace
   const std::string json_filename = file_stem + ".json";
   const std::filesystem::path trace_artifact = trace_root / file_stem;
   const std::filesystem::path trace_staging = trace_root / ("." + file_stem + ".staging");
+  const std::filesystem::path trace_failure =
+      trace_root / (file_stem + ".failure.json");
+  const std::filesystem::path trace_failure_staging =
+      trace_root / ("." + file_stem + ".failure.json.staging");
   const std::filesystem::path legacy_raw_output = trace_root / raw_filename;
   const std::filesystem::path legacy_json_output = trace_root / json_filename;
   if (std::filesystem::exists(trace_artifact, filesystem_error) ||
       std::filesystem::exists(trace_staging, filesystem_error) ||
+      std::filesystem::exists(trace_failure, filesystem_error) ||
+      std::filesystem::exists(trace_failure_staging, filesystem_error) ||
       std::filesystem::exists(legacy_raw_output, filesystem_error) ||
       std::filesystem::exists(legacy_json_output, filesystem_error) || filesystem_error) {
     fail_trace(result, "trace_output", "trace output already exists or cannot be inspected", error_text);
@@ -704,8 +1044,25 @@ int run_llama_stage_trace(const LlamaStageTraceRequest& request, LlamaStageTrace
   std::vector<HsaCodeImageAsset> images;
   ResidentHsaDispatch dispatch;
   std::string detail;
-  if (!build_llama_layer0_stage_trace_dispatch(request.model_dir, request.token_id, &images, &dispatch,
+  if (!build_llama_layer0_stage_trace_dispatch(request.model_dir, request.token_id,
+                                               request.rmsnorm_zero_store,
+                                               request.rmsnorm_epsilon_arithmetic, &images, &dispatch,
                                                &detail)) {
+    fail_trace(result, "trace_prepare", detail, error_text);
+    return 1;
+  }
+  if (request.rmsnorm_unit_scale &&
+      !replace_trace_rmsnorm_scale_with_ones(&dispatch, &detail)) {
+    fail_trace(result, "trace_prepare", detail, error_text);
+    return 1;
+  }
+  if (request.rmsnorm_zero_input &&
+      !replace_trace_rmsnorm_input_with_zeroes(&dispatch, &detail)) {
+    fail_trace(result, "trace_prepare", detail, error_text);
+    return 1;
+  }
+  if (request.rmsnorm_output_sentinel &&
+      !initialize_trace_rmsnorm_output_with_ones(&dispatch, &detail)) {
     fail_trace(result, "trace_prepare", detail, error_text);
     return 1;
   }
@@ -729,6 +1086,36 @@ int run_llama_stage_trace(const LlamaStageTraceRequest& request, LlamaStageTrace
     std::string close_error;
     resident.close(&close_error);
   };
+  const ResidentHsaStage* trace_stage = nullptr;
+  std::vector<uint8_t> trace_kernargs;
+  TraceFailureDiagnostic failure_diagnostic;
+  if (spec->stage_index >= 0) {
+    if (static_cast<size_t>(spec->stage_index) >= dispatch.stages.size()) {
+      close_on_failure();
+      fail_trace(result, "trace_prepare", "trace stage is missing from resident dispatch", error_text);
+      return 1;
+    }
+    trace_stage = &dispatch.stages[static_cast<size_t>(spec->stage_index)];
+    if (!materialize_trace_kernargs(*trace_stage, dispatch_result, &trace_kernargs, &detail)) {
+      close_on_failure();
+      fail_trace(result, "trace_metadata", detail, error_text);
+      return 1;
+    }
+    if (spec->stage_index == 0 && trace_kernargs.size() != 32U) {
+      close_on_failure();
+      fail_trace(result, "trace_metadata", "RMSNorm kernargs must materialize to 32 bytes",
+                 error_text);
+      return 1;
+    }
+    if (!capture_trace_failure_diagnostic(
+            dispatch, dispatch_result, images, *trace_stage, trace_kernargs, result->scale_source,
+            result->input_source, result->output_initialization, result->rmsnorm_kernel,
+            result->rmsnorm_expected_output, &failure_diagnostic, &detail)) {
+      close_on_failure();
+      fail_trace(result, "trace_metadata", detail, error_text);
+      return 1;
+    }
+  }
   for (int stage_index = 0; stage_index <= spec->stage_index; ++stage_index) {
     if (!resident.dispatch(dispatch.stages[static_cast<size_t>(stage_index)], &dispatch_result,
                            &detail)) {
@@ -756,10 +1143,28 @@ int run_llama_stage_trace(const LlamaStageTraceRequest& request, LlamaStageTrace
   uint64_t finite_count = 0;
   if (!count_finite_values(bytes, spec->dtype, &finite_count) ||
       finite_count != spec->byte_count / (std::string(spec->dtype) == "float16" ? 2U : 4U)) {
+    if (trace_stage != nullptr) {
+      if (!complete_nonfinite_trace(trace_root, trace_failure_staging, trace_failure,
+                                    failure_diagnostic.json, kTracePublicationOps, result,
+                                    error_text)) {
+        close_on_failure();
+        return 1;
+      }
+    } else {
+      fail_trace(result, "trace_nonfinite", "trace output contains NaN or infinity", error_text);
+    }
     close_on_failure();
-    fail_trace(result, "trace_nonfinite", "trace output contains NaN or infinity", error_text);
     return 1;
   }
+  if (request.rmsnorm_epsilon_arithmetic &&
+      !is_repeated_fp16_value(bytes, kRmsnormEpsilonArithmeticExpectedF16Bits)) {
+    close_on_failure();
+    fail_trace(result, "trace_expected_output",
+               "epsilon arithmetic probe output does not equal repeated f16_0x5cf1_316.25",
+               error_text);
+    return 1;
+  }
+
   if (!resident.close(&detail)) {
     fail_trace(result, "resident_close", detail, error_text);
     return 1;
@@ -774,16 +1179,13 @@ int run_llama_stage_trace(const LlamaStageTraceRequest& request, LlamaStageTrace
   result->raw_path = (std::filesystem::path(file_stem) / raw_filename).generic_string();
   result->json_path = (trace_artifact / json_filename).string();
   result->gpu_va = dispatch_result.buffer_gpu_vas[output_buffer_index];
-  if (spec->stage_index >= 0) {
-    const ResidentHsaStage& stage = dispatch.stages[static_cast<size_t>(spec->stage_index)];
-    std::vector<uint8_t> kernargs;
-    if (!materialize_trace_kernargs(stage, dispatch_result, &kernargs, &detail) ||
-        !trace_scalars_json(spec->stage_index, kernargs, &result->scalars_json, &detail)) {
+  if (trace_stage != nullptr) {
+    if (!trace_scalars_json(spec->stage_index, trace_kernargs, &result->scalars_json, &detail)) {
       fail_trace(result, "trace_metadata", detail, error_text);
       return 1;
     }
-    result->kernarg_hex = hex_bytes(kernargs);
-    result->hsa_image_sha256 = images[stage.hsa_image_index].image_sha256;
+    result->kernarg_hex = hex_bytes(trace_kernargs);
+    result->hsa_image_sha256 = images[trace_stage->hsa_image_index].image_sha256;
   } else {
     result->kernarg_hex = "not_dispatched";
     result->hsa_image_sha256 = "not_dispatched";
@@ -808,7 +1210,13 @@ int run_llama_stage_trace(const LlamaStageTraceRequest& request, LlamaStageTrace
       result->sha256 + "\",\"finite_count\":" + std::to_string(result->finite_count) +
       ",\"raw_path\":\"" + result->raw_path + "\",\"kernarg_hex\":\"" + result->kernarg_hex +
       "\",\"hsa_image_sha256\":\"" + result->hsa_image_sha256 + "\",\"gpu_va\":" +
-      std::to_string(result->gpu_va) + ",\"scalars\":" + result->scalars_json + "}\n";
+      std::to_string(result->gpu_va) + ",\"scale_source\":\"" +
+      json_escape_trace_metadata(result->scale_source) + "\",\"input_source\":\"" +
+      json_escape_trace_metadata(result->input_source) + "\",\"output_initialization\":\"" +
+      json_escape_trace_metadata(result->output_initialization) + "\",\"rmsnorm_kernel\":\"" +
+      json_escape_trace_metadata(result->rmsnorm_kernel) + "\",\"rmsnorm_expected_output\":\"" +
+      json_escape_trace_metadata(result->rmsnorm_expected_output) + "\",\"scalars\":" +
+      result->scalars_json + "}\n";
   if (!publish_trace_artifact(trace_staging, trace_artifact, trace_root, raw_filename, json_filename,
                               raw, json, kTracePublicationOps, &detail)) {
     fail_trace(result, "trace_output", detail, error_text);

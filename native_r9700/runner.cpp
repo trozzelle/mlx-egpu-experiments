@@ -45,8 +45,8 @@ void print_help(const char* argv0) {
   std::printf("  --native-prefill-proof --model <mlx-model-dir> --token-ids-json '[...]' --out <npz> --log <path>\n");
   std::printf("                         16-layer streamed HSA Llama prefill (fail-closed until accepted)\n");
   std::printf("  --llama-stage-trace --model <dir> --token-id <uint32> --layer 0 --position 0 \\\n");
-  std::printf("      --stage <boundary> --trace-dir <dir>\n");
-  std::printf("                         trace one layer-0/token-0 resident boundary; never writes an NPZ/cache\n");
+  std::printf("      --stage <boundary> --trace-dir <dir> [--rmsnorm-unit-scale [--rmsnorm-zero-input [--rmsnorm-output-sentinel [--rmsnorm-zero-store]]]]\n");
+  std::printf("                         trace one layer-0/token-0 resident boundary; zero-store requires normalized zero-input unit-scale sentinel\n");
   std::printf("  --help                show this message\n");
 }
 
@@ -211,8 +211,10 @@ void print_llama_stage_trace_result(const native_r9700::LlamaStageTraceResult& r
   std::printf("{\"token_index\":%u,\"layer_index\":%u,\"stage\":\"%s\",\"buffer\":\"%s\","
               "\"shape\":%s,\"dtype\":\"%s\",\"byte_count\":%llu,\"sha256\":\"%s\","
               "\"finite_count\":%llu,\"raw_path\":\"%s\",\"kernarg_hex\":\"%s\","
-              "\"hsa_image_sha256\":\"%s\",\"gpu_va\":%llu,\"scalars\":%s,"
-              "\"failure_stage\":\"%s\",\"failure_text\":\"%s\",\"exit_status\":%d}\n",
+              "\"hsa_image_sha256\":\"%s\",\"gpu_va\":%llu,\"rmsnorm_kernel\":\"%s\","
+              "\"scale_source\":\"%s\",\"input_source\":\"%s\",\"output_initialization\":\"%s\","
+              "\"rmsnorm_expected_output\":\"%s\",\"scalars\":%s,\"failure_stage\":\"%s\","
+              "\"failure_text\":\"%s\",\"exit_status\":%d}\n",
               result.token_index, result.layer_index, json_escape(result.stage).c_str(),
               json_escape(result.buffer).c_str(),
               result.shape_json.empty() ? "[]" : result.shape_json.c_str(),
@@ -221,6 +223,10 @@ void print_llama_stage_trace_result(const native_r9700::LlamaStageTraceResult& r
               static_cast<unsigned long long>(result.finite_count), json_escape(result.raw_path).c_str(),
               json_escape(result.kernarg_hex).c_str(), json_escape(result.hsa_image_sha256).c_str(),
               static_cast<unsigned long long>(result.gpu_va),
+              json_escape(result.rmsnorm_kernel).c_str(), json_escape(result.scale_source).c_str(),
+              json_escape(result.input_source).c_str(),
+              json_escape(result.output_initialization).c_str(),
+              json_escape(result.rmsnorm_expected_output).c_str(),
               result.scalars_json.empty() ? "{}" : result.scalars_json.c_str(),
               json_escape(result.failure_stage).c_str(), json_escape(result.failure_text).c_str(),
               result.exit_status);
@@ -313,14 +319,44 @@ int main(int argc, char** argv) {
   }
 
   if (std::strcmp(argv[1], "--llama-stage-trace") == 0) {
-    if (argc != 14 || std::strcmp(argv[2], "--model") != 0 ||
-        std::strcmp(argv[4], "--token-id") != 0 || std::strcmp(argv[6], "--layer") != 0 ||
-        std::strcmp(argv[8], "--position") != 0 || std::strcmp(argv[10], "--stage") != 0 ||
-        std::strcmp(argv[12], "--trace-dir") != 0) {
+    bool rmsnorm_unit_scale = false;
+    bool rmsnorm_zero_input = false;
+    bool rmsnorm_output_sentinel = false;
+    bool rmsnorm_zero_store = false;
+    bool rmsnorm_epsilon_arithmetic = false;
+
+    if ((argc != 14 && argc != 15 && argc != 16 && argc != 17 && argc != 18 && argc != 19) ||
+        std::strcmp(argv[2], "--model") != 0 || std::strcmp(argv[4], "--token-id") != 0 ||
+        std::strcmp(argv[6], "--layer") != 0 || std::strcmp(argv[8], "--position") != 0 ||
+        std::strcmp(argv[10], "--stage") != 0 || std::strcmp(argv[12], "--trace-dir") != 0) {
       std::fprintf(stderr,
                    "error: --llama-stage-trace expects --model <dir> --token-id <uint32> "
-                   "--layer 0 --position 0 --stage <boundary> --trace-dir <dir>\n");
+                   "--layer 0 --position 0 --stage <boundary> --trace-dir <dir> "
+                   "[--rmsnorm-unit-scale [--rmsnorm-zero-input [--rmsnorm-output-sentinel "
+                   "[--rmsnorm-zero-store|--rmsnorm-epsilon-arithmetic]]]]\n");
       return 2;
+    }
+    for (int index = 14; index < argc; ++index) {
+      if (std::strcmp(argv[index], "--rmsnorm-unit-scale") == 0 && !rmsnorm_unit_scale) {
+        rmsnorm_unit_scale = true;
+      } else if (std::strcmp(argv[index], "--rmsnorm-zero-input") == 0 && !rmsnorm_zero_input) {
+        rmsnorm_zero_input = true;
+      } else if (std::strcmp(argv[index], "--rmsnorm-output-sentinel") == 0 &&
+                 !rmsnorm_output_sentinel) {
+        rmsnorm_output_sentinel = true;
+      } else if (std::strcmp(argv[index], "--rmsnorm-zero-store") == 0 &&
+                 !rmsnorm_zero_store) {
+        rmsnorm_zero_store = true;
+      } else if (std::strcmp(argv[index], "--rmsnorm-epsilon-arithmetic") == 0 &&
+                 !rmsnorm_epsilon_arithmetic) {
+        rmsnorm_epsilon_arithmetic = true;
+      } else {
+        std::fprintf(stderr,
+                     "error: --llama-stage-trace accepts only --rmsnorm-unit-scale, "
+                     "--rmsnorm-zero-input, --rmsnorm-output-sentinel, --rmsnorm-zero-store, "
+                     "and --rmsnorm-epsilon-arithmetic once each\n");
+        return 2;
+      }
     }
     native_r9700::LlamaStageTraceRequest request;
     if (!parse_u32_strict(argv[5], &request.token_id)) {
@@ -339,6 +375,55 @@ int main(int argc, char** argv) {
     request.model_dir = argv[3];
     request.stage = argv[11];
     request.trace_dir = argv[13];
+    request.rmsnorm_unit_scale = rmsnorm_unit_scale;
+    request.rmsnorm_zero_input = rmsnorm_zero_input;
+    request.rmsnorm_output_sentinel = rmsnorm_output_sentinel;
+    request.rmsnorm_zero_store = rmsnorm_zero_store;
+    request.rmsnorm_epsilon_arithmetic = rmsnorm_epsilon_arithmetic;
+    if (request.rmsnorm_zero_input && !request.rmsnorm_unit_scale) {
+      std::fprintf(stderr,
+                   "error: --rmsnorm-zero-input requires --rmsnorm-unit-scale\n");
+      return 2;
+    }
+    if (request.rmsnorm_unit_scale && request.stage != "normalized") {
+      std::fprintf(stderr,
+                   "error: --rmsnorm-unit-scale only supports the normalized boundary\n");
+      return 2;
+    }
+    if (request.rmsnorm_output_sentinel &&
+        (!request.rmsnorm_zero_input || !request.rmsnorm_unit_scale)) {
+      std::fprintf(stderr,
+                   "error: --rmsnorm-output-sentinel requires --rmsnorm-zero-input and "
+                   "--rmsnorm-unit-scale\n");
+      return 2;
+    }
+    if (request.rmsnorm_output_sentinel && request.stage != "normalized") {
+      std::fprintf(stderr,
+                   "error: --rmsnorm-output-sentinel only supports the normalized boundary\n");
+      return 2;
+    }
+    if (request.rmsnorm_zero_store &&
+        (!request.rmsnorm_output_sentinel || !request.rmsnorm_zero_input ||
+         !request.rmsnorm_unit_scale)) {
+      std::fprintf(stderr,
+                   "error: --rmsnorm-zero-store requires --rmsnorm-output-sentinel, "
+                   "--rmsnorm-zero-input, and --rmsnorm-unit-scale\n");
+      return 2;
+    }
+    if (request.rmsnorm_epsilon_arithmetic &&
+        (!request.rmsnorm_output_sentinel || !request.rmsnorm_zero_input ||
+         !request.rmsnorm_unit_scale)) {
+      std::fprintf(stderr,
+                   "error: --rmsnorm-epsilon-arithmetic requires --rmsnorm-output-sentinel, "
+                   "--rmsnorm-zero-input, and --rmsnorm-unit-scale\n");
+      return 2;
+    }
+    if (request.rmsnorm_epsilon_arithmetic && request.rmsnorm_zero_store) {
+      std::fprintf(stderr,
+                   "error: --rmsnorm-epsilon-arithmetic and --rmsnorm-zero-store are mutually "
+                   "exclusive\n");
+      return 2;
+    }
     native_r9700::LlamaStageTraceResult result;
     const int status = native_r9700::run_llama_stage_trace(request, &result, nullptr);
     print_llama_stage_trace_result(result);

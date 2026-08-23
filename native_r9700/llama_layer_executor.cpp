@@ -174,6 +174,22 @@ constexpr std::array<LlamaStageAssetConfig, 9> kLlamaStageAssetConfigs = {{
     {"llama_gated_mlp_f16", "native_r9700/kernels/llama-gated-mlp-hsa-assets",
      "llama-gated-mlp-f16-v1", 6144, 56},
 }};
+constexpr LlamaStageAssetConfig kLlamaRmsNormZeroStoreTraceAssetConfig = {
+    "llama_rmsnorm_zero_store_f16",
+    "native_r9700/kernels/llama-rmsnorm-zero-store-hsa-assets",
+    "llama-rmsnorm-f16-v1",
+    5888,
+    32,
+};
+constexpr LlamaStageAssetConfig kLlamaRmsNormEpsilonArithmeticTraceAssetConfig = {
+    "llama_rmsnorm_epsilon_arithmetic_f16",
+    "native_r9700/kernels/llama-rmsnorm-epsilon-arithmetic-hsa-assets",
+    "llama-rmsnorm-f16-v1",
+    5888,
+    32,
+};
+
+
 
 bool build_llama_stage_dispatch(const LlamaLayer0WeightSpans& weights, uint32_t token_id,
                                 std::vector<HsaCodeImageAsset>* images,
@@ -361,6 +377,8 @@ bool build_llama_layer_weight_table(const std::string& model_dir,
 }
 
 bool build_llama_layer0_stage_trace_dispatch(const std::string& model_dir, uint32_t token_id,
+                                             bool rmsnorm_zero_store,
+                                             bool rmsnorm_epsilon_arithmetic,
                                              std::vector<HsaCodeImageAsset>* images,
                                              ResidentHsaDispatch* dispatch,
                                              std::string* error_text) {
@@ -368,8 +386,36 @@ bool build_llama_layer0_stage_trace_dispatch(const std::string& model_dir, uint3
     return fail(error_text, "token id is outside the supported Llama vocabulary");
   }
   LlamaLayer0WeightSpans weights;
-  if (!bind_real_layer0_weights(model_dir, &weights, error_text)) return false;
-  return build_llama_stage_dispatch(weights, token_id, images, dispatch, error_text);
+  if (!bind_real_layer0_weights(model_dir, &weights, error_text) ||
+      !build_llama_stage_dispatch(weights, token_id, images, dispatch, error_text)) {
+    return false;
+  }
+  if (!rmsnorm_zero_store && !rmsnorm_epsilon_arithmetic) return true;
+
+  const LlamaStageAssetConfig& config =
+      rmsnorm_epsilon_arithmetic ? kLlamaRmsNormEpsilonArithmeticTraceAssetConfig
+                                 : kLlamaRmsNormZeroStoreTraceAssetConfig;
+  const LlamaKernelAsset* asset = find_llama_kernel_asset(config.name);
+  KernelDescriptor descriptor;
+  if (asset == nullptr ||
+      !load_verified_kernel_code(*asset, config.root, config.schema, &descriptor, error_text)) {
+    return false;
+  }
+  if (images->empty() || dispatch->hsa_images.empty() || dispatch->stages.empty() ||
+      dispatch->stages.front().kernargs.size() != config.kernarg_bytes) {
+    return fail(error_text, "trace dispatch lacks the RMSNorm stage-0 image");
+  }
+  HsaCodeImageAsset probe_image;
+  probe_image.image = std::move(descriptor.code);
+  probe_image.entry_offset = config.entry_offset;
+  probe_image.image_sha256 = descriptor.sha256;
+  probe_image.rsrc1 = descriptor.rsrc1;
+  probe_image.rsrc2 = descriptor.rsrc2;
+  probe_image.rsrc3 = descriptor.rsrc3;
+  images->front() = std::move(probe_image);
+  dispatch->hsa_images.front() = &images->front();
+  dispatch->stages.front().entry_offset = images->front().entry_offset;
+  return true;
 }
 
 

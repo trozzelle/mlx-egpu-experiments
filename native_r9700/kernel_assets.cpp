@@ -15,7 +15,7 @@ namespace {
 
 // Stage assets are added here only after their code and metadata are reviewed
 // together. This intentionally excludes generic probes and archived blobs.
-const std::array<LlamaKernelAsset, 9> kLlamaKernelManifest = {{
+const std::array<LlamaKernelAsset, 11> kLlamaKernelManifest = {{
     {
         {"llama_k_projection_f16",
          "9c2f584f4bd4c918f8c2a95a0a1f29a7102c19e8080b0d538b36f26e6e8fcc9b",
@@ -40,6 +40,24 @@ const std::array<LlamaKernelAsset, 9> kLlamaKernelManifest = {{
          {}, 3222208513U, 132U, 160U, 64U, 1U, 1U, 64U, 1U, 1U, 32U},
         {"llama_rmsnorm_f16.image",
          "0878234b9282e8e83970542e3defed11e081dcae4dc7412c319ac77d179b63d0",
+         "gfx1201", 0, 0, 0, "source_amdgpu_metadata"},
+        "llama-rmsnorm-f16-v1",
+    },
+    {
+        {"llama_rmsnorm_zero_store_f16",
+         "8be1b744e76cab295943e9a78b7cabdfd20d6e22c16f92862baf140f27b1de47",
+         {}, 3222208512U, 132U, 32U, 64U, 1U, 1U, 64U, 1U, 1U, 32U},
+        {"llama_rmsnorm_zero_store_f16.image",
+         "8be1b744e76cab295943e9a78b7cabdfd20d6e22c16f92862baf140f27b1de47",
+         "gfx1201", 0, 0, 0, "source_amdgpu_metadata"},
+        "llama-rmsnorm-f16-v1",
+    },
+    {
+        {"llama_rmsnorm_epsilon_arithmetic_f16",
+         "e440884d246d20580826888b6d279ce61eb24018b2b0196e1a1285071d41e037",
+         {}, 3222208512U, 132U, 64U, 64U, 1U, 1U, 64U, 1U, 1U, 32U},
+        {"llama_rmsnorm_epsilon_arithmetic_f16.image",
+         "e440884d246d20580826888b6d279ce61eb24018b2b0196e1a1285071d41e037",
          "gfx1201", 0, 0, 0, "source_amdgpu_metadata"},
         "llama-rmsnorm-f16-v1",
     },

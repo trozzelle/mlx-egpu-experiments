@@ -1,0 +1,35 @@
+# LN-2 RMSNorm kernel analysis
+
+## Scope and established boundary
+
+`ln-1c-first-stage.md:15-25` establishes that the token-128000 embedding is an exact, finite 2048-element fp16 input on both paths, while the first native failure is the RMSNorm `normalized` buffer. This review stops at that boundary.
+
+The checked-in source is the source of the loaded asset: `shasum -a 256 native_r9700/kernels/llama_rmsnorm_f16.cpp` is `67d2d8f4e4acf13c9380530fbbbcf5fa96b953509457d514dea2e191405e961a`, exactly the manifest's `source_sha256` (`native_r9700/kernels/llama-rmsnorm-hsa-assets/llama_rmsnorm_f16.json:117-119`). Thus this is not a stale-source versus manifest mismatch.
+
+## Exact native/CPU comparison
+
+| Concern | Native path | CPU oracle | Consequence for non-finites |
+|---|---|---|---|
+| Input/weight representation | Reinterprets each `unsigned short` as `_Float16`, then promotes to `float` (`native_r9700/kernels/llama_rmsnorm_f16.cpp:13-15`, `21-23`). | Requires fp16 x/weight then casts both to float32 (`native_r9700/primitives.py:159-162`, `178-179`). | The paths agree on fp16 storage and fp32 math. The embedding proof establishes only `hidden_input`; it does **not** establish the scale-buffer bytes delivered to the GPU. A NaN/Inf scale bit-pattern is propagated directly by the native multiply. |
+| Reduction/indexing | One active lane per 64-lane workgroup; it sums columns 0..2047 sequentially in fp32, row `workgroup_id_x`, with 64-bit `row * 2048` addressing (`llama_rmsnorm_f16.cpp:6-19`). | `np.mean(xf * xf, axis=-1, keepdims=True)` over the final axis (`primitives.py:180-181`). | Reduction order can change finite rounding, but with finite fp16 input every square and the 2048-term fp32 sum is finite (even 2048 × 65504² is far below fp32 max). It cannot itself make NaN/Inf. |
+| Epsilon | Scalar fp32 added after multiplication by the fp32 reciprocal of 2048 (`llama_rmsnorm_f16.cpp:18-19`). | Positive configuration epsilon added to fp32 mean (`primitives.py:173-182`). | The supplied stage scalar is little-endian `0x3727c5ac` (`llama_layer_executor.cpp:143-146`, `249`), which decodes to fp32 `9.999999747378752e-06`. The stage descriptor/manifest agree on `float32` offset 24 (`llama_stage_layout.cpp:38-43`; `llama_rmsnorm_f16.json:87-111`). If those actual kernarg bytes are delivered unchanged, the radicand is strictly positive. A corrupt/incorrectly rebound scalar can still make the sqrt NaN (NaN epsilon or a sufficiently negative epsilon). |
+| Launch geometry | Kernel row is the X workgroup id; lanes 1..63 exit (`llama_rmsnorm_f16.cpp:6-10`). | Processes the one `[1,2048]` row. | RMSNorm's descriptor is `workgroup=(64,1,1)`, `global=(64,1,1)` (`llama_stage_layout.cpp:215-218`); the builder writes the same workgroup dimensions and uses `global_x=64` for RMSNorm (`llama_layer_executor.cpp:229-245`, `249`). This is one workgroup/row 0 under the runtime's required global-divisible-by-workgroup convention (`amdev_session.cpp:1634-1641`). No source-level missing-lane or row-0 indexing defect is evident. |
+| Output write/rounding | Computes `(float)input * (float)weight * inverse_rms`, converts once to `_Float16`, and writes every column of the row (`llama_rmsnorm_f16.cpp:20-25`). | Computes fp32 normalize then fp32 multiply and converts once to fp16 (`primitives.py:181-183`). | Division versus reciprocal-multiply and reduction ordering may change finite fp16 rounding. They cannot generate NaN/Inf from finite operands and positive epsilon, except a final fp16 overflow. The CPU oracle's documented finite expected output (`ln-1c-first-stage.md:19-20`) makes an expected-data overflow unlikely; it does not prove the GPU received the same scale bytes. |
+
+The host-side buffer/binding layout is internally consistent: the resident buffer API writes each bound buffer's GPU VA into the supplied kernarg layout (`native_r9700/amdev_session.h:37-40`), and RMSNorm binds buffer 0 (selected embedding row) at 0, buffer 1 (input layernorm) at 8, and buffer 11 (normalized) at 16 (`llama_layer_executor.cpp:247-250`). The buffer order makes those indices `embedding_row`, `input_layernorm`, and `normalized` respectively (`llama_layer_executor.cpp:184-203`). This is positive static evidence, not proof that the live VAs/content observed by hardware were correct.
+
+## Ranked hypotheses
+
+1. **Live scale-buffer content or its GPU-VA binding is wrong (highest).** The kernel has no finite check for `scale[column]` before multiplying it into every output (`llama_rmsnorm_f16.cpp:21-24`). Hidden bytes being exact excludes the first operand, but not the independent `input_layernorm_weight` buffer. A NaN/Inf scale produces exactly the reported class of failure even with a finite embedding and valid epsilon. The CPU result is only evidence for the CPU-loaded weight, not that the native resident span/VA is identical.
+2. **The live epsilon kernarg is corrupt or does not reach offset 24.** Static ABI metadata, layout, and host encoding agree, and the layout validator requires a finite positive logical epsilon (`llama_stage_layout.cpp:426-431`), so this is less likely than an unchecked device payload/binding failure. If delivery differs from the logically validated value, NaN or a negative radicand makes `sqrt` and every output non-finite (`llama_rmsnorm_f16.cpp:18-24`).
+3. **The normalized output VA or dispatch execution is not the buffer/readback being traced.** `normalized` is a distinct 4096-byte resident allocation (`llama_layer_executor.cpp:198-200`), and the kernel writes only through the third pointer (`llama_rmsnorm_f16.cpp:24`). A bad output binding, a dispatch that did not execute, or incoherent readback can expose uninitialized/unrelated fp16 data containing NaN/Inf despite correct inputs. The static pointer order is coherent, so this remains a live-runtime hypothesis.
+4. **Final fp16 overflow or ordinary arithmetic variance (lowest).** This is mathematically possible only if the native product crosses the fp16 finite maximum after normalization. The source/CPU association differences can affect rounding, but cannot by themselves create NaN/Inf from finite values, positive epsilon, and a product within fp16 range. The documented finite CPU result weakens this explanation substantially.
+
+## Smallest discriminator (do not run in this analysis)
+
+Run one otherwise identical token-128000/position-0 RMSNorm dispatch with **only** the resident scale span replaced by 2048 fp16 `1.0` values, retaining the already byte-proven embedding, the same `0x3727c5ac` epsilon, launch geometry, output allocation, and readback. Record only `finite_count` for `normalized` plus the emitted 32-byte kernarg hex.
+
+- A fully finite result isolates the failure to the production scale bytes/scale VA (hypothesis 1).
+- Any non-finite result rules out scale payload values and leaves epsilon delivery or output/dispatch/readback coherence (hypotheses 2–3).
+
+This single-variable probe is smaller and more discriminating than changing the reduction or launch: those are already statically aligned with the CPU contract and cannot explain non-finites under finite operands.

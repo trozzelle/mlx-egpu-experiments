@@ -1,0 +1,120 @@
+{
+  "descriptor_offset": 1664,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 5888,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 760
+    },
+    {
+      "address": 1328,
+      "image_offset": 1328,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1424,
+      "image_offset": 1424,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1464,
+      "image_offset": 1464,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1504,
+      "image_offset": 1504,
+      "name": ".dynstr",
+      "size": 106
+    },
+    {
+      "address": 1664,
+      "image_offset": 1664,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 5888,
+      "image_offset": 5888,
+      "name": ".text",
+      "size": 896
+    },
+    {
+      "address": 10880,
+      "image_offset": 10880,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 10992,
+      "image_offset": 10992,
+      "name": ".relro_padding",
+      "size": 1296
+    },
+    {
+      "address": 15088,
+      "image_offset": 15088,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "llama_rmsnorm_epsilon_arithmetic_f16.image",
+  "image_sha256": "e440884d246d20580826888b6d279ce61eb24018b2b0196e1a1285071d41e037",
+  "image_size": 15089,
+  "kernarg_schema": {
+    "bytes": 32,
+    "fields": [
+      {
+        "name": "hidden_input",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "scale",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "hidden_output",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "epsilon",
+        "offset": 24,
+        "type": "float32"
+      }
+    ],
+    "name": "llama-rmsnorm-f16-v1"
+  },
+  "name": "llama_rmsnorm_epsilon_arithmetic_f16",
+  "rsrc1": 3222208512,
+  "rsrc2": 132,
+  "rsrc3": 64,
+  "source_path": "native_r9700/kernels/llama_rmsnorm_epsilon_arithmetic_f16.cpp",
+  "source_sha256": "79b8c594962bf44ef0dd8391f2dff96958c9acefc11d6c03aae3ace382130c3e",
+  "target": "gfx1201"
+}
