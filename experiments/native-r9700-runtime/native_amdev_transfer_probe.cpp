@@ -2965,6 +2965,10 @@ constexpr RegDef kGcVmL2Cntl4{"regGCVM_L2_CNTL4", 5597U, 0U};                   
 constexpr RegDef kGcVmL2Cntl5{"regGCVM_L2_CNTL5", 5603U, 0U};                                              // regs.py:5703 gc_12_0_0
 constexpr RegDef kGcVmProtectionFaultDefaultLo{"regGCVM_L2_PROTECTION_FAULT_DEFAULT_ADDR_LO32", 5588U, 0U}; // regs.py:5689 gc_12_0_0
 constexpr RegDef kGcVmProtectionFaultDefaultHi{"regGCVM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32", 5589U, 0U}; // regs.py:5690 gc_12_0_0
+constexpr RegDef kGcVmProtectionFaultStatusLo32{"regGCVM_L2_PROTECTION_FAULT_STATUS_LO32", 5584U, 0U}; // regs.py:5685 gc_12_0_0
+constexpr RegDef kGcVmProtectionFaultStatusHi32{"regGCVM_L2_PROTECTION_FAULT_STATUS_HI32", 5585U, 0U}; // regs.py:5686 gc_12_0_0
+constexpr RegDef kGcVmProtectionFaultAddrLo32{"regGCVM_L2_PROTECTION_FAULT_ADDR_LO32", 5586U, 0U};     // regs.py:5687 gc_12_0_0
+constexpr RegDef kGcVmProtectionFaultAddrHi32{"regGCVM_L2_PROTECTION_FAULT_ADDR_HI32", 5587U, 0U};     // regs.py:5688 gc_12_0_0
 constexpr RegDef kGcIdentityLowLo{"regGCVM_L2_CONTEXT1_IDENTITY_APERTURE_LOW_ADDR_LO32", 5591U, 0U};        // regs.py:5691 gc_12_0_0
 constexpr RegDef kGcIdentityLowHi{"regGCVM_L2_CONTEXT1_IDENTITY_APERTURE_LOW_ADDR_HI32", 5592U, 0U};        // regs.py:5692 gc_12_0_0
 constexpr RegDef kGcIdentityHighLo{"regGCVM_L2_CONTEXT1_IDENTITY_APERTURE_HIGH_ADDR_LO32", 5593U, 0U};      // regs.py:5693 gc_12_0_0
@@ -3927,6 +3931,10 @@ struct ComputeDoorbellConsumptionSnapshot {
   uint32_t cp_mec_rs64_exception_status = 0;
   uint32_t cp_mec_rs64_instr_pntr = 0;
   uint32_t cp_mec_rs64_prgrm_cntr_start_hi = 0;
+  uint32_t gcvm_protection_fault_status_lo32 = 0;
+  uint32_t gcvm_protection_fault_status_hi32 = 0;
+  uint32_t gcvm_protection_fault_addr_lo32 = 0;
+  uint32_t gcvm_protection_fault_addr_hi32 = 0;
   uint32_t cp_mec_local_instr_base_lo = 0;
   uint32_t cp_mec_local_instr_base_hi = 0;
   uint32_t cp_mec_local_instr_mask_lo = 0;
@@ -4301,6 +4309,18 @@ bool read_compute_doorbell_consumption_snapshot(
                           regs_gfx1201::kCpMecRs64PrgrmCntrStartHi.name,
                           &snapshot->cp_mec_rs64_prgrm_cntr_start_hi,
                           error_text) &&
+      read_debug_register(client, log, regs_gfx1201::kGcVmProtectionFaultStatusLo32,
+                          regs_gfx1201::kGcVmProtectionFaultStatusLo32.name,
+                          &snapshot->gcvm_protection_fault_status_lo32, error_text) &&
+      read_debug_register(client, log, regs_gfx1201::kGcVmProtectionFaultStatusHi32,
+                          regs_gfx1201::kGcVmProtectionFaultStatusHi32.name,
+                          &snapshot->gcvm_protection_fault_status_hi32, error_text) &&
+      read_debug_register(client, log, regs_gfx1201::kGcVmProtectionFaultAddrLo32,
+                          regs_gfx1201::kGcVmProtectionFaultAddrLo32.name,
+                          &snapshot->gcvm_protection_fault_addr_lo32, error_text) &&
+      read_debug_register(client, log, regs_gfx1201::kGcVmProtectionFaultAddrHi32,
+                          regs_gfx1201::kGcVmProtectionFaultAddrHi32.name,
+                          &snapshot->gcvm_protection_fault_addr_hi32, error_text) &&
       read_debug_register(client, log, regs_gfx1201::kCpMecLocalInstrBaseLo,
                           regs_gfx1201::kCpMecLocalInstrBaseLo.name,
                           &snapshot->cp_mec_local_instr_base_lo, error_text) &&
@@ -4484,6 +4504,14 @@ std::string format_compute_doorbell_consumption_snapshot(
          format_hex32(snapshot.cp_mec_rs64_instr_pntr) +
          ", cp_mec_rs64_prgrm_cntr_start_hi=" +
          format_hex32(snapshot.cp_mec_rs64_prgrm_cntr_start_hi) +
+         ", gcvm_protection_fault_status_lo32=" +
+         format_hex32(snapshot.gcvm_protection_fault_status_lo32) +
+         ", gcvm_protection_fault_status_hi32=" +
+         format_hex32(snapshot.gcvm_protection_fault_status_hi32) +
+         ", gcvm_protection_fault_addr_lo32=" +
+         format_hex32(snapshot.gcvm_protection_fault_addr_lo32) +
+         ", gcvm_protection_fault_addr_hi32=" +
+         format_hex32(snapshot.gcvm_protection_fault_addr_hi32) +
          ", cp_mec_local_instr_base_lo=" +
          format_hex32(snapshot.cp_mec_local_instr_base_lo) +
          ", cp_mec_local_instr_base_hi=" +
