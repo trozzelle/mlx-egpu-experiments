@@ -36,6 +36,7 @@ _BASELINE_R_TOKENS = {
     "prompt-0": [12366, 13, 578, 469],
     "prompt-1": [128009, 128006, 78191, 271],
     "prompt-2": [128009, 128006, 128006, 128006],
+    "prompt-16": [11, 706, 28995, 12207],
 }
 _CPU_REFERENCE_PRODUCER_KIND = "cpu_reference"
 _R9700_NATIVE_PRODUCER_KIND = "r9700_native"
@@ -149,8 +150,8 @@ def test_load_prompt_cases_preserves_fixture_order_and_s_minus_one_split():
 
     cases = parity.load_prompt_cases(_FIXTURE_DIR)
 
-    assert [case.name for case in cases] == ["prompt-0", "prompt-1", "prompt-2"]
-    assert [case.S for case in cases] == [6, 222, 661]
+    assert [case.name for case in cases] == ["prompt-0", "prompt-1", "prompt-2", "prompt-16"]
+    assert [case.S for case in cases] == [6, 222, 661, 17]
     for case in cases:
         assert isinstance(case, parity.PromptCase)
         assert len(case.token_ids) == case.S
@@ -389,6 +390,7 @@ def test_run_parity_suite_fixture_r_passes_when_all_prompt_tokens_match(tmp_path
         "prompt-0",
         "prompt-1",
         "prompt-2",
+        "prompt-16",
     ]
     for prompt_name, expected_tokens in _BASELINE_R_TOKENS.items():
         prompt_result = _prompt_result(result, prompt_name)

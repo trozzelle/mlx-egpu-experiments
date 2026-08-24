@@ -29,5 +29,15 @@
     "max_new_tokens": 4,
     "S": 661
   },
-  "_joint_r_tokens_digest": "aa6ed796a65e75c43d0d3c27d5a9509546c915f5dc53177c663da41475cd381c"
+  "_joint_r_tokens_digest": "aa6ed796a65e75c43d0d3c27d5a9509546c915f5dc53177c663da41475cd381c",
+  "prompt-16": {
+    "r_tokens": [
+      11,
+      706,
+      28995,
+      12207
+    ],
+    "max_new_tokens": 4,
+    "S": 17
+  }
 }

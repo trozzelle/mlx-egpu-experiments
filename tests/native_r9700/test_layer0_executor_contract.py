@@ -232,7 +232,7 @@ int selected_embedding_rows_and_token_scalars() {
     return 1;
   }
 
-  std::vector<native_r9700::ResidentHsaStage> stages(9);
+  std::vector<native_r9700::ResidentHsaStage> stages(10);
   stages[3].kernargs.resize(48);
   stages[4].kernargs.resize(48);
   stages[5].kernargs.resize(32);
