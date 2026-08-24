@@ -2244,10 +2244,14 @@ struct RemoteSysmemFdResult {
 
 class RemoteClient {
  public:
+  // Additive-only counter: incremented once per socket RPC issued (send_all),
+  // never changes any RPC argument, return value, or wire byte.
+  mutable uint64_t rpc_count = 0;
   explicit RemoteClient(int fd) : fd_(fd) {}
 
   RemoteRpcResult rpc(RemoteCmd cmd, uint32_t bar, uint64_t arg0, uint64_t arg1, uint64_t arg2,
                       const std::vector<uint8_t>& payload, uint64_t readout_size) const {
+    ++rpc_count;
     RemoteRpcResult result;
     const RemoteCmdFrame frame = build_remote_cmd_frame(cmd, kRemoteDevId, bar, arg0, arg1, arg2);
     std::vector<uint8_t> request(frame.begin(), frame.end());
@@ -2313,6 +2317,7 @@ class RemoteClient {
 
   bool mmio_write_fire_and_forget(uint32_t bar, uint64_t offset, const std::vector<uint8_t>& payload,
                                   std::string* error_text) const {
+    ++rpc_count;
     // tinygrad/runtime/support/system.py:388-390 RemotePCIDevice._bulk_write sends
     // RemoteCmd::MMIO_WRITE as <BIIQQQ> args (offset, len(data), 0) plus payload and
     // intentionally reads no response header.
@@ -2328,6 +2333,7 @@ class RemoteClient {
   }
 
   RemoteSysmemFdResult rpc_sysmem_fd(uint64_t size, bool contiguous) const {
+    ++rpc_count;
     RemoteSysmemFdResult result;
     if (size > 0xffffffffULL) {
       result.error_text = "MAP_SYSMEM_FD size exceeds 32-bit RPC size field: " + std::to_string(size);

@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include <fcntl.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "amdev_session.h"
@@ -34,8 +35,17 @@
 namespace {
 
 bool flush_gc_tlb_vmid0_native(const RemoteClient& client, DiscoveryLog* log,
-                               std::string* error_text) {
-  if (!flush_hdp(client, *log, error_text)) {
+                               std::string* error_text, long* hdp_flush_usec = nullptr) {
+  timeval hdp_start{};
+  if (hdp_flush_usec != nullptr) gettimeofday(&hdp_start, nullptr);
+  const bool hdp_flushed = flush_hdp(client, *log, error_text);
+  if (hdp_flush_usec != nullptr) {
+    timeval hdp_now{};
+    gettimeofday(&hdp_now, nullptr);
+    *hdp_flush_usec += (hdp_now.tv_sec - hdp_start.tv_sec) * 1000000L +
+                       (hdp_now.tv_usec - hdp_start.tv_usec);
+  }
+  if (!hdp_flushed) {
     *error_text = "GC TLB HDP flush failed: " + *error_text;
     log->vm.gc_tlb_flush_status = "fail";
     return false;
@@ -64,7 +74,7 @@ bool setup_fixed_vm_mapping(const RemoteClient& client, DiscoveryLog* log,
                             const VmBufferLog& staging, const VmBufferLog& readback,
                             const VmBufferLog& sdma_control,
                             const VmBufferLog* compute_control, bool enable_gc_hub,
-                            FixedVmMappingResult* result) {
+                            FixedVmMappingResult* result, long* hdp_flush_usec = nullptr) {
   result->tables = log->vm.tables;
   std::string error;
   if (!(enable_gc_hub ? is_supported_gfx1201_vm_ip_layout(*log, &error)
@@ -102,7 +112,7 @@ bool setup_fixed_vm_mapping(const RemoteClient& client, DiscoveryLog* log,
     result->error_text = error;
     return false;
   }
-  if (!flush_gc_tlb_vmid0_native(client, log, &error)) {
+  if (!flush_gc_tlb_vmid0_native(client, log, &error, hdp_flush_usec)) {
     result->failure_stage = "gc_tlb_flush";
     result->error_text = error;
     return false;
@@ -1886,6 +1896,32 @@ bool run_resident_kernel_dispatch(const ResidentKernelDispatch& request,
 }  // namespace
 
 
+struct PhaseTimers {
+  long model_load_usec = 0;
+  long staging_copy_usec = 0;
+  long sdma_setup_usec = 0;
+  long sdma_submit_usec = 0;
+  long sdma_fence_wait_usec = 0;
+  long pm4_build_usec = 0;
+  long hdp_flush_usec = 0;
+  long doorbell_usec = 0;
+  long timeline_wait_usec = 0;
+  uint64_t sdma_setup_count = 0;
+  uint64_t compute_submit_count = 0;
+  uint64_t socket_rpc_count = 0;
+};
+
+struct ScopedUsec {
+  long* target;
+  timeval start{};
+  explicit ScopedUsec(long* out) : target(out) { gettimeofday(&start, nullptr); }
+  ~ScopedUsec() {
+    timeval now{}; gettimeofday(&now, nullptr);
+    *target += (now.tv_sec - start.tv_sec) * 1000000L + (now.tv_usec - start.tv_usec);
+  }
+};
+
+
 struct ResidentHsaSession::Impl {
   struct Image {
     uint32_t rsrc1 = 0;
@@ -1896,6 +1932,7 @@ struct ResidentHsaSession::Impl {
   };
 
   DiscoveryLog log;
+  PhaseTimers phase_timers;
   UniqueFd socket_fd;
   std::unique_ptr<HardwareLock> hardware_lock;
 
@@ -1982,6 +2019,7 @@ struct ResidentHsaSession::Impl {
     socket_fd.reset();
     hardware_lock.reset();
     log = DiscoveryLog{};
+    phase_timers = PhaseTimers{};
 
     staging = VmBufferLog{"staging", kTransferProofVmStagingVa, kResidentStagingByteCount, 0,
                           "not_run", {}};
@@ -2112,7 +2150,8 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
   std::memset(state.compute_control_mapping.data, 0, state.compute_control_mapping.size);
   FixedVmMappingResult vm_result;
   if (!setup_fixed_vm_mapping(*state.client, &state.log, state.staging, state.readback,
-                              state.sdma_control, &state.compute_control, true, &vm_result)) {
+                              state.sdma_control, &state.compute_control, true, &vm_result,
+                              &state.phase_timers.hdp_flush_usec)) {
     return fail(vm_result.failure_stage.c_str(), vm_result.error_text);
   }
   const uint64_t vram_mib = state.log.vram_size_bytes >> 20U;
@@ -2264,16 +2303,33 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
 
       const uint32_t chunk =
           static_cast<uint32_t>(std::min<uint64_t>(kResidentStagingByteCount, upload.size() - offset));
-      std::memcpy(state.staging_mapping.data, upload.data() + offset, chunk);
+      {
+        ScopedUsec timer(&state.phase_timers.staging_copy_usec);
+        std::memcpy(state.staging_mapping.data, upload.data() + offset, chunk);
+      }
       std::atomic_thread_fence(std::memory_order_seq_cst);
       std::memset(static_cast<uint8_t*>(state.sdma_control_mapping.data) + am_sdma::kFenceOffset, 0,
                   sizeof(uint32_t));
-      if (!setup_sdma_queue0(*state.client, &state.log, &detail) ||
-          !submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
-                            state.staging.gpu_va, state.buffers[index].gpu_va + offset, chunk,
-                            am_sdma::kFenceValue, 0, &detail) ||
-          !poll_sdma_fence(state.sdma_control_mapping, &detail)) {
-        return fail_after_resident("sdma_h2d", detail);
+      {
+        ScopedUsec timer(&state.phase_timers.sdma_setup_usec);
+        ++state.phase_timers.sdma_setup_count;
+        if (!setup_sdma_queue0(*state.client, &state.log, &detail)) {
+          return fail_after_resident("sdma_h2d", detail);
+        }
+      }
+      {
+        ScopedUsec timer(&state.phase_timers.sdma_submit_usec);
+        if (!submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
+                              state.staging.gpu_va, state.buffers[index].gpu_va + offset, chunk,
+                              am_sdma::kFenceValue, 0, &detail)) {
+          return fail_after_resident("sdma_h2d", detail);
+        }
+      }
+      {
+        ScopedUsec timer(&state.phase_timers.sdma_fence_wait_usec);
+        if (!poll_sdma_fence(state.sdma_control_mapping, &detail)) {
+          return fail_after_resident("sdma_h2d", detail);
+        }
       }
       offset += chunk;
     }
@@ -2358,7 +2414,11 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
                               image.rsrc1, image.rsrc2, rsrc3, image.wave32, stage.workgroup_x,
                               stage.workgroup_y, stage.workgroup_z, stage.global_x,
                               stage.global_y, stage.global_z};
-  const std::vector<uint32_t> pm4_words = build_pm4_dispatch_words(pm4);
+  std::vector<uint32_t> pm4_words;
+  {
+    ScopedUsec timer(&state.phase_timers.pm4_build_usec);
+    pm4_words = build_pm4_dispatch_words(pm4);
+  }
   // Reset the completion timeline before submit: the RELEASE_MEM in this
   // dispatch writes kReleaseMemTimelineValue, and the poll below waits for that
   // value. Without a reset, a prior dispatch's completed timeline leaves the
@@ -2368,14 +2428,21 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
                   am_compute::kTimelineOffset,
               0, sizeof(uint32_t));
   std::atomic_thread_fence(std::memory_order_seq_cst);
-  if (!submit_compute_dispatch_with_post_doorbell_diagnostics(
-          *state.client, &state.log, &state.compute_control_mapping, pm4_words, &detail)) {
-    return fail("pm4_submit", detail);
+  ++state.phase_timers.compute_submit_count;
+  {
+    ScopedUsec timer(&state.phase_timers.doorbell_usec);
+    if (!submit_compute_dispatch_with_post_doorbell_diagnostics(
+            *state.client, &state.log, &state.compute_control_mapping, pm4_words, &detail)) {
+      return fail("pm4_submit", detail);
+    }
   }
   long elapsed_usec = 0;
-  if (!poll_compute_timeline_with_consumption_diagnostics(
-          *state.client, &state.log, state.compute_control_mapping, &elapsed_usec, &detail)) {
-    return fail("compute_fence_poll", detail);
+  {
+    ScopedUsec timer(&state.phase_timers.timeline_wait_usec);
+    if (!poll_compute_timeline_with_consumption_diagnostics(
+            *state.client, &state.log, state.compute_control_mapping, &elapsed_usec, &detail)) {
+      return fail("compute_fence_poll", detail);
+    }
   }
   result->pm4_dispatch_word_count += pm4_words.size();
   result->pm4_dispatch_digest = pm4_dispatch_digest(pm4_words);
@@ -2420,16 +2487,33 @@ bool ResidentHsaSession::upload_named(const std::string& buffer_name, const uint
   while (offset < byte_count) {
     const uint32_t chunk =
         static_cast<uint32_t>(std::min<uint64_t>(kResidentStagingByteCount, byte_count - offset));
-    std::memcpy(state.staging_mapping.data, bytes + offset, chunk);
+    {
+      ScopedUsec timer(&state.phase_timers.staging_copy_usec);
+      std::memcpy(state.staging_mapping.data, bytes + offset, chunk);
+    }
     std::atomic_thread_fence(std::memory_order_seq_cst);
     std::memset(static_cast<uint8_t*>(state.sdma_control_mapping.data) + am_sdma::kFenceOffset, 0,
                 sizeof(uint32_t));
-    if (!setup_sdma_queue0(*state.client, &state.log, &detail) ||
-        !submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
-                          state.staging.gpu_va, state.buffers[buffer_index].gpu_va + offset, chunk,
-                          am_sdma::kFenceValue, 0, &detail) ||
-        !poll_sdma_fence(state.sdma_control_mapping, &detail)) {
-      return fail(detail);
+    {
+      ScopedUsec timer(&state.phase_timers.sdma_setup_usec);
+      ++state.phase_timers.sdma_setup_count;
+      if (!setup_sdma_queue0(*state.client, &state.log, &detail)) {
+        return fail(detail);
+      }
+    }
+    {
+      ScopedUsec timer(&state.phase_timers.sdma_submit_usec);
+      if (!submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
+                            state.staging.gpu_va, state.buffers[buffer_index].gpu_va + offset, chunk,
+                            am_sdma::kFenceValue, 0, &detail)) {
+        return fail(detail);
+      }
+    }
+    {
+      ScopedUsec timer(&state.phase_timers.sdma_fence_wait_usec);
+      if (!poll_sdma_fence(state.sdma_control_mapping, &detail)) {
+        return fail(detail);
+      }
     }
     offset += chunk;
   }
@@ -2471,12 +2555,26 @@ bool ResidentHsaSession::readback(const std::vector<std::string>& names,
       const uint32_t chunk = static_cast<uint32_t>(std::min<uint64_t>(kPageSize, byte_count - offset));
       std::memset(static_cast<uint8_t*>(state.sdma_control_mapping.data) + am_sdma::kFenceOffset, 0,
                   sizeof(uint32_t));
-      if (!setup_sdma_queue0(*state.client, &state.log, &detail) ||
-          !submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
-                            state.buffers[buffer_index].gpu_va + offset, state.readback.gpu_va,
-                            chunk, am_sdma::kFenceValue, 0, &detail) ||
-          !poll_sdma_fence(state.sdma_control_mapping, &detail)) {
-        return fail(detail);
+      {
+        ScopedUsec timer(&state.phase_timers.sdma_setup_usec);
+        ++state.phase_timers.sdma_setup_count;
+        if (!setup_sdma_queue0(*state.client, &state.log, &detail)) {
+          return fail(detail);
+        }
+      }
+      {
+        ScopedUsec timer(&state.phase_timers.sdma_submit_usec);
+        if (!submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
+                              state.buffers[buffer_index].gpu_va + offset, state.readback.gpu_va,
+                              chunk, am_sdma::kFenceValue, 0, &detail)) {
+          return fail(detail);
+        }
+      }
+      {
+        ScopedUsec timer(&state.phase_timers.sdma_fence_wait_usec);
+        if (!poll_sdma_fence(state.sdma_control_mapping, &detail)) {
+          return fail(detail);
+        }
       }
       std::atomic_thread_fence(std::memory_order_seq_cst);
       std::memcpy(observed.data() + offset, state.readback_mapping.data, chunk);
@@ -2494,6 +2592,25 @@ bool ResidentHsaSession::close(std::string* error_text) {
     state.reset_after_close();
     return true;
   }
+  if (state.client != nullptr) {
+    state.phase_timers.socket_rpc_count = state.client->rpc_count;
+  }
+  std::printf("phase_timer model_load_usec: %ld\n", state.phase_timers.model_load_usec);
+  std::printf("phase_timer staging_copy_usec: %ld\n", state.phase_timers.staging_copy_usec);
+  std::printf("phase_timer sdma_setup_usec: %ld\n", state.phase_timers.sdma_setup_usec);
+  std::printf("phase_timer sdma_submit_usec: %ld\n", state.phase_timers.sdma_submit_usec);
+  std::printf("phase_timer sdma_fence_wait_usec: %ld\n", state.phase_timers.sdma_fence_wait_usec);
+  std::printf("phase_timer pm4_build_usec: %ld\n", state.phase_timers.pm4_build_usec);
+  std::printf("phase_timer hdp_flush_usec: %ld\n", state.phase_timers.hdp_flush_usec);
+  std::printf("phase_timer doorbell_usec: %ld\n", state.phase_timers.doorbell_usec);
+  std::printf("phase_timer timeline_wait_usec: %ld\n", state.phase_timers.timeline_wait_usec);
+  std::printf("phase_counter sdma_setup_count: %llu\n",
+              static_cast<unsigned long long>(state.phase_timers.sdma_setup_count));
+  std::printf("phase_counter compute_submit_count: %llu\n",
+              static_cast<unsigned long long>(state.phase_timers.compute_submit_count));
+  std::printf("phase_counter socket_rpc_count: %llu\n",
+              static_cast<unsigned long long>(state.phase_timers.socket_rpc_count));
+
   std::string detail;
   if (state.compute_queue_retirement != nullptr &&
       !state.compute_queue_retirement->retire(&detail)) {

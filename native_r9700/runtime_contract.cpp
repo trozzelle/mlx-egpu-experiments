@@ -14,6 +14,7 @@
 #include <iterator>
 #include <limits>
 #include <string>
+#include <sys/time.h>
 #include <unistd.h>
 #include <vector>
 
@@ -717,10 +718,18 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
 
   LlamaLayerWeightTable weight_table;
   std::string detail;
-  if (!build_llama_layer_weight_table(request.model_dir, &weight_table, &detail)) {
+  timeval model_load_start{};
+  gettimeofday(&model_load_start, nullptr);
+  const bool weight_table_ok = build_llama_layer_weight_table(request.model_dir, &weight_table, &detail);
+  timeval model_load_end{};
+  gettimeofday(&model_load_end, nullptr);
+  const long model_load_usec = (model_load_end.tv_sec - model_load_start.tv_sec) * 1000000L +
+                               (model_load_end.tv_usec - model_load_start.tv_usec);
+  if (!weight_table_ok) {
     fail(result, "layer_weight_table", detail, error_text);
     return 1;
   }
+  log_progress("phase_timer model_load_usec: " + std::to_string(model_load_usec));
   for (uint32_t token_id : request.token_ids) {
     Fp16WeightSpan selected_row;
     if (!select_llama_embedding_row(weight_table.embed_tokens, token_id, &selected_row, &detail)) {
