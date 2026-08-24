@@ -40,6 +40,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "amdev_session.h"
 
 namespace native_r9700 {
 
@@ -6259,6 +6260,13 @@ struct NativePrefillResult {
   std::string native_prefill_blocker_source;
   std::string failure_stage;
   std::string failure_text;
+  // Per-phase launch/transport timing (usec) + submission counters from the
+  // resident session; populated before the NPZ is serialized.
+  PhaseTimers phase_timers;
+  // End-to-end native prefill wall time measured by the runner (usec).
+  uint64_t wall_usec = 0;
+  // Number of prompt tokens prefilled (S-1 cache prefix length).
+  uint32_t n_prefix = 0;
   int exit_status = 1;
 };
 

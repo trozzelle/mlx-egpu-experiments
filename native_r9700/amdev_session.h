@@ -10,6 +10,24 @@
 namespace native_r9700 {
 struct VramLayout;
 
+// Per-phase wall-clock timing (usec) + submission counters accumulated by a
+// resident session. Exposed so the native-prefill result can report the
+// launch/transport breakdown instead of only the aggregate wall time.
+struct PhaseTimers {
+  long model_load_usec = 0;
+  long staging_copy_usec = 0;
+  long sdma_setup_usec = 0;
+  long sdma_submit_usec = 0;
+  long sdma_fence_wait_usec = 0;
+  long pm4_build_usec = 0;
+  long hdp_flush_usec = 0;
+  long doorbell_usec = 0;
+  long timeline_wait_usec = 0;
+  uint64_t sdma_setup_count = 0;
+  uint64_t compute_submit_count = 0;
+  uint64_t socket_rpc_count = 0;
+};
+
 
 // A bounded C0-compatible launch: one input page, one output page, one code
 // page, and one kernarg page. It becomes physical only through
@@ -142,6 +160,9 @@ class ResidentHsaSession {
   // Must be called before close; close resets the control mapping.
   bool compute_ring_pointers(uint64_t* rptr_dwords, uint64_t* wptr_dwords,
                              std::string* error_text);
+  // Returns the session's accumulated phase timers + submission counters.
+  // Valid after prepare; reflects the completed work after close.
+  const PhaseTimers& phase_timers() const;
   bool upload_named(const std::string& buffer_name, const uint8_t* bytes,
                     uint64_t byte_count, ResidentHsaDispatchResult* result,
                     std::string* error_text);

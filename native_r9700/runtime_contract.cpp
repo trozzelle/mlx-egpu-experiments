@@ -879,6 +879,9 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
     return 1;
   }
   log_progress("resident_close complete");
+  // phase_timers() returns the close-time snapshot (captured before the reset).
+  result->phase_timers = resident.phase_timers();
+  result->n_prefix = static_cast<uint32_t>(request.token_ids.size());
   result->kernel_count = dispatch_result.pm4_dispatch_count;
   result->transfer_bytes = dispatch_result.sdma_upload_bytes + dispatch_result.sdma_download_bytes;
   NativePrefillNpzPayload payload;

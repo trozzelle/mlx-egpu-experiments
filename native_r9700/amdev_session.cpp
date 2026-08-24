@@ -1939,20 +1939,6 @@ bool run_resident_kernel_dispatch(const ResidentKernelDispatch& request,
 }  // namespace
 
 
-struct PhaseTimers {
-  long model_load_usec = 0;
-  long staging_copy_usec = 0;
-  long sdma_setup_usec = 0;
-  long sdma_submit_usec = 0;
-  long sdma_fence_wait_usec = 0;
-  long pm4_build_usec = 0;
-  long hdp_flush_usec = 0;
-  long doorbell_usec = 0;
-  long timeline_wait_usec = 0;
-  uint64_t sdma_setup_count = 0;
-  uint64_t compute_submit_count = 0;
-  uint64_t socket_rpc_count = 0;
-};
 
 struct ScopedUsec {
   long* target;
@@ -1980,6 +1966,9 @@ struct ResidentHsaSession::Impl {
 
   DiscoveryLog log;
   PhaseTimers phase_timers;
+  // Close-time snapshot of the phase accumulator, captured before the reset so
+  // callers can read the completed breakdown after close().
+  PhaseTimers final_timers;
   UniqueFd socket_fd;
   std::unique_ptr<HardwareLock> hardware_lock;
 
@@ -2749,8 +2738,14 @@ bool ResidentHsaSession::close(std::string* error_text) {
     if (error_text != nullptr) *error_text = "resident VRAM cleanup did not complete: " + detail;
     return false;
   }
+  state.final_timers = state.phase_timers;
   state.reset_after_close();
   return true;
+}
+
+const PhaseTimers& ResidentHsaSession::phase_timers() const {
+  // After close, the accumulator is reset; return the close-time snapshot.
+  return impl_->resident == nullptr ? impl_->final_timers : impl_->phase_timers;
 }
 
 bool validate_resident_kernel_dispatch(const ResidentKernelDispatch& request,

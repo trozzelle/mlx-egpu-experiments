@@ -20,6 +20,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <sys/time.h>
 
 #include "runtime.h"
 #include "llama_layer_executor.h"
@@ -153,6 +154,12 @@ std::string log_value(std::string value) {
   return value;
 }
 
+double tokens_per_sec(const native_r9700::NativePrefillResult& result) {
+  if (result.wall_usec == 0) return 0.0;
+  return static_cast<double>(result.n_prefix) * 1e6 /
+         static_cast<double>(result.wall_usec);
+}
+
 std::string native_prefill_key_value(const native_r9700::NativePrefillResult& result) {
   return "producer_kind: " + log_value(result.producer_kind) + "\n" +
          "runtime_substrate: " + std::string(native_r9700::kRuntimeSubstrate) + "\n" +
@@ -166,6 +173,21 @@ std::string native_prefill_key_value(const native_r9700::NativePrefillResult& re
          "prefill_npz_path: " + log_value(result.prefill_npz_path) + "\n" +
          "kernel_count: " + std::to_string(result.kernel_count) + "\n" +
          "transfer_bytes: " + std::to_string(result.transfer_bytes) + "\n" +
+         "n_prefix: " + std::to_string(result.n_prefix) + "\n" +
+         "wall_usec: " + std::to_string(result.wall_usec) + "\n" +
+         "tokens_per_sec: " + std::to_string(tokens_per_sec(result)) + "\n" +
+         "phase_timer model_load_usec: " + std::to_string(result.phase_timers.model_load_usec) + "\n" +
+         "phase_timer staging_copy_usec: " + std::to_string(result.phase_timers.staging_copy_usec) + "\n" +
+         "phase_timer sdma_setup_usec: " + std::to_string(result.phase_timers.sdma_setup_usec) + "\n" +
+         "phase_timer sdma_submit_usec: " + std::to_string(result.phase_timers.sdma_submit_usec) + "\n" +
+         "phase_timer sdma_fence_wait_usec: " + std::to_string(result.phase_timers.sdma_fence_wait_usec) + "\n" +
+         "phase_timer pm4_build_usec: " + std::to_string(result.phase_timers.pm4_build_usec) + "\n" +
+         "phase_timer hdp_flush_usec: " + std::to_string(result.phase_timers.hdp_flush_usec) + "\n" +
+         "phase_timer doorbell_usec: " + std::to_string(result.phase_timers.doorbell_usec) + "\n" +
+         "phase_timer timeline_wait_usec: " + std::to_string(result.phase_timers.timeline_wait_usec) + "\n" +
+         "phase_counter sdma_setup_count: " + std::to_string(result.phase_timers.sdma_setup_count) + "\n" +
+         "phase_counter compute_submit_count: " + std::to_string(result.phase_timers.compute_submit_count) + "\n" +
+         "phase_counter socket_rpc_count: " + std::to_string(result.phase_timers.socket_rpc_count) + "\n" +
          "failure_stage: " + log_value(result.failure_stage) + "\n" +
          "failure_text: " + log_value(result.failure_text) + "\n" +
          "exit_status: " + std::to_string(result.exit_status) + "\n";
@@ -183,6 +205,21 @@ std::string native_prefill_json(const native_r9700::NativePrefillResult& result)
          json_escape(result.native_prefill_blocker_source) +
          "\",\"kernel_count\":" + std::to_string(result.kernel_count) +
          ",\"transfer_bytes\":" + std::to_string(result.transfer_bytes) +
+         ",\"n_prefix\":" + std::to_string(result.n_prefix) +
+         ",\"wall_usec\":" + std::to_string(result.wall_usec) +
+         ",\"tokens_per_sec\":" + std::to_string(tokens_per_sec(result)) +
+         ",\"model_load_usec\":" + std::to_string(result.phase_timers.model_load_usec) +
+         ",\"staging_copy_usec\":" + std::to_string(result.phase_timers.staging_copy_usec) +
+         ",\"sdma_setup_usec\":" + std::to_string(result.phase_timers.sdma_setup_usec) +
+         ",\"sdma_submit_usec\":" + std::to_string(result.phase_timers.sdma_submit_usec) +
+         ",\"sdma_fence_wait_usec\":" + std::to_string(result.phase_timers.sdma_fence_wait_usec) +
+         ",\"pm4_build_usec\":" + std::to_string(result.phase_timers.pm4_build_usec) +
+         ",\"hdp_flush_usec\":" + std::to_string(result.phase_timers.hdp_flush_usec) +
+         ",\"doorbell_usec\":" + std::to_string(result.phase_timers.doorbell_usec) +
+         ",\"timeline_wait_usec\":" + std::to_string(result.phase_timers.timeline_wait_usec) +
+         ",\"sdma_setup_count\":" + std::to_string(result.phase_timers.sdma_setup_count) +
+         ",\"compute_submit_count\":" + std::to_string(result.phase_timers.compute_submit_count) +
+         ",\"socket_rpc_count\":" + std::to_string(result.phase_timers.socket_rpc_count) +
          ",\"failure_stage\":\"" + json_escape(result.failure_stage) +
          "\",\"failure_text\":\"" + json_escape(result.failure_text) +
          "\",\"exit_status\":" + std::to_string(result.exit_status) + "}\n";
@@ -573,7 +610,14 @@ int main(int argc, char** argv) {
     std::string parse_error;
     const bool parsed_tokens = parse_token_ids_json(argv[5], &request.token_ids, &parse_error);
     if (!parsed_tokens) request.token_ids.clear();
+    timeval wall_start{};
+    timeval wall_end{};
+    gettimeofday(&wall_start, nullptr);
     int status = native_r9700::run_native_prefill(request, &result, nullptr);
+    gettimeofday(&wall_end, nullptr);
+    result.wall_usec = static_cast<uint64_t>(
+        (wall_end.tv_sec - wall_start.tv_sec) * 1000000L +
+        (wall_end.tv_usec - wall_start.tv_usec));
     if (!parsed_tokens && result.failure_stage == "native_prefill_request") {
       result.failure_text = parse_error;
       status = result.exit_status = 1;
