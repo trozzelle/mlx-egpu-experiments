@@ -53,7 +53,7 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 |---|---|---|---|---|---|---|
 | T1 Monotonic PM4 timeline value | Done | — | — | opt-t1-monotonic-timeline.md | 2/2 passed; field at struct end (positional-agg safe) | — |
 | T2 Parameterize submit/poll | Done | — | — | opt-t2-transport-params.md | 24/24 passed; build exit 0 | — |
-| T3 Batched resident dispatch | Not started | — | T1, T2 | — | — | — |
+| T3 Batched resident dispatch | Done | — | T1, T2 | opt-t3-batched-dispatch.md + opt-t3b-perstage-kernargs.md | 38/38 passed; per-stage kernargs ring (16 pages) fixes race | — |
 | T4 Batched SDMA upload | Not started | — | — | — | — | — |
 | T5 Wire prefill loop | Not started | — | T3 | — | — | — |
 | T6 Verify + measure | Not started | — | T1–T5 | — | — | — |

@@ -224,7 +224,7 @@ EXPECTED_COMPUTE_VM_LAYOUT_LINES = (
     "compute_wptr_va: 0x000020000000f008",
     "compute_timeline_va: 0x000020000000f010",
     "compute_eop_va: 0x0000200000010000",
-    "compute_control_requested_size: 40960",
+    "compute_control_requested_size: 106496",
     "compute_control_queue_cpu_offset: 0",
     "compute_control_kernargs_cpu_offset: 4096",
     "kernel_input_ptb_index: 1",

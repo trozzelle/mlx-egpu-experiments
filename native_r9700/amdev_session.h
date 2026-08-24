@@ -132,6 +132,8 @@ class ResidentHsaSession {
                std::string* error_text);
   bool dispatch(const ResidentHsaStage& stage, ResidentHsaDispatchResult* result,
                 std::string* error_text);
+  bool dispatch_batch(const std::vector<ResidentHsaStage>& stages,
+                      ResidentHsaDispatchResult* result, std::string* error_text);
   bool upload_named(const std::string& buffer_name, const uint8_t* bytes,
                     uint64_t byte_count, ResidentHsaDispatchResult* result,
                     std::string* error_text);
@@ -142,6 +144,8 @@ class ResidentHsaSession {
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
+  bool build_stage_pm4(const ResidentHsaStage& stage, std::vector<uint32_t>* words,
+                       std::string* error_text);
 };
 // A no-device allocation plan produced by the same ResidentMemory order used
 // by dispatch_resident_hsa. Callers use these VAs to validate stage bindings
