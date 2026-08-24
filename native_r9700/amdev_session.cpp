@@ -793,8 +793,11 @@ bool submit_compute_dispatch_with_post_doorbell_diagnostics(
 bool poll_compute_timeline_with_consumption_diagnostics(
     const RemoteClient& client, DiscoveryLog* log,
     const SysmemMapping& compute_control_mapping, long* elapsed_usec,
-    std::string* error_text) {
-  if (poll_compute_timeline(compute_control_mapping, elapsed_usec, error_text)) return true;
+    std::string* error_text,
+    uint32_t expected_value = am_compute::kReleaseMemTimelineValue) {
+  if (poll_compute_timeline(compute_control_mapping, elapsed_usec, error_text,
+                            expected_value))
+    return true;
 
   ComputeQueueDebugSnapshot queue_snapshot;
   std::string queue_error;
@@ -2011,6 +2014,10 @@ struct ResidentHsaSession::Impl {
   std::string uncertain_text;
   std::string release_error;
   bool prepared = false;
+  // Monotonic RELEASE_MEM timeline value assigned to each stage's PM4 stream.
+  // The terminal poll waits for (next_timeline_value - 1), so no per-dispatch
+  // timeline reset may occur between stages of a batch.
+  uint32_t next_timeline_value = 1;
   SdmaRingState sdma_ring;
 
   const char* first_pte_failure() const {
@@ -2079,6 +2086,7 @@ struct ResidentHsaSession::Impl {
     uncertain_text.clear();
     release_error.clear();
     prepared = false;
+    next_timeline_value = 1;
     sdma_ring = SdmaRingState{};
   }
   bool submit_sdma_chunk_persistent(uint64_t src_va, uint64_t dst_va, uint32_t byte_count,
@@ -2410,6 +2418,7 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
     return fail_after_resident("compute_ring_setup", detail);
   }
   state.prepared = true;
+  state.next_timeline_value = 1;
   result->failure_stage = "none";
   return true;
 }
@@ -2425,16 +2434,30 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
   if (result == nullptr) return fail("dispatch", "resident HSA dispatch result is required");
   Impl& state = *impl_;
   if (!state.prepared) return fail("dispatch", "resident HSA session is not prepared");
+  return dispatch_batch({stage}, result, error_text);
+}
+
+bool ResidentHsaSession::build_stage_pm4(const ResidentHsaStage& stage, uint32_t slot,
+                                         std::vector<uint32_t>* words,
+                                         std::string* error_text) {
+  Impl& state = *impl_;
+  // preflight: image index, entry offset (256-aligned), nonempty kernargs <= slot,
+  // nonzero geometry, in-bounds non-overlapping bindings — the former dispatch()
+  // checks, sized against kKernargSlotByteCount.
   if (stage.hsa_image_index >= state.images.size() ||
       stage.entry_offset >= state.images[stage.hsa_image_index].byte_count ||
       (stage.entry_offset & 0xffU) != 0 || stage.kernargs.empty() ||
-      stage.kernargs.size() > kPageSize) {
-    return fail("preflight", "HSA stage does not fit the prepared resident image table");
+      stage.kernargs.size() > am_compute::kKernargSlotByteCount) {
+    *error_text = "HSA stage does not fit the prepared resident image table";
+    return false;
   }
   const uint32_t dimensions[] = {stage.workgroup_x, stage.workgroup_y, stage.workgroup_z,
                                  stage.global_x, stage.global_y, stage.global_z};
   for (uint32_t dimension : dimensions) {
-    if (dimension == 0) return fail("preflight", "HSA dispatch geometry dimensions must be nonzero");
+    if (dimension == 0) {
+      *error_text = "HSA dispatch geometry dimensions must be nonzero";
+      return false;
+    }
   }
   ResidentKernelDispatch kernarg_request;
   kernarg_request.kernargs = stage.kernargs;
@@ -2443,35 +2466,21 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
     if (binding.buffer_index >= state.buffers.size() ||
         binding.kernarg_byte_offset > kernarg_request.kernargs.size() ||
         kernarg_request.kernargs.size() - binding.kernarg_byte_offset < sizeof(uint64_t)) {
-      return fail("preflight", "HSA kernarg binding is outside its buffer or kernarg layout");
+      *error_text = "HSA kernarg binding is outside its buffer or kernarg layout";
+      return false;
     }
     for (uint32_t occupied : occupied_offsets) {
       if (binding.kernarg_byte_offset < occupied + sizeof(uint64_t) &&
           occupied < binding.kernarg_byte_offset + sizeof(uint64_t)) {
-        return fail("preflight", "HSA kernarg bindings must not overlap");
+        *error_text = "HSA kernarg bindings must not overlap";
+        return false;
       }
     }
     occupied_offsets.push_back(binding.kernarg_byte_offset);
     store_u64_le(kernarg_request.kernargs.data() + binding.kernarg_byte_offset,
                  state.buffers[binding.buffer_index].gpu_va);
   }
-  uint32_t kernarg_slot = 0;
-  const char* slot_env = std::getenv("NATIVE_KERNARG_SLOT");
-  const bool use_slot_bind = slot_env != nullptr && slot_env[0] != '\0';
-  if (use_slot_bind) {
-    kernarg_slot = static_cast<uint32_t>(std::strtoul(slot_env, nullptr, 0));
-  }
-  std::string detail;
-  uint64_t kernargs_va = am_compute::kKernargsVa;
-  if (use_slot_bind) {
-    if (!bind_resident_kernel_kernargs_slot(kernarg_request, &state.compute_control_mapping,
-                                            kernarg_slot, &kernargs_va, &detail)) {
-      return fail("kernarg_bind", detail);
-    }
-  } else if (!bind_resident_kernel_kernargs(kernarg_request, &state.compute_control_mapping,
-                                            &detail)) {
-    return fail("kernarg_bind", detail);
-  }
+#ifdef NATIVE_R9700_DIAG_DISPATCH
   for (size_t i = 0; i < state.buffers.size(); ++i) {
     std::fprintf(stderr, "DIAG buffer[%zu] gpu_va=0x%016llx phys=0x%016llx\n",
                  i, static_cast<unsigned long long>(state.buffers[i].gpu_va),
@@ -2479,9 +2488,18 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
   }
   for (size_t i = 0; i + 8 <= kernarg_request.kernargs.size(); i += 8) {
     uint64_t v = 0;
-    for (size_t b = 0; b < 8; ++b) v |= static_cast<uint64_t>(kernarg_request.kernargs[i + b]) << (8 * b);
+    for (size_t b = 0; b < 8; ++b)
+      v |= static_cast<uint64_t>(kernarg_request.kernargs[i + b]) << (8 * b);
     std::fprintf(stderr, "DIAG kernarg[%zu] = 0x%016llx\n", i / 8,
                  static_cast<unsigned long long>(v));
+  }
+#endif
+  uint64_t slot_va = 0;
+  std::string detail;
+  if (!bind_resident_kernel_kernargs_slot(kernarg_request, &state.compute_control_mapping,
+                                          slot, &slot_va, &detail)) {
+    *error_text = detail;
+    return false;
   }
   const Impl::Image& image = state.images[stage.hsa_image_index];
   // Diagnostic: override COMPUTE_PGM_RSRC3 (INST_PREF_SIZE on GFX12) without
@@ -2491,42 +2509,104 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
                              ? static_cast<uint32_t>(std::strtoul(rsrc3_override_env, nullptr, 0))
                              : image.rsrc3;
   const Pm4DispatchConfig pm4{state.image_buffers[stage.hsa_image_index].gpu_va + stage.entry_offset,
-                              kernargs_va, am_compute::kTimelineVa,
+                              slot_va, am_compute::kTimelineVa,
                               image.rsrc1, image.rsrc2, rsrc3, image.wave32, stage.workgroup_x,
                               stage.workgroup_y, stage.workgroup_z, stage.global_x,
-                              stage.global_y, stage.global_z};
-  std::vector<uint32_t> pm4_words;
+                              stage.global_y, stage.global_z, state.next_timeline_value++};
+  const std::vector<uint32_t> stage_words = build_pm4_dispatch_words(pm4);
+  words->insert(words->end(), stage_words.begin(), stage_words.end());
+  return true;
+}
+
+bool ResidentHsaSession::dispatch_batch(const std::vector<ResidentHsaStage>& stages,
+                                        ResidentHsaDispatchResult* result,
+                                        std::string* error_text) {
+  auto fail = [&](const char* failure_stage, const std::string& text) {
+    if (result != nullptr) result->failure_stage = failure_stage;
+    if (error_text != nullptr) *error_text = text;
+    return false;
+  };
+  if (result == nullptr) return fail("dispatch", "resident HSA dispatch result is required");
+  Impl& state = *impl_;
+  if (!state.prepared) return fail("dispatch", "resident HSA session is not prepared");
+  if (stages.empty()) return fail("preflight", "dispatch batch has no stages");
+  if (stages.size() > am_compute::kKernargSlotCount)
+    return fail("preflight", "dispatch batch exceeds the 10 in-page kernarg slots");
+
+  std::vector<uint32_t> batch;
+  batch.reserve(stages.size() * am_compute::kPm4DispatchDwordCount);
   {
     ScopedUsec timer(&state.phase_timers.pm4_build_usec);
-    pm4_words = build_pm4_dispatch_words(pm4);
+    for (size_t index = 0; index < stages.size(); ++index) {
+      std::string detail;
+      if (!build_stage_pm4(stages[index], static_cast<uint32_t>(index), &batch, &detail))
+        return fail("preflight", detail);
+    }
   }
-  // Reset the completion timeline before submit: the RELEASE_MEM in this
-  // dispatch writes kReleaseMemTimelineValue, and the poll below waits for that
-  // value. Without a reset, a prior dispatch's completed timeline leaves the
-  // value already at 1, so the poll returns before THIS dispatch retires and
-  // the readback races the kernel (observed as an all-Inf stage-1 readback).
-  std::memset(static_cast<uint8_t*>(state.compute_control_mapping.data) +
-                  am_compute::kTimelineOffset,
-              0, sizeof(uint32_t));
-  std::atomic_thread_fence(std::memory_order_seq_cst);
+
+  // Single submission: read current WPTR once, write the whole batch, publish once.
   ++state.phase_timers.compute_submit_count;
-  if (!submit_compute_dispatch_with_post_doorbell_diagnostics(
-          *state.client, &state.log, &state.compute_control_mapping, pm4_words, &detail,
-          &state.phase_timers.hdp_flush_usec, &state.phase_timers.doorbell_usec)) {
-    return fail("pm4_submit", detail);
+  uint64_t current_wptr_dwords = 0;
+  std::string detail;
+  std::memcpy(&current_wptr_dwords,
+              static_cast<const uint8_t*>(state.compute_control_mapping.data) +
+                  am_compute::kWptrOffset,
+              sizeof(uint64_t));
+  if (!write_compute_ring_words(&state.compute_control_mapping, batch,
+                                current_wptr_dwords, &detail))
+    return fail("pm4_batch", detail);
+  {
+    ScopedUsec timer(&state.phase_timers.hdp_flush_usec);
+    if (!flush_hdp(*state.client, state.log, &detail)) return fail("hdp_flush", detail);
+  }
+  const uint64_t new_wptr_dwords = current_wptr_dwords + batch.size();
+  if (!write_compute_control_u64(&state.compute_control_mapping, am_compute::kWptrOffset,
+                                 new_wptr_dwords, &detail))
+    return fail("pm4_wptr", detail);
+  std::atomic_thread_fence(std::memory_order_seq_cst);
+  {
+    ScopedUsec timer(&state.phase_timers.doorbell_usec);
+    if (!state.client->mmio_write_fire_and_forget(
+            2, am_compute::kMecDoorbellBar2ByteOffset, u64_payload_le(new_wptr_dwords), &detail))
+      return fail("pm4_doorbell", detail);
   }
   long elapsed_usec = 0;
   {
     ScopedUsec timer(&state.phase_timers.timeline_wait_usec);
     if (!poll_compute_timeline_with_consumption_diagnostics(
-            *state.client, &state.log, state.compute_control_mapping, &elapsed_usec, &detail)) {
+            *state.client, &state.log, state.compute_control_mapping, &elapsed_usec, &detail,
+            state.next_timeline_value - 1))
       return fail("compute_fence_poll", detail);
-    }
   }
-  result->pm4_dispatch_word_count += pm4_words.size();
-  result->pm4_dispatch_digest = pm4_dispatch_digest(pm4_words);
-  ++result->pm4_dispatch_count;
+  result->pm4_dispatch_count += static_cast<uint32_t>(stages.size());
+  result->pm4_dispatch_word_count += static_cast<uint64_t>(batch.size());
   result->failure_stage = "none";
+  return true;
+}
+
+bool ResidentHsaSession::compute_ring_pointers(uint64_t* rptr_dwords, uint64_t* wptr_dwords,
+                                               std::string* error_text) {
+  if (rptr_dwords == nullptr || wptr_dwords == nullptr) {
+    if (error_text != nullptr) *error_text = "compute ring pointer outputs are required";
+    return false;
+  }
+  Impl& state = *impl_;
+  if (state.compute_control_mapping.data == nullptr ||
+      am_compute::kRptrOffset > state.compute_control_mapping.size ||
+      sizeof(uint64_t) > state.compute_control_mapping.size - am_compute::kRptrOffset ||
+      am_compute::kWptrOffset > state.compute_control_mapping.size ||
+      sizeof(uint64_t) > state.compute_control_mapping.size - am_compute::kWptrOffset) {
+    if (error_text != nullptr) *error_text = "compute control mapping cannot hold rptr/wptr";
+    return false;
+  }
+  std::memcpy(rptr_dwords,
+              static_cast<const uint8_t*>(state.compute_control_mapping.data) +
+                  am_compute::kRptrOffset,
+              sizeof(uint64_t));
+  std::memcpy(wptr_dwords,
+              static_cast<const uint8_t*>(state.compute_control_mapping.data) +
+                  am_compute::kWptrOffset,
+              sizeof(uint64_t));
   return true;
 }
 

@@ -132,6 +132,16 @@ class ResidentHsaSession {
                std::string* error_text);
   bool dispatch(const ResidentHsaStage& stage, ResidentHsaDispatchResult* result,
                 std::string* error_text);
+  // Dispatches up to kKernargSlotCount stages as one ring write, one doorbell,
+  // and one terminal timeline poll. Slot i binds stage i's kernargs into the
+  // in-page slot i, so the single-stage path (slot 0, timeline_value 1) is
+  // byte-identical to dispatch.
+  bool dispatch_batch(const std::vector<ResidentHsaStage>& stages,
+                      ResidentHsaDispatchResult* result, std::string* error_text);
+  // Reads the live compute ring rptr/wptr (in dwords) from the control page.
+  // Must be called before close; close resets the control mapping.
+  bool compute_ring_pointers(uint64_t* rptr_dwords, uint64_t* wptr_dwords,
+                             std::string* error_text);
   bool upload_named(const std::string& buffer_name, const uint8_t* bytes,
                     uint64_t byte_count, ResidentHsaDispatchResult* result,
                     std::string* error_text);
@@ -140,6 +150,10 @@ class ResidentHsaSession {
   bool close(std::string* error_text);
 
  private:
+  // Per-stage PM4 transform (preflight, kernarg slot bind, build). Appends 59
+  // dwords to *words and advances next_timeline_value.
+  bool build_stage_pm4(const ResidentHsaStage& stage, uint32_t slot,
+                       std::vector<uint32_t>* words, std::string* error_text);
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

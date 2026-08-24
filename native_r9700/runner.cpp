@@ -22,7 +22,7 @@
 #include <vector>
 
 #include "runtime.h"
-
+#include "llama_layer_executor.h"
 namespace {
 
 
@@ -47,6 +47,8 @@ void print_help(const char* argv0) {
   std::printf("  --llama-stage-trace --model <dir> --token-id <uint32> --layer 0 --position 0 \\\n");
   std::printf("      --stage <boundary> --trace-dir <dir> [--rmsnorm-unit-scale [--rmsnorm-zero-input [--rmsnorm-output-sentinel [--rmsnorm-zero-store]]]]\n");
   std::printf("                         trace one layer-0/token-0 resident boundary; zero-store requires normalized zero-input unit-scale sentinel\n");
+  std::printf("  --llama-two-stage-trace --model <dir> --token-id <uint32> --layer 0 --position 0\n");
+  std::printf("                         dispatch the first two layer-0 stages as one batched ring write\n");
   std::printf("  --help                show this message\n");
 }
 
@@ -428,6 +430,91 @@ int main(int argc, char** argv) {
     const int status = native_r9700::run_llama_stage_trace(request, &result, nullptr);
     print_llama_stage_trace_result(result);
     return status;
+  }
+
+  if (std::strcmp(argv[1], "--llama-two-stage-trace") == 0) {
+    if (argc != 10 || std::strcmp(argv[2], "--model") != 0 ||
+        std::strcmp(argv[4], "--token-id") != 0 || std::strcmp(argv[6], "--layer") != 0 ||
+        std::strcmp(argv[8], "--position") != 0) {
+      std::fprintf(stderr,
+                   "error: --llama-two-stage-trace expects --model <dir> --token-id <uint32> "
+                   "--layer 0 --position 0\n");
+      return 2;
+    }
+    uint32_t token_id = 0;
+    uint32_t layer_index = 0;
+    uint32_t position = 0;
+    if (!parse_u32_strict(argv[5], &token_id) || !parse_u32_strict(argv[7], &layer_index) ||
+        !parse_u32_strict(argv[9], &position)) {
+      std::fprintf(stderr,
+                   "error: --token-id, --layer, and --position must be strict uint32 values\n");
+      return 2;
+    }
+    if (layer_index != 0 || position != 0) {
+      std::fprintf(stderr, "error: --llama-two-stage-trace supports only layer 0 and position 0\n");
+      return 2;
+    }
+    std::string detail;
+    std::vector<native_r9700::HsaCodeImageAsset> images;
+    native_r9700::ResidentHsaDispatch dispatch;
+    if (!native_r9700::build_llama_layer0_stage_trace_dispatch(
+            argv[3], token_id, false, false, &images, &dispatch, &detail)) {
+      std::printf("two_stage_trace status: failed\n");
+      std::printf("failure_stage: trace_prepare\n");
+      std::printf("failure_text: %s\n", detail.c_str());
+      std::printf("exit_status: 1\n");
+      return 1;
+    }
+    if (dispatch.stages.size() < 2) {
+      std::printf("two_stage_trace status: failed\n");
+      std::printf("failure_stage: trace_prepare\n");
+      std::printf("failure_text: layer-0 dispatch has fewer than two stages\n");
+      std::printf("exit_status: 1\n");
+      return 1;
+    }
+    native_r9700::ResidentHsaSession resident;
+    native_r9700::ResidentHsaDispatchResult dispatch_result;
+    if (!resident.prepare(dispatch, &dispatch_result, &detail)) {
+      std::printf("two_stage_trace status: failed\n");
+      std::printf("failure_stage: resident_prepare\n");
+      std::printf("failure_text: backend_failure_stage=%s: %s\n",
+                  dispatch_result.failure_stage.c_str(), detail.c_str());
+      std::printf("exit_status: 1\n");
+      return 1;
+    }
+    const std::vector<native_r9700::ResidentHsaStage> first_two_stages = {
+        dispatch.stages[0], dispatch.stages[1]};
+    if (!resident.dispatch_batch(first_two_stages, &dispatch_result, &detail)) {
+      std::string close_error;
+      resident.close(&close_error);
+      std::printf("two_stage_trace status: failed\n");
+      std::printf("failure_stage: resident_dispatch_batch\n");
+      std::printf("failure_text: backend_failure_stage=%s: %s\n",
+                  dispatch_result.failure_stage.c_str(), detail.c_str());
+      std::printf("exit_status: 1\n");
+      return 1;
+    }
+    uint64_t rptr_dwords = 0;
+    uint64_t wptr_dwords = 0;
+    std::string pointer_error;
+    if (!resident.compute_ring_pointers(&rptr_dwords, &wptr_dwords, &pointer_error)) {
+      std::string close_error;
+      resident.close(&close_error);
+      std::printf("two_stage_trace status: failed\n");
+      std::printf("failure_stage: compute_ring_pointers\n");
+      std::printf("failure_text: %s\n", pointer_error.c_str());
+      std::printf("exit_status: 1\n");
+      return 1;
+    }
+    std::string close_error;
+    const bool closed = resident.close(&close_error);
+    std::printf("two_stage_trace status: ok\n");
+    std::printf("batch_dword_count: %llu\n",
+                static_cast<unsigned long long>(dispatch_result.pm4_dispatch_word_count));
+    std::printf("compute_rptr: %llu\n", static_cast<unsigned long long>(rptr_dwords));
+    std::printf("compute_wptr: %llu\n", static_cast<unsigned long long>(wptr_dwords));
+    std::printf("exit_status: %d\n", closed ? 0 : 1);
+    return closed ? 0 : 1;
   }
 
   if (std::strcmp(argv[1], "--llama-embed-smoke") == 0) {
