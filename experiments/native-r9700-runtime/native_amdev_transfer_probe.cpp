@@ -316,15 +316,9 @@ constexpr uint64_t kRptrVa = am_vm::kVaBase + (15ULL * kPageSize);
 constexpr uint64_t kWptrVa = kRptrVa + 8ULL;
 constexpr uint64_t kTimelineVa = kRptrVa + 16ULL;
 constexpr uint64_t kEopVa = am_vm::kVaBase + (16ULL * kPageSize);
-// Per-stage kernargs ring: pages 17..32 (16 pages) for batched resident
-// dispatch, one distinct kernargs page per in-flight stage.
-constexpr uint64_t kKernargsRingVa = am_vm::kVaBase + (17ULL * kPageSize);
-constexpr uint32_t kKernargsRingPageCount = 16U;
-constexpr uint64_t kComputeControlKernargsRingCpuOffset = 10ULL * kPageSize;
 // All fixed mappings must stay inside the first PDB0 2 MiB span (512 PTB
 // entries); resident payloads own PDB0 index 1 and beyond.
-static_assert(kKernargsRingVa + kKernargsRingPageCount * kPageSize <=
-                  am_vm::kVaBase + (512ULL * kPageSize),
+static_assert(kEopVa + kPageSize <= am_vm::kVaBase + (512ULL * kPageSize),
               "fixed VA layout overflows the first PDB0 page-table span");
 constexpr uint64_t fixed_vram_paddr_for_va(uint64_t gpu_va) {
   return am_vm::kFixedVramBufferPaddr + (((gpu_va - am_vm::kVramVa) / kPageSize) * kPageSize);
@@ -338,7 +332,7 @@ constexpr uint64_t kMqdPaddr = am_vm::kPtableArenaBase + (3ULL * kPageSize);
 constexpr uint32_t kRingSize = 0x8000U;
 constexpr uint32_t kEopSize = 0x1000U;
 constexpr uint32_t kMqdSize = 2048U;
-constexpr uint64_t kComputeControlByteCount = 26ULL * kPageSize;            // 2 control + 8 ring + 16 kernargs ring
+constexpr uint64_t kComputeControlByteCount = 10ULL * kPageSize;            // 2 control + 8 ring
 constexpr uint64_t kComputeControlQueueCpuOffset = 0ULL;
 constexpr uint64_t kRptrOffset = 0ULL;
 constexpr uint64_t kWptrOffset = 8ULL;
@@ -1506,13 +1500,11 @@ int run_compute_vm_layout_self_test() {
       am_compute::kEopVramPaddr != am_vm::kFixedVramBufferPaddr + (15ULL * kPageSize)) {
     return self_test_failure("compute-vm-layout", "compute VRAM physical layout mismatch");
   }
-  if (am_compute::kComputeControlByteCount != 26ULL * kPageSize ||
+  if (am_compute::kComputeControlByteCount != 10ULL * kPageSize ||
       am_compute::kComputeControlKernargsCpuOffset != kPageSize ||
       am_compute::kComputeControlRingCpuOffset != 2ULL * kPageSize ||
-      am_compute::kComputeControlRingByteCount != 8ULL * kPageSize ||
-      am_compute::kComputeControlKernargsRingCpuOffset != 10ULL * kPageSize ||
-      am_compute::kKernargsRingPageCount != 16U) {
-    return self_test_failure("compute-vm-layout", "compute_control 26-page CPU layout mismatch");
+      am_compute::kComputeControlRingByteCount != 8ULL * kPageSize) {
+    return self_test_failure("compute-vm-layout", "compute_control ten-page CPU layout mismatch");
   }
 
   std::printf("self_test: compute-vm-layout\n");
@@ -3394,8 +3386,8 @@ bool write_fixed_page_tables(const RemoteClient& client, DiscoveryLog* log, cons
     *error_text = "MAP_SYSMEM_FD page lists must contain staging, readback, and sdma_control page-0 physical addresses";
     return false;
   }
-  if (compute_control != nullptr && compute_control->sys_pages.size() < 26) {
-    *error_text = "MAP_SYSMEM_FD page list must contain compute_control 2 control pages plus 8 ring pages plus 16 kernargs-ring pages";
+  if (compute_control != nullptr && compute_control->sys_pages.size() < 10) {
+    *error_text = "MAP_SYSMEM_FD page list must contain compute_control 2 control pages plus 8 ring pages";
     return false;
   }
   if ((staging.sys_pages[0] % kPageSize) != 0 || (readback.sys_pages[0] % kPageSize) != 0 ||
@@ -3488,11 +3480,6 @@ bool write_fixed_page_tables(const RemoteClient& client, DiscoveryLog* log, cons
     for (uint64_t i = 0; i < 8; ++i) {
       add_ptb_pte(am_compute::kRingVa + i * kPageSize,
                   compute_control->sys_pages[am_compute::kComputeControlRingCpuOffset / kPageSize + i],
-                  sysmem_flags);
-    }
-    for (uint64_t i = 0; i < am_compute::kKernargsRingPageCount; ++i) {
-      add_ptb_pte(am_compute::kKernargsRingVa + i * kPageSize,
-                  compute_control->sys_pages[am_compute::kComputeControlKernargsRingCpuOffset / kPageSize + i],
                   sysmem_flags);
     }
     add_ptb_pte(am_compute::kRptrVa, compute_control->sys_pages[0], sysmem_flags);
