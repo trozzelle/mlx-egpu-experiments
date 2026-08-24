@@ -6089,7 +6089,8 @@ bool write_compute_ring_words(SysmemMapping* compute_control_mapping,
 bool submit_compute_dispatch(const RemoteClient& client, DiscoveryLog* log,
                              SysmemMapping* compute_control_mapping,
                              const std::vector<uint32_t>& words, std::string* error_text,
-                             bool capture_queue_snapshot = true) {
+                             bool capture_queue_snapshot = true, long* hdp_flush_usec = nullptr,
+                             long* doorbell_usec = nullptr) {
   if (log == nullptr) {
     *error_text = "DiscoveryLog precondition failed: null log";
     return false;
@@ -6121,7 +6122,16 @@ bool submit_compute_dispatch(const RemoteClient& client, DiscoveryLog* log,
                                 error_text)) {
     return false;
   }
-  if (!flush_hdp(client, *log, error_text)) {
+  timeval hdp_start{};
+  if (hdp_flush_usec != nullptr) gettimeofday(&hdp_start, nullptr);
+  const bool hdp_flushed = flush_hdp(client, *log, error_text);
+  if (hdp_flush_usec != nullptr) {
+    timeval hdp_now{};
+    gettimeofday(&hdp_now, nullptr);
+    *hdp_flush_usec += (hdp_now.tv_sec - hdp_start.tv_sec) * 1000000L +
+                       (hdp_now.tv_usec - hdp_start.tv_usec);
+  }
+  if (!hdp_flushed) {
     *error_text = "flush HDP after compute PM4 ring write failed: " + *error_text;
     return false;
   }
@@ -6142,8 +6152,17 @@ bool submit_compute_dispatch(const RemoteClient& client, DiscoveryLog* log,
   }
   std::atomic_thread_fence(std::memory_order_seq_cst);
   const std::vector<uint8_t> doorbell_payload = u64_payload_le(new_wptr_dwords);
-  if (!client.mmio_write_fire_and_forget(2, am_compute::kMecDoorbellBar2ByteOffset,
-                                         doorbell_payload, error_text)) {
+  timeval doorbell_start{};
+  if (doorbell_usec != nullptr) gettimeofday(&doorbell_start, nullptr);
+  const bool doorbell_written = client.mmio_write_fire_and_forget(
+      2, am_compute::kMecDoorbellBar2ByteOffset, doorbell_payload, error_text);
+  if (doorbell_usec != nullptr) {
+    timeval doorbell_now{};
+    gettimeofday(&doorbell_now, nullptr);
+    *doorbell_usec += (doorbell_now.tv_sec - doorbell_start.tv_sec) * 1000000L +
+                      (doorbell_now.tv_usec - doorbell_start.tv_usec);
+  }
+  if (!doorbell_written) {
     *error_text = "write compute MEC doorbell failed: " + *error_text;
     return false;
   }

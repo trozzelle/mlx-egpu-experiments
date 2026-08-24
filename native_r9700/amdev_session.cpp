@@ -744,8 +744,11 @@ void log_compute_queue_post_doorbell_diagnostics(const RemoteClient& client,
 
 bool submit_compute_dispatch_with_post_doorbell_diagnostics(
     const RemoteClient& client, DiscoveryLog* log, SysmemMapping* compute_control_mapping,
-    const std::vector<uint32_t>& words, std::string* error_text) {
-  if (!submit_compute_dispatch(client, log, compute_control_mapping, words, error_text)) return false;
+    const std::vector<uint32_t>& words, std::string* error_text, long* hdp_flush_usec = nullptr,
+    long* doorbell_usec = nullptr) {
+  if (!submit_compute_dispatch(client, log, compute_control_mapping, words, error_text, true,
+                               hdp_flush_usec, doorbell_usec))
+    return false;
   log_compute_queue_post_doorbell_diagnostics(client, *log);
   return true;
 }
@@ -2429,12 +2432,10 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
               0, sizeof(uint32_t));
   std::atomic_thread_fence(std::memory_order_seq_cst);
   ++state.phase_timers.compute_submit_count;
-  {
-    ScopedUsec timer(&state.phase_timers.doorbell_usec);
-    if (!submit_compute_dispatch_with_post_doorbell_diagnostics(
-            *state.client, &state.log, &state.compute_control_mapping, pm4_words, &detail)) {
-      return fail("pm4_submit", detail);
-    }
+  if (!submit_compute_dispatch_with_post_doorbell_diagnostics(
+          *state.client, &state.log, &state.compute_control_mapping, pm4_words, &detail,
+          &state.phase_timers.hdp_flush_usec, &state.phase_timers.doorbell_usec)) {
+    return fail("pm4_submit", detail);
   }
   long elapsed_usec = 0;
   {
