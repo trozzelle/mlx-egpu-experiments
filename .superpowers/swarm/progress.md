@@ -9,26 +9,32 @@
 
 ## Current facts
 
-- C0 kernel proof and resident-VRAM smoke pass (restored 2026-08-23 after cold cycle via full AMDev boot + queue warm-up).
-- A two-token native Llama prefill runs all 16 layers and emits a schema-valid `r9700_native` NPZ.
-- Native C1R prompt-0 still fails: `P = [0, 0, 0, 0]`, `R = [12366, 13, 578, 469]`; K/V comparisons are non-finite.
-- LN-1 established that hidden input is finite and byte-exact, while the first normalized RMSNorm trace fails closed with `trace_nonfinite`.
+- C0 kernel proof and resident-VRAM smoke pass on the R9700 (`1002:7551`, gfx1201).
+- The native 16-layer prefill emits a schema-valid `r9700_native` NPZ with finite,
+  numerically-correct K/V (all 16 layers, ULP-level vs the CPU reference).
+- **C1R is token-exact** at prompt-0 (`P == R == [12366, 13, 578, 469]`) and at
+  the meaningful 16-token prompt-16 (`P == R == [11, 706, 28995, 12207]`).
+- **C2R imported-cache serving passes** for prompt-16: `route=native_producer`,
+  `accepted_cache=true`, `fallback_reason=none`, `decoded_tokens` token-exact.
+- Root causes fixed this recovery: single-dispatch compute ring (`5755f8d`),
+  missing completion-timeline reset (`8f2f0ca`), launch geometry + o-proj/gated-MLP
+  width (`c8f5770`), missing query RoPE in attention (`36bf94a`), and the fused
+  gated-MLP PCIe-bandwidth blowup (`6036802`).
 
 ## Active ledger
 
 | Task | Status | Evidence | Blocker |
 |---|---|---|---|
-| LN-1A Layer-0/token-0 oracle | Done | `reports/ln-1a-oracle.md`; oracle and validation coverage reports | — |
-| LN-1B Bounded native trace | Done | `reports/ln-1b-native-trace.md`; publication and validation reports | — |
-| LN-1C First-stage comparison | Done | `reports/ln-1c-first-stage.md`; `reports/ln-1-final-review.md` | First failure is normalized RMSNorm output. |
-| LN-2 RMSNorm repair | In progress | `reports/ln-2a-cold-boot-recovery-and-mqd-byteswap.md` | C0 gate restored; queue healthy (embed byte-exact). A/B: sqrt completes NaN (original bug), rsqrt faults (dead), epsilon probe times out (unproven). Next: decompose `1/sqrt`. |
-| LN-3 Layer-0 recurrence | Blocked | — | Await finite, validated LN-2 output. |
-| LN-4 All-layer recurrence | Blocked | — | Await LN-3 16-token pass. |
-| LN-5 Native C1R/C2R | Blocked | — | Await finite native K/V and token-exact C1R parity. |
+| LN-2 RMSNorm repair | Done | token-exact `normalized` (`a0ab94d1`) | — |
+| LN-3 Layer-0 recurrence | Done | n=2/16 K/V ULP-correct | — |
+| LN-4 All-layer recurrence | Done | 16-layer prefill ULP-correct; 16-token prefill ~59 s | — |
+| LN-5 Native C1R/C2R | Done | prompt-0 + prompt-16 C1R token-exact; C2R prompt-16 no-fallback | — |
+| 64/128-token progression | Open | — | Widen attention key-token span past 64. |
+| Qwen producer | Blocked | — | Resumes after 128-token Llama gate. |
 
 ## Guardrails
 
 - Stop at the first non-finite or out-of-tolerance stage.
 - CPU/NumPy is oracle evidence only; it cannot produce an accepted native artifact.
 - Preserve `S-1` cache semantics and final-token injection.
-- Do not resume C2R or Qwen work before a meaningful native Llama acceptance gate passes.
+- Do not resume Qwen work before the 128-token Llama acceptance gate passes.

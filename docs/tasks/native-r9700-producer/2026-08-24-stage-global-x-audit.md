@@ -128,18 +128,23 @@ correct `global_x` is always evaluated at `sequence_length = 1`.
   `P == R == [12366, 13, 578, 469]`. This is the first native R9700 C1R
   acceptance.
 
+### Performance split + 16-token acceptance (done)
+
+- Split the fused gated-MLP into `llama_gate_up_projection_f16` (RMSNorm +
+  gate/up projected once, fp16 out) + `llama_mlp_down_f16` (SiLU + down +
+  residual; the 32 KiB gate/up is cache-resident). This removes the 137 GB
+  redundant per-dispatch read and drops the 16-token prefill from >300 s (and a
+  timeline timeout) to ~59 s, still ULP-correct.
+- Added `prompt-16` (16 prefix + 1 final token). **C1R is token-exact**:
+  `P == R == [11, 706, 28995, 12207]`, and **C2R imported-cache serving passes**
+  (`route=native_producer`, `accepted_cache=true`, `fallback_reason=none`,
+  `decoded_tokens == [11, 706, 28995, 12207]`) — the native producer now reaches
+  token-for-token C1R/C2R parity at the meaningful 16-token length.
+
 ## Remaining
 
-- **Performance (blocking 16-token).** The fused gated-MLP kernel rereads the
-  67 MiB gate/up weights once per output column (2048× redundant ≈ 137 GB per
-  dispatch over the TinyGPU PCIe link), so a single dispatch exceeds the 3 s
-  compute-timeline poll and a 16-token prefill dies at layer 4. Split it back
-  into a `gate_up` (project once) + `mlp_down` (read the 32 KiB gate/up from the
-  cache) pair — the round-3 kernel split is correct, only my reference was buggy.
-- The score kernel also recomputes `powf`/`cosf`/`sinf` per (head, key, pair);
-  precompute the RoPE cos/sin once.
-- Add a 16–128-token fixture prompt (current fixtures are S=6/222/661; the
-  222/661 prompts exceed the 128-token resident cache), then run C1R at the
-  meaningful 16-token length and C2R imported-cache serving.
+- The score kernel still recomputes `powf`/`cosf`/`sinf` per (head, key, pair);
+  precompute the RoPE cos/sin once (performance only).
 - Widen the attention key-token span past 64 for the full 128-token cache, then
-  Qwen can resume.
+  run the 64/128-token progression (the 222/661 fixtures also exceed the current
+  128-token cache). Qwen can then resume.
