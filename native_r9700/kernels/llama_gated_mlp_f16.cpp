@@ -8,9 +8,13 @@ extern "C" __attribute__((global)) void llama_gated_mlp_f16(
     unsigned int sequence_length) {
   constexpr unsigned int kHiddenSize = 2048U;
   constexpr unsigned int kIntermediateSize = 8192U;
+  constexpr unsigned int kColumnsPerWorkgroup = 64U;
   constexpr float kEpsilon = 1.0e-5f;
-  const unsigned int token = __builtin_amdgcn_workgroup_id_x();
-  const unsigned int output_column = __builtin_amdgcn_workitem_id_x();
+  const unsigned int workgroup = __builtin_amdgcn_workgroup_id_x();
+  const unsigned int token = workgroup / (kHiddenSize / kColumnsPerWorkgroup);
+  const unsigned int output_column =
+      workgroup % (kHiddenSize / kColumnsPerWorkgroup) * kColumnsPerWorkgroup +
+      __builtin_amdgcn_workitem_id_x();
   if (token >= sequence_length || output_column >= kHiddenSize) return;
 
   float sum_of_squares = 0.0f;

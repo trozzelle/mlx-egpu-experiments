@@ -82,7 +82,7 @@
     }
   ],
   "image_path": "llama_gated_mlp_f16.image",
-  "image_sha256": "2bca687f148135665fcf5afce4782bcb996a0a52d1fc96986e15e261a60c55fe",
+  "image_sha256": "71f242dbddbcd058dd73cd8b24f39007326e77238eeec4ff719b576fd86e18ec",
   "image_size": 16241,
   "kernarg_schema": {
     "bytes": 56,
@@ -130,6 +130,6 @@
   "rsrc2": 132,
   "rsrc3": 176,
   "source_path": "native_r9700/kernels/llama_gated_mlp_f16.cpp",
-  "source_sha256": "fe8d722f2380c908bccd8143b8db4e5b84e083211c4404194f680930923e176e",
+  "source_sha256": "9978253c65f73ce2e88e6bad21a0bd5397efc98d6d2646027957dcb55f1b860d",
   "target": "gfx1201"
 }

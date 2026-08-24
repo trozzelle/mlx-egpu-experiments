@@ -5,8 +5,12 @@ extern "C" __attribute__((global)) void llama_o_projection_f16(
     unsigned short* post_attention_hidden,
     unsigned int sequence_length) {
   constexpr unsigned int kHiddenSize = 2048U;
-  const unsigned int token = __builtin_amdgcn_workgroup_id_x();
-  const unsigned int output_column = __builtin_amdgcn_workitem_id_x();
+  constexpr unsigned int kColumnsPerWorkgroup = 64U;
+  const unsigned int workgroup = __builtin_amdgcn_workgroup_id_x();
+  const unsigned int token = workgroup / (kHiddenSize / kColumnsPerWorkgroup);
+  const unsigned int output_column =
+      workgroup % (kHiddenSize / kColumnsPerWorkgroup) * kColumnsPerWorkgroup +
+      __builtin_amdgcn_workitem_id_x();
   if (token >= sequence_length || output_column >= kHiddenSize) return;
   float accumulator = 0.0f;
   for (unsigned int column = 0U; column < kHiddenSize; ++column) {

@@ -60,30 +60,30 @@
       "address": 5888,
       "image_offset": 5888,
       "name": ".text",
-      "size": 768
+      "size": 896
     },
     {
-      "address": 10752,
-      "image_offset": 10752,
+      "address": 10880,
+      "image_offset": 10880,
       "name": ".dynamic",
       "size": 112
     },
     {
-      "address": 10864,
-      "image_offset": 10864,
+      "address": 10992,
+      "image_offset": 10992,
       "name": ".relro_padding",
-      "size": 1424
+      "size": 1296
     },
     {
-      "address": 14960,
-      "image_offset": 14960,
+      "address": 15088,
+      "image_offset": 15088,
       "name": ".bss",
       "size": 1
     }
   ],
   "image_path": "llama_o_projection_f16.image",
-  "image_sha256": "683c31d0f63e120fc8806d83d7115e5e6d3fd7c46525226ef140da3f939df557",
-  "image_size": 14961,
+  "image_sha256": "944a5d70745f9c17b9f1da1f96720779710caf1d1357f9e4fb988663017ead36",
+  "image_size": 15089,
   "kernarg_schema": {
     "bytes": 40,
     "fields": [
@@ -118,8 +118,8 @@
   "name": "llama_o_projection_f16",
   "rsrc1": 3222208513,
   "rsrc2": 132,
-  "rsrc3": 48,
+  "rsrc3": 64,
   "source_path": "native_r9700/kernels/llama_o_projection_f16.cpp",
-  "source_sha256": "ddfbf86580a858d814ff25ccdcaf4b48d47cdd510d20f86973f3ba1a89e74b7e",
+  "source_sha256": "a9a119cc539f254205ae169e866dc94a14fc2f739a32cab59475bb0b9a4bf9e5",
   "target": "gfx1201"
 }

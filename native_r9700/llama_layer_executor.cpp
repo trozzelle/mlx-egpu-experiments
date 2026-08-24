@@ -267,18 +267,18 @@ bool build_llama_stage_dispatch(const LlamaLayer0WeightSpans& weights, uint32_t 
   // Buffer order: selected row, input/post norms, Q/K/V/O/gate/up/down,
   // hidden, normalized, fresh K/V, K/V cache, score/probability, context, post-attention.
   append_stage(0, {{0, 0}, {1, 8}, {11, 16}}, {{24, 0x3727c5acU}}, 1);
-  append_stage(1, {{11, 0}, {4, 8}, {12, 16}}, {{24, 1}}, 512);
-  append_stage(2, {{11, 0}, {5, 8}, {13, 16}}, {{24, 1}}, 512);
+  append_stage(1, {{11, 0}, {4, 8}, {12, 16}}, {{24, 1}}, 8);
+  append_stage(2, {{11, 0}, {5, 8}, {13, 16}}, {{24, 1}}, 8);
   append_stage(3, {{12, 0}, {13, 8}, {14, 16}, {15, 24}},
-               {{32, 1}, {36, 0}, {40, 128}}, 512);
+               {{32, 1}, {36, 0}, {40, 128}}, 8);
   append_stage(4, {{11, 0}, {3, 8}, {14, 16}, {16, 24}},
-               {{32, 1}, {36, 0}, {40, 128}}, 2048);
-  append_stage(5, {{16, 0}, {17, 8}}, {{16, 1}, {20, 0}, {24, 128}}, 2048);
+               {{32, 1}, {36, 0}, {40, 128}}, 32);
+  append_stage(5, {{16, 0}, {17, 8}}, {{16, 1}, {20, 0}, {24, 128}}, 32);
   append_stage(6, {{17, 0}, {15, 8}, {18, 16}},
-               {{24, 1}, {28, 0}, {32, 128}}, 2048);
-  append_stage(7, {{18, 0}, {6, 8}, {0, 16}, {19, 24}}, {{32, 1}}, 2048);
+               {{24, 1}, {28, 0}, {32, 128}}, 32);
+  append_stage(7, {{18, 0}, {6, 8}, {0, 16}, {19, 24}}, {{32, 1}}, 32);
   append_stage(8, {{19, 0}, {2, 8}, {7, 16}, {8, 24}, {9, 32}, {10, 40}},
-               {{48, 1}}, 2048);
+               {{48, 1}}, 32);
   return true;
 }
 
@@ -545,34 +545,34 @@ bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
     append_stage(&layer_stages, 0, {{hidden0, 0},
                                    {buffers.input_layernorm, 8},
                                    {candidate.shared_buffers.normalized, 16}},
-                 {{24, 0x3727c5acU}}, 64);
+                 {{24, 0x3727c5acU}}, 1);
     append_stage(&layer_stages, 1, {{candidate.shared_buffers.normalized, 0},
                                    {buffers.k_projection, 8}, {candidate.shared_buffers.fresh_k, 16}},
-                 {{24, 1}}, 512);
+                 {{24, 1}}, 8);
     append_stage(&layer_stages, 2, {{candidate.shared_buffers.normalized, 0},
                                    {buffers.v_projection, 8}, {candidate.shared_buffers.fresh_v, 16}},
-                 {{24, 1}}, 512);
+                 {{24, 1}}, 8);
     append_stage(&layer_stages, 3, {{candidate.shared_buffers.fresh_k, 0},
                                    {candidate.shared_buffers.fresh_v, 8}, {k_cache, 16}, {v_cache, 24}},
-                 {{32, 1}, {36, 0}, {40, 128}}, 512);
+                 {{32, 1}, {36, 0}, {40, 128}}, 8);
     append_stage(&layer_stages, 4, {{candidate.shared_buffers.normalized, 0}, {buffers.q_projection, 8},
                                    {k_cache, 16}, {candidate.shared_buffers.attention_scores, 24}},
-                 {{32, 1}, {36, 0}, {40, 128}}, 2048);
+                 {{32, 1}, {36, 0}, {40, 128}}, 32);
     append_stage(&layer_stages, 5, {{candidate.shared_buffers.attention_scores, 0},
                                    {candidate.shared_buffers.attention_probabilities, 8}},
-                 {{16, 1}, {20, 0}, {24, 128}}, 2048);
+                 {{16, 1}, {20, 0}, {24, 128}}, 32);
     append_stage(&layer_stages, 6, {{candidate.shared_buffers.attention_probabilities, 0}, {v_cache, 8},
                                    {candidate.shared_buffers.context, 16}},
-                 {{24, 1}, {28, 0}, {32, 128}}, 2048);
+                 {{24, 1}, {28, 0}, {32, 128}}, 32);
 
     append_stage(&layer_stages, 7, {{candidate.shared_buffers.context, 0}, {buffers.o_projection, 8},
                                    {hidden0, 16},
                                    {candidate.shared_buffers.post_attention_hidden, 24}},
-                 {{32, 1}}, 2048);
+                 {{32, 1}}, 32);
     append_stage(&layer_stages, 8, {{candidate.shared_buffers.post_attention_hidden, 0},
                                    {buffers.post_attention_layernorm, 8}, {buffers.gate_projection, 16},
                                    {buffers.up_projection, 24}, {buffers.down_projection, 32},
-                                   {hidden0, 40}}, {{48, 1}}, 2048);
+                                   {hidden0, 40}}, {{48, 1}}, 32);
     candidate.layer_stages.push_back(std::move(layer_stages));
   }
   *dispatch = std::move(candidate);
