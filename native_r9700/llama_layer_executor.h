@@ -79,6 +79,8 @@ struct LlamaSharedResidentBufferIndices {
   uint32_t attention_probabilities;
   uint32_t context;
   uint32_t post_attention_hidden;
+  uint32_t gate;
+  uint32_t up;
 };
 
 
@@ -93,7 +95,7 @@ struct LlamaPersistentDispatch {
   // layer weights stream exactly once per layer instead of once per token.
   std::vector<uint32_t> hidden_buffers;
   // (stage index, kernarg binding slot) pairs whose buffer index names the
-  // per-token hidden window: stage 0 slot 0, stage 7 slot 2, stage 8 slot 5.
+  // per-token hidden window: stage 0 slot 0, stage 7 slot 2, stage 9 slot 4.
   std::vector<std::pair<uint32_t, uint32_t>> hidden_binding_slots;
   std::vector<uint32_t> k_cache_buffers;
   std::vector<uint32_t> v_cache_buffers;

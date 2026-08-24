@@ -15,7 +15,7 @@ namespace {
 
 // Stage assets are added here only after their code and metadata are reviewed
 // together. This intentionally excludes generic probes and archived blobs.
-const std::array<LlamaKernelAsset, 11> kLlamaKernelManifest = {{
+const std::array<LlamaKernelAsset, 13> kLlamaKernelManifest = {{
     {
         {"llama_k_projection_f16",
          "9c2f584f4bd4c918f8c2a95a0a1f29a7102c19e8080b0d538b36f26e6e8fcc9b",
@@ -114,6 +114,24 @@ const std::array<LlamaKernelAsset, 11> kLlamaKernelManifest = {{
          "71f242dbddbcd058dd73cd8b24f39007326e77238eeec4ff719b576fd86e18ec",
          "gfx1201", 0, 0, 0, "source_amdgpu_metadata"},
         "llama-gated-mlp-f16-v1",
+    },
+    {
+        {"llama_gate_up_projection_f16",
+         "0c0a6da2e7ef1378ef0cfa735f096ceeb58772be8a7d6324166117d421d01a0c",
+         {}, 3222208514U, 132U, 144U, 64U, 1U, 1U, 64U, 1U, 1U, 56U},
+        {"llama_gate_up_projection_f16.image",
+         "0c0a6da2e7ef1378ef0cfa735f096ceeb58772be8a7d6324166117d421d01a0c",
+         "gfx1201", 0, 0, 0, "source_amdgpu_metadata"},
+        "llama-gate-up-projection-f16-v1",
+    },
+    {
+        {"llama_mlp_down_f16",
+         "a9ad797933d1c627ff903f47aca89d33c3cf99f22d87149c52b337a3bfde236f",
+         {}, 3222208515U, 132U, 176U, 64U, 1U, 1U, 64U, 1U, 1U, 48U},
+        {"llama_mlp_down_f16.image",
+         "a9ad797933d1c627ff903f47aca89d33c3cf99f22d87149c52b337a3bfde236f",
+         "gfx1201", 0, 0, 0, "source_amdgpu_metadata"},
+        "llama-mlp-down-f16-v1",
     },
 }};
 

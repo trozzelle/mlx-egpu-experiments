@@ -110,7 +110,7 @@ constexpr std::array<LlamaStageTraceSpec, 11> kLlamaStageTraceStages = {{
     {"context", "layer0.context", "[1,32,64]", "float16", 4096, 6, TraceBufferKind::Context},
     {"post_attention_hidden", "layer0.post_attention_hidden", "[1,2048]", "float16", 4096,
      7, TraceBufferKind::PostAttentionHidden},
-    {"final_hidden", "layer0.hidden", "[1,2048]", "float16", 4096, 8,
+    {"final_hidden", "layer0.hidden", "[1,2048]", "float16", 4096, 9,
      TraceBufferKind::FinalHidden},
 }};
 

@@ -172,6 +172,33 @@ GATED_MLP_KERNARG_SCHEMA = {
         {"name": "sequence_length", "offset": 48, "type": "uint32"},
     ],
 }
+GATE_UP_PROJECTION_KERNEL_NAME = "llama_gate_up_projection_f16"
+GATE_UP_PROJECTION_KERNARG_SCHEMA = {
+    "name": "llama-gate-up-projection-f16-v1",
+    "bytes": 56,
+    "fields": [
+        {"name": "post_attention_hidden", "offset": 0, "type": "uint64"},
+        {"name": "post_attention_layernorm_weight", "offset": 8, "type": "uint64"},
+        {"name": "gate_projection_weight", "offset": 16, "type": "uint64"},
+        {"name": "up_projection_weight", "offset": 24, "type": "uint64"},
+        {"name": "gate_output", "offset": 32, "type": "uint64"},
+        {"name": "up_output", "offset": 40, "type": "uint64"},
+        {"name": "sequence_length", "offset": 48, "type": "uint32"},
+    ],
+}
+MLP_DOWN_KERNEL_NAME = "llama_mlp_down_f16"
+MLP_DOWN_KERNARG_SCHEMA = {
+    "name": "llama-mlp-down-f16-v1",
+    "bytes": 48,
+    "fields": [
+        {"name": "gate_input", "offset": 0, "type": "uint64"},
+        {"name": "up_input", "offset": 8, "type": "uint64"},
+        {"name": "down_projection_weight", "offset": 16, "type": "uint64"},
+        {"name": "residual", "offset": 24, "type": "uint64"},
+        {"name": "hidden", "offset": 32, "type": "uint64"},
+        {"name": "sequence_length", "offset": 40, "type": "uint32"},
+    ],
+}
 QWEN_DELTANET_KERNEL_NAME = "qwen_deltanet_state"
 QWEN_DELTANET_KERNARG_SCHEMA = {
     "name": "qwen-deltanet-state-v1",
@@ -257,6 +284,10 @@ ATTENTION_CONTEXT_CANONICAL_SOURCE_PATH = Path(
 )
 O_PROJECTION_CANONICAL_SOURCE_PATH = Path("native_r9700/kernels/llama_o_projection_f16.cpp")
 GATED_MLP_CANONICAL_SOURCE_PATH = Path("native_r9700/kernels/llama_gated_mlp_f16.cpp")
+GATE_UP_PROJECTION_CANONICAL_SOURCE_PATH = Path(
+    "native_r9700/kernels/llama_gate_up_projection_f16.cpp"
+)
+MLP_DOWN_CANONICAL_SOURCE_PATH = Path("native_r9700/kernels/llama_mlp_down_f16.cpp")
 QWEN_DELTANET_CANONICAL_SOURCE_PATH = Path("native_r9700/kernels/qwen_deltanet_state.cpp")
 QWEN_FULL_ATTENTION_CANONICAL_SOURCE_PATH = Path("native_r9700/kernels/qwen_full_attention.cpp")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -278,6 +309,8 @@ ATTENTION_SOFTMAX_CANONICAL_SOURCE = REPOSITORY_ROOT / ATTENTION_SOFTMAX_CANONIC
 ATTENTION_CONTEXT_CANONICAL_SOURCE = REPOSITORY_ROOT / ATTENTION_CONTEXT_CANONICAL_SOURCE_PATH
 O_PROJECTION_CANONICAL_SOURCE = REPOSITORY_ROOT / O_PROJECTION_CANONICAL_SOURCE_PATH
 GATED_MLP_CANONICAL_SOURCE = REPOSITORY_ROOT / GATED_MLP_CANONICAL_SOURCE_PATH
+GATE_UP_PROJECTION_CANONICAL_SOURCE = REPOSITORY_ROOT / GATE_UP_PROJECTION_CANONICAL_SOURCE_PATH
+MLP_DOWN_CANONICAL_SOURCE = REPOSITORY_ROOT / MLP_DOWN_CANONICAL_SOURCE_PATH
 QWEN_DELTANET_CANONICAL_SOURCE = REPOSITORY_ROOT / QWEN_DELTANET_CANONICAL_SOURCE_PATH
 QWEN_FULL_ATTENTION_CANONICAL_SOURCE = REPOSITORY_ROOT / QWEN_FULL_ATTENTION_CANONICAL_SOURCE_PATH
 REVIEWED_ASSETS = (
@@ -391,6 +424,19 @@ REVIEWED_ASSETS = (
         ("post_attention_hidden", "post_attention_layernorm_weight",
          "gate_projection_weight", "up_projection_weight", "down_projection_weight", "hidden"),
         (("sequence_length", "unsigned int"),), 52,
+    ),
+    (
+        GATE_UP_PROJECTION_CANONICAL_SOURCE_PATH, GATE_UP_PROJECTION_CANONICAL_SOURCE,
+        GATE_UP_PROJECTION_KERNEL_NAME, GATE_UP_PROJECTION_KERNARG_SCHEMA,
+        ("post_attention_hidden", "post_attention_layernorm_weight",
+         "gate_projection_weight", "up_projection_weight", "gate_output", "up_output"),
+        (("sequence_length", "unsigned int"),), 52,
+    ),
+    (
+        MLP_DOWN_CANONICAL_SOURCE_PATH, MLP_DOWN_CANONICAL_SOURCE,
+        MLP_DOWN_KERNEL_NAME, MLP_DOWN_KERNARG_SCHEMA,
+        ("gate_input", "up_input", "down_projection_weight", "residual", "hidden"),
+        (("sequence_length", "unsigned int"),), 44,
     ),
     (
         QWEN_DELTANET_CANONICAL_SOURCE_PATH, QWEN_DELTANET_CANONICAL_SOURCE,

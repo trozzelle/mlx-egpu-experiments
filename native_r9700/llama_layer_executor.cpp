@@ -39,7 +39,7 @@ constexpr std::array<const char*, 10> kRequiredLayer0SpanNames = {{
     "model.layers.0.mlp.down_proj.weight",
 }};
 
-constexpr std::array<const char*, 9> kRequiredLlamaStageAssetNames = {{
+constexpr std::array<const char*, 10> kRequiredLlamaStageAssetNames = {{
     "llama_rmsnorm_f16",
     "llama_k_projection_f16",
     "llama_v_projection_f16",
@@ -48,7 +48,8 @@ constexpr std::array<const char*, 9> kRequiredLlamaStageAssetNames = {{
     "llama_causal_attention_softmax_f32",
     "llama_causal_attention_context_f16",
     "llama_o_projection_f16",
-    "llama_gated_mlp_f16",
+    "llama_gate_up_projection_f16",
+    "llama_mlp_down_f16",
 }};
 
 template <size_t N>
@@ -155,7 +156,7 @@ struct LlamaStageAssetConfig {
   uint64_t descriptor_offset;
 };
 
-constexpr std::array<LlamaStageAssetConfig, 9> kLlamaStageAssetConfigs = {{
+constexpr std::array<LlamaStageAssetConfig, 10> kLlamaStageAssetConfigs = {{
     {"llama_rmsnorm_f16", "native_r9700/kernels/llama-rmsnorm-hsa-assets",
      "llama-rmsnorm-f16-v1", 5888, 32, 1536},
     {"llama_k_projection_f16", "native_r9700/kernels/llama-k-projection-hsa-assets",
@@ -172,8 +173,10 @@ constexpr std::array<LlamaStageAssetConfig, 9> kLlamaStageAssetConfigs = {{
      "llama-causal-attention-context-f16-v1", 5888, 40, 1728},
     {"llama_o_projection_f16", "native_r9700/kernels/llama-o-projection-hsa-assets",
      "llama-o-projection-f16-v1", 5888, 40, 1664},
-    {"llama_gated_mlp_f16", "native_r9700/kernels/llama-gated-mlp-hsa-assets",
-     "llama-gated-mlp-f16-v1", 6144, 56, 1792},
+    {"llama_gate_up_projection_f16", "native_r9700/kernels/llama-gate-up-projection-hsa-assets",
+     "llama-gate-up-projection-f16-v1", 6144, 56, 1792},
+    {"llama_mlp_down_f16", "native_r9700/kernels/llama-mlp-down-hsa-assets",
+     "llama-mlp-down-f16-v1", 5888, 48, 1728},
 }};
 constexpr LlamaStageAssetConfig kLlamaRmsNormZeroStoreTraceAssetConfig = {
     "llama_rmsnorm_zero_store_f16",
@@ -224,6 +227,8 @@ bool build_llama_stage_dispatch(const LlamaLayer0WeightSpans& weights, uint32_t 
   dispatch->buffers.push_back({"layer0.attention_probabilities", {}, 32 * 128 * 4, 0});
   dispatch->buffers.push_back({"layer0.context", {}, 32 * 64 * 2, 0});
   dispatch->buffers.push_back({"layer0.post_attention_hidden", {}, 4096, 0});
+  dispatch->buffers.push_back({"layer0.gate", {}, 8192 * 2, 0});
+  dispatch->buffers.push_back({"layer0.up", {}, 8192 * 2, 0});
   images->clear();
   images->reserve(kLlamaStageAssetConfigs.size());
   for (const LlamaStageAssetConfig& config : kLlamaStageAssetConfigs) {
@@ -277,8 +282,9 @@ bool build_llama_stage_dispatch(const LlamaLayer0WeightSpans& weights, uint32_t 
   append_stage(6, {{17, 0}, {15, 8}, {18, 16}},
                {{24, 1}, {28, 0}, {32, 128}}, 32);
   append_stage(7, {{18, 0}, {6, 8}, {0, 16}, {19, 24}}, {{32, 1}}, 32);
-  append_stage(8, {{19, 0}, {2, 8}, {7, 16}, {8, 24}, {9, 32}, {10, 40}},
-               {{48, 1}}, 32);
+  append_stage(8, {{19, 0}, {2, 8}, {7, 16}, {8, 24}, {20, 32}, {21, 40}},
+               {{48, 1}}, 128);
+  append_stage(9, {{20, 0}, {21, 8}, {9, 16}, {19, 24}, {10, 32}}, {{40, 1}}, 32);
   return true;
 }
 
@@ -472,7 +478,7 @@ bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
     // kernarg binding per token so layer weights stream once per layer.
     candidate.request.buffers[candidate.hidden_buffers.back()].allow_post_prepare_upload = true;
   }
-  candidate.hidden_binding_slots = {{0, 0}, {7, 2}, {8, 5}};
+  candidate.hidden_binding_slots = {{0, 0}, {7, 2}, {9, 4}};
   candidate.shared_buffers.normalized = append_scratch("llama.normalized", 4096);
   candidate.shared_buffers.fresh_k = append_scratch("llama.fresh_k", 1024);
   candidate.shared_buffers.fresh_v = append_scratch("llama.fresh_v", 1024);
@@ -482,6 +488,8 @@ bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
   candidate.shared_buffers.context = append_scratch("llama.context", 4096);
   candidate.shared_buffers.post_attention_hidden =
       append_scratch("llama.post_attention_hidden", 4096);
+  candidate.shared_buffers.gate = append_scratch("llama.gate", 8192 * 2);
+  candidate.shared_buffers.up = append_scratch("llama.up", 8192 * 2);
   candidate.k_cache_buffers.reserve(kLlamaStageLayerCount);
   candidate.v_cache_buffers.reserve(kLlamaStageLayerCount);
   for (uint32_t layer = 0; layer < kLlamaStageLayerCount; ++layer) {
@@ -571,8 +579,12 @@ bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
                  {{32, 1}}, 32);
     append_stage(&layer_stages, 8, {{candidate.shared_buffers.post_attention_hidden, 0},
                                    {buffers.post_attention_layernorm, 8}, {buffers.gate_projection, 16},
-                                   {buffers.up_projection, 24}, {buffers.down_projection, 32},
-                                   {hidden0, 40}}, {{48, 1}}, 32);
+                                   {buffers.up_projection, 24}, {candidate.shared_buffers.gate, 32},
+                                   {candidate.shared_buffers.up, 40}}, {{48, 1}}, 128);
+    append_stage(&layer_stages, 9, {{candidate.shared_buffers.gate, 0},
+                                   {candidate.shared_buffers.up, 8}, {buffers.down_projection, 16},
+                                   {candidate.shared_buffers.post_attention_hidden, 24},
+                                   {hidden0, 32}}, {{40, 1}}, 32);
     candidate.layer_stages.push_back(std::move(layer_stages));
   }
   *dispatch = std::move(candidate);

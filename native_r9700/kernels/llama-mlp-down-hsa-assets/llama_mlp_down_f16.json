@@ -1,0 +1,130 @@
+{
+  "descriptor_offset": 1728,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 5888,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 852
+    },
+    {
+      "address": 1424,
+      "image_offset": 1424,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1520,
+      "image_offset": 1520,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1560,
+      "image_offset": 1560,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1600,
+      "image_offset": 1600,
+      "name": ".dynstr",
+      "size": 70
+    },
+    {
+      "address": 1728,
+      "image_offset": 1728,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 5888,
+      "image_offset": 5888,
+      "name": ".text",
+      "size": 1792
+    },
+    {
+      "address": 11776,
+      "image_offset": 11776,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 11888,
+      "image_offset": 11888,
+      "name": ".relro_padding",
+      "size": 400
+    },
+    {
+      "address": 15984,
+      "image_offset": 15984,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "llama_mlp_down_f16.image",
+  "image_sha256": "a9ad797933d1c627ff903f47aca89d33c3cf99f22d87149c52b337a3bfde236f",
+  "image_size": 15985,
+  "kernarg_schema": {
+    "bytes": 48,
+    "fields": [
+      {
+        "name": "gate_input",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "up_input",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "down_projection_weight",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "residual",
+        "offset": 24,
+        "type": "uint64"
+      },
+      {
+        "name": "hidden",
+        "offset": 32,
+        "type": "uint64"
+      },
+      {
+        "name": "sequence_length",
+        "offset": 40,
+        "type": "uint32"
+      }
+    ],
+    "name": "llama-mlp-down-f16-v1"
+  },
+  "name": "llama_mlp_down_f16",
+  "rsrc1": 3222208515,
+  "rsrc2": 132,
+  "rsrc3": 176,
+  "source_path": "native_r9700/kernels/llama_mlp_down_f16.cpp",
+  "source_sha256": "b96024827302acec57c0ce82ca3b5f4f14572b95bf2b9bf5cd79271152d744a0",
+  "target": "gfx1201"
+}

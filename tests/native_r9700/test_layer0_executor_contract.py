@@ -326,12 +326,12 @@ int persistent_dispatch_layer_major_structure(const char* work_dir) {
   }
 
   // The hidden operand is bound at stage 0 offset 0, stage 7 offset 16, and
-  // stage 8 offset 40; retargeting swaps only those binding buffer indices.
+  // stage 9 offset 32; retargeting swaps only those binding buffer indices.
   if (dispatch.hidden_binding_slots.size() != 3) return 10;
   std::vector<uint32_t> stage_order;
   for (const auto& slot : dispatch.hidden_binding_slots) stage_order.push_back(slot.first);
-  if (stage_order != std::vector<uint32_t>{0, 7, 8}) return 11;
-  if (dispatch.layer_stages.size() != 16 || dispatch.layer_stages[5].size() != 9) return 12;
+  if (stage_order != std::vector<uint32_t>{0, 7, 9}) return 11;
+  if (dispatch.layer_stages.size() != 16 || dispatch.layer_stages[5].size() != 10) return 12;
 
   const std::vector<native_r9700::ResidentHsaStage>& stages = dispatch.layer_stages[5];
   const uint32_t first_hidden = dispatch.hidden_buffers[0];
