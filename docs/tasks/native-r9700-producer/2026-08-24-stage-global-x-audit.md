@@ -108,41 +108,33 @@ correct `global_x` is always evaluated at `sequence_length = 1`.
   elements; `context`/`post_attention_hidden` are ULP-level (fp16 accumulation
   order vs NumPy matmul).
 
-### Stage-8 root cause: fused gated-MLP kernel is numerically wrong (open)
+### Stage-4 root cause: missing query RoPE (fixed)
 
-- `--stage final_hidden` (new trace boundary, `layer0.hidden`) retires finite but
-  **all 2048 columns differ** from a validated NumPy recomputation (the NumPy
-  forward is bit-exact for `normalized` and `layer0_K`, so it is trustworthy).
-- The gated-MLP `.cpp` source is correct (weight shapes `(8192,2048)` gate/up and
-  `(2048,8192)` down, uint64 indexing, no scratch/spill: `private_seg_fixed=0`).
-  The wrong-but-finite output points at the COMGR-compiled 8192×2048 fused kernel
-  itself (loop-miscompilation or a `__builtin_expf`/SiLU transcendental defect —
-  `expf` is only trivially exercised at `expf(0)` by the position-0 softmax).
-- Consequence: the full 16-layer prefill now runs (`kernel_count=144`,
-  `native_prefill_acceptance=pass`, `producer_kind=r9700_native`) and layer 0 K/V
-  is correct, but layers 1–15 are wrong (they consume layer 0's gated-MLP hidden),
-  so C1R prompt-0 is `P=[264,3224,7559,304]` vs `R=[12366,13,578,469]`.
-
-### Round-3 narrowing (still open)
-
-- The wrong output survives restructure: splitting the fused kernel into a
-  `gate_up` (RMSNorm + gate/up) + `mlp_down` (SiLU + down + residual) pair, and
-  separately removing the SiLU (`silu_gate = gate`), each still leave the result
-  wrong (max diff ~9.2 with SiLU, ~2.8 without). Rounding the RMSNorm output to
-  fp16 in `gate_up` does not change it. So this is **not** the fused-loop shape,
-  and **not** a simple SiLU/`expf` defect.
-- The working kernels (K/V/o projection) read weights up to 8 MiB; the failing
-  MLP kernels read 32 MiB `gate/up/down` weights. The full prefill transfers
-  ~2.07 GB (weights fully uploaded), so the remaining suspect is the resident
-  **GPU-VA/PTB mapping of the 32 MiB weight buffers** (or their SDMA chunking),
-  not the kernel arithmetic. Next: read back a 32 MiB weight span on-device and
-  compare it byte-for-byte with the safetensors shard.
+- The earlier "gated-MLP is wrong" and "32 MiB weight" hypotheses were a
+  **reference bug**, not a kernel bug: my NumPy recomputation repeated the V
+  vector element-wise (`np.repeat(v, 4, axis=1)`) instead of repeating each KV
+  head, so the GQA context and everything downstream was wrong. With the correct
+  head-wise repeat, the gated-MLP output and the CPU reference agree to fp16 ULP
+  (max ~1 ULP).
+- The real defect was that the attention **score kernel projected Q on the fly
+  but never RoPE-rotated it**, while the K cache was already rotated by the
+  rope-kv stage. Position 0 is RoPE identity, so the single-token trace looked
+  correct; every position > 0 attended with an unrotated query, corrupting
+  multi-token prefixes and every layer ≥ 1. Fixed by rotating the query in the
+  score kernel (pair-wise projection + the same llama3-scaled cos/sin split-half
+  rotation as the rope-kv kernel, using `absolute_query`).
+- Result: n=2 prefill matches the CPU reference to fp16 ULP across all 16 layers
+  (max ~4 ULP at layer 15), and **C1R prompt-0 is token-exact**
+  `P == R == [12366, 13, 578, 469]`. This is the first native R9700 C1R
+  acceptance.
 
 ## Remaining
 
-- Verify the 32 MiB gate/up/down weight buffers are byte-identical on-device
-  (add a weight readback or a bounded gate/up trace), then repair the mapping if
-  truncated; otherwise continue kernel-level isolation.
-- Re-verify `final_hidden` and layer 1 K/V, then re-run C1R parity (prompt-0).
-- Then layer-0 recurrence at lengths 2/6/16/64, the attention key-token span for
-  length 128, and C2R.
+- The score kernel recomputes `powf`/`cosf`/`sinf` per (head, key, pair), making
+  multi-token prefill slow; precompute the RoPE cos/sin once (host or a small
+  pre-pass) before the 16-token gate.
+- Add a 16–128-token fixture prompt (the current fixtures are S=6/222/661; the
+  222/661 prompts exceed the 128-token resident cache), then run C1R at the
+  meaningful 16-token length and C2R imported-cache serving.
+- Widen the attention key-token span past 64 for the full 128-token cache, then
+  Qwen can resume.
