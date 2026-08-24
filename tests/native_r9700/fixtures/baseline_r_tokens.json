@@ -29,7 +29,6 @@
     "max_new_tokens": 4,
     "S": 661
   },
-  "_joint_r_tokens_digest": "aa6ed796a65e75c43d0d3c27d5a9509546c915f5dc53177c663da41475cd381c",
   "prompt-16": {
     "r_tokens": [
       11,
@@ -39,5 +38,6 @@
     ],
     "max_new_tokens": 4,
     "S": 17
-  }
+  },
+  "_joint_r_tokens_digest": "c2acbcee56b5f83223f816a67d351b58c286759eae922d4c75abd2d93b174630"
 }

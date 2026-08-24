@@ -51,6 +51,7 @@ STAGE_SPECS = {
     "post_attention_hidden": StageSpec(
         "layer0.post_attention_hidden", (1, 2048), "float16"
     ),
+    "final_hidden": StageSpec("layer0.hidden", (1, 2048), "float16"),
 }
 
 STAGES = tuple(STAGE_SPECS)
@@ -71,6 +72,7 @@ _REQUIRED_BY_STAGE = {
     "attention_probabilities": ("model.embed_tokens.weight", "model.layers.0.input_layernorm.weight", "model.layers.0.self_attn.q_proj.weight", "model.layers.0.self_attn.k_proj.weight"),
     "context": ("model.embed_tokens.weight", "model.layers.0.input_layernorm.weight", "model.layers.0.self_attn.q_proj.weight", "model.layers.0.self_attn.k_proj.weight", "model.layers.0.self_attn.v_proj.weight"),
     "post_attention_hidden": ("model.embed_tokens.weight", "model.layers.0.input_layernorm.weight", "model.layers.0.self_attn.q_proj.weight", "model.layers.0.self_attn.k_proj.weight", "model.layers.0.self_attn.v_proj.weight", "model.layers.0.self_attn.o_proj.weight"),
+    "final_hidden": ("model.embed_tokens.weight", "model.layers.0.input_layernorm.weight", "model.layers.0.self_attn.q_proj.weight", "model.layers.0.self_attn.k_proj.weight", "model.layers.0.self_attn.v_proj.weight", "model.layers.0.self_attn.o_proj.weight", "model.layers.0.post_attention_layernorm.weight", "model.layers.0.mlp.gate_proj.weight", "model.layers.0.mlp.up_proj.weight", "model.layers.0.mlp.down_proj.weight"),
 }
 
 _EXPECTED_SHAPES = {
@@ -80,6 +82,10 @@ _EXPECTED_SHAPES = {
     "model.layers.0.self_attn.k_proj.weight": lambda cfg: (cfg.n_kv_heads * cfg.head_dim, cfg.hidden_size),
     "model.layers.0.self_attn.v_proj.weight": lambda cfg: (cfg.n_kv_heads * cfg.head_dim, cfg.hidden_size),
     "model.layers.0.self_attn.o_proj.weight": lambda cfg: (cfg.hidden_size, cfg.hidden_size),
+    "model.layers.0.post_attention_layernorm.weight": lambda cfg: (cfg.hidden_size,),
+    "model.layers.0.mlp.gate_proj.weight": lambda cfg: (cfg.intermediate_size, cfg.hidden_size),
+    "model.layers.0.mlp.up_proj.weight": lambda cfg: (cfg.intermediate_size, cfg.hidden_size),
+    "model.layers.0.mlp.down_proj.weight": lambda cfg: (cfg.hidden_size, cfg.intermediate_size),
 }
 
 
@@ -247,7 +253,19 @@ def _stage_tensor(data: ModelData, token_id: int, position: int, stage: str) -> 
     projected = primitives.matmul(
         context_hidden, tensors["model.layers.0.self_attn.o_proj.weight"].T
     )
-    return _canonical_stage_tensor(stage, hidden + projected), provenance
+    post_attention_hidden = (hidden + projected).astype(np.float16, copy=False)
+    if stage == "post_attention_hidden":
+        return _canonical_stage_tensor(stage, post_attention_hidden), provenance
+    post_normed = primitives.rms_norm(
+        post_attention_hidden,
+        tensors["model.layers.0.post_attention_layernorm.weight"],
+        cfg.rms_norm_eps,
+    )
+    gate = primitives.matmul(post_normed, tensors["model.layers.0.mlp.gate_proj.weight"].T)
+    up = primitives.matmul(post_normed, tensors["model.layers.0.mlp.up_proj.weight"].T)
+    gated = (primitives.silu(gate) * up).astype(np.float16, copy=False)
+    mlp_out = primitives.matmul(gated, tensors["model.layers.0.mlp.down_proj.weight"].T)
+    return _canonical_stage_tensor(stage, (post_attention_hidden + mlp_out).astype(np.float16, copy=False)), provenance
 
 
 def _model_geometry(data: ModelData) -> Mapping[str, Any]:

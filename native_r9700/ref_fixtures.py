@@ -95,10 +95,11 @@ PROMPT_TEXTS: Dict[str, str] = {
     "prompt-0": PROMPT_0,
     "prompt-1": PROMPT_1,
     "prompt-2": PROMPT_2,
+    "prompt-16": "",
 }
 
 #: Expected token lengths (S) from docs/path-a-validation-results.md.
-EXPECTED_S: Dict[str, int] = {"prompt-0": 6, "prompt-1": 222, "prompt-2": 661}
+EXPECTED_S: Dict[str, int] = {"prompt-0": 6, "prompt-1": 222, "prompt-2": 661, "prompt-16": 17}
 
 # Deterministic PRNG seed for the synthetic intermediate tensors so identical
 # inputs regenerate the same primitives_fixtures.npz byte-for-byte.

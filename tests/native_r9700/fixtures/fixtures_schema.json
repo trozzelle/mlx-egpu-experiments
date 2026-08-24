@@ -18,26 +18,32 @@
     },
     "prompt-2": {
       "S": 661
+    },
+    "prompt-16": {
+      "S": 17
     }
   },
   "files": {
     "prompts.json": {
       "kind": "json",
-      "sha256": "200f703cabda17c4f47ae48c00374b1308566931738c10e3f9328c3713b9fdc5",
+      "sha256": "e78012e14fad2061e1ba5ffd56e7bc6b4a1119017e5ef12b373a2dac17ff56ef",
       "keys": [
         "prompt-0",
         "prompt-1",
-        "prompt-2"
+        "prompt-2",
+        "prompt-16"
       ],
       "note": "prompt text + mlx token ids + S"
     },
     "baseline_r_tokens.json": {
       "kind": "json",
-      "sha256": "635fc8caae9a1443e1b0d0291d60821812bb7f72565c06e2b3069a37ddb2510d",
+      "sha256": "c350dd03e414f4a05a06d913c1523273000cf30b06dc42db7c2995d1313ef237",
       "keys": [
         "prompt-0",
         "prompt-1",
-        "prompt-2"
+        "prompt-2",
+        "prompt-16",
+        "_joint_r_tokens_digest"
       ],
       "note": "mlx-lm native-baseline R token ids per prompt"
     },
