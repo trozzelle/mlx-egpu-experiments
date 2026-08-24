@@ -2072,6 +2072,7 @@ struct ResidentHsaSession::Impl {
     sdma_ring.put_bytes = new_put_bytes;
     ++sdma_ring.next_fence;
     log.sdma.submit_status = "pass";
+    ScopedUsec timer(&phase_timers.sdma_fence_wait_usec);
     return poll_sdma_fence(sdma_control_mapping, fence_value, error_text);
   }
 };
