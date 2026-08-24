@@ -72,10 +72,10 @@ const std::array<LlamaKernelAsset, 13> kLlamaKernelManifest = {{
     },
     {
         {"llama_causal_attention_score_f16",
-         "ec202f98e61b304bc66811ae8fe099fba8d5af9f9fe52744457a02776e768b75",
-         {}, 3222208514U, 132U, 176U, 64U, 1U, 1U, 64U, 1U, 1U, 48U},
+         "7a5a32ffc89a7f70f347555eeb8709e77ee695530e789d2f29d875ed06c2c734",
+         {}, 3222208514U, 132U, 320U, 64U, 1U, 1U, 64U, 1U, 1U, 48U},
         {"llama_causal_attention_score_f16.image",
-         "ec202f98e61b304bc66811ae8fe099fba8d5af9f9fe52744457a02776e768b75",
+         "7a5a32ffc89a7f70f347555eeb8709e77ee695530e789d2f29d875ed06c2c734",
          "gfx1201", 0, 0, 0, "source_amdgpu_metadata"},
         "llama-causal-attention-score-f16-v1",
     },

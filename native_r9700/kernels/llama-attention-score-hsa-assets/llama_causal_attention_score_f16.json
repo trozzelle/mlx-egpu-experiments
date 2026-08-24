@@ -48,7 +48,7 @@
       "address": 1640,
       "image_offset": 1640,
       "name": ".dynstr",
-      "size": 98
+      "size": 97
     },
     {
       "address": 1792,
@@ -60,30 +60,30 @@
       "address": 6144,
       "image_offset": 6144,
       "name": ".text",
-      "size": 1792
+      "size": 2944
     },
     {
-      "address": 12032,
-      "image_offset": 12032,
+      "address": 13184,
+      "image_offset": 13184,
       "name": ".dynamic",
       "size": 112
     },
     {
-      "address": 12144,
-      "image_offset": 12144,
+      "address": 13296,
+      "image_offset": 13296,
       "name": ".relro_padding",
-      "size": 144
+      "size": 3088
     },
     {
-      "address": 16240,
-      "image_offset": 16240,
+      "address": 17392,
+      "image_offset": 17392,
       "name": ".bss",
       "size": 1
     }
   ],
   "image_path": "llama_causal_attention_score_f16.image",
-  "image_sha256": "ec202f98e61b304bc66811ae8fe099fba8d5af9f9fe52744457a02776e768b75",
-  "image_size": 16241,
+  "image_sha256": "7a5a32ffc89a7f70f347555eeb8709e77ee695530e789d2f29d875ed06c2c734",
+  "image_size": 17393,
   "kernarg_schema": {
     "bytes": 48,
     "fields": [
@@ -128,8 +128,8 @@
   "name": "llama_causal_attention_score_f16",
   "rsrc1": 3222208514,
   "rsrc2": 132,
-  "rsrc3": 176,
+  "rsrc3": 320,
   "source_path": "native_r9700/kernels/llama_causal_attention_score_f16.cpp",
-  "source_sha256": "650239231d9ad079e5a437d7e5c0f024fbefe0316efcae560cd5ed6c01bb847f",
+  "source_sha256": "7f366f312609a26531925973878cddf2ef036d8bff1265b9b5a26fda3203a4b6",
   "target": "gfx1201"
 }
