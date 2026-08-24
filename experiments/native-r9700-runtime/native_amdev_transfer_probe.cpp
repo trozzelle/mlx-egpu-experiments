@@ -340,6 +340,8 @@ constexpr uint64_t kTimelineOffset = 16ULL;
 constexpr uint64_t kComputeControlKernargsCpuOffset = kPageSize;            // page 1
 constexpr uint64_t kComputeControlRingCpuOffset = 2ULL * kPageSize;         // page 2..9
 constexpr uint64_t kComputeControlRingByteCount = 8ULL * kPageSize;         // ring = 8 pages
+constexpr uint32_t kKernargSlotCount = 10U;
+constexpr uint32_t kKernargSlotByteCount = 256U;
 constexpr uint64_t kScalarValue = 1ULL;
 
 // tinygrad/runtime/autogen/am/regs.py:5981-6037 defines the gfx12 HQD copy span.

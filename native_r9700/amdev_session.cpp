@@ -624,6 +624,43 @@ bool bind_resident_kernel_kernargs(const ResidentKernelDispatch& request,
   return true;
 }
 
+// Slices the existing C0 kernarg page (compute_control.sys_pages[1] at
+// kKernargsVa) into kKernargSlotCount immutable 256-byte slots. Zeroes ONLY
+// the target slot so previously prepared stages' arguments survive a batch.
+// The legacy bind_resident_kernel_kernargs (whole-page) stays intact for the
+// Task 2.2 A/B ladder.
+bool bind_resident_kernel_kernargs_slot(const ResidentKernelDispatch& request,
+                                        SysmemMapping* compute_control_mapping,
+                                        uint32_t slot, uint64_t* slot_va,
+                                        std::string* error_text) {
+  if (compute_control_mapping == nullptr || compute_control_mapping->data == nullptr ||
+      compute_control_mapping->size < am_compute::kComputeControlByteCount) {
+    *error_text = "compute control mapping is smaller than the C0 fixed control span";
+    return false;
+  }
+  if (slot >= am_compute::kKernargSlotCount) {
+    *error_text = "kernarg slot is out of range";
+    return false;
+  }
+  if (request.kernargs.empty() || request.kernargs.size() > am_compute::kKernargSlotByteCount) {
+    *error_text = "kernargs exceed the 256-byte slot";
+    return false;
+  }
+  uint8_t* const destination = static_cast<uint8_t*>(compute_control_mapping->data) +
+                               am_compute::kComputeControlKernargsCpuOffset +
+                               static_cast<uint64_t>(slot) * am_compute::kKernargSlotByteCount;
+  std::memset(destination, 0, am_compute::kKernargSlotByteCount);
+  std::memcpy(destination, request.kernargs.data(), request.kernargs.size());
+  std::atomic_thread_fence(std::memory_order_seq_cst);
+  if (std::memcmp(destination, request.kernargs.data(), request.kernargs.size()) != 0) {
+    *error_text = "kernarg slot CPU layout readback mismatch";
+    return false;
+  }
+  *slot_va = am_compute::kKernargsVa +
+             static_cast<uint64_t>(slot) * am_compute::kKernargSlotByteCount;
+  return true;
+}
+
 void store_u64_le(uint8_t* destination, uint64_t value) {
   for (size_t index = 0; index < sizeof(value); ++index) {
     destination[index] = static_cast<uint8_t>(value >> (8U * index));
