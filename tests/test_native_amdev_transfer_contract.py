@@ -262,7 +262,7 @@ EXPECTED_COMPUTE_MQD_ENCODING_LINES = (
     "mqd_cp_hqd_eop_base_addr_span_index: 37",
     "mqd_cp_hqd_eop_control_span_index: 39",
     "mqd_cp_mqd_base_addr_lo: 0x02003000",
-    "mqd_cp_mqd_base_addr_hi: 0x00000000",
+    "mqd_cp_mqd_base_addr_hi: 0x00000080",
     "mqd_cp_hqd_pq_base_lo: 0x00000070",
     "mqd_cp_hqd_pq_base_hi: 0x00000020",
     "mqd_cp_hqd_pq_wptr_poll_addr_lo: 0x0000f008",

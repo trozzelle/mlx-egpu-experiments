@@ -674,7 +674,7 @@ std::vector<uint32_t> build_compute_dispatch_words(uint64_t code_va, uint64_t ke
   return words;
 }
 
-ComputeMqd build_compute_mqd() {
+ComputeMqd build_compute_mqd(uint64_t mc_base) {
   ComputeMqd mqd{};
   mqd[kMqdHeader] = am_compute::kMqdHeader;
   const uint64_t code_addr = am_compute::kCodeVramVa >> 8;
@@ -696,8 +696,9 @@ ComputeMqd build_compute_mqd() {
   mqd[kMqdComputeStaticThreadMgmtSe7] = am_compute::kComputeStaticThreadMgmt;
   mqd[kMqdComputeUserData0] = lo32(am_compute::kKernargsVa);
 
-  mqd[kMqdCpMqdBaseAddrLo] = lo32(am_compute::kMqdPaddr);
-  mqd[kMqdCpMqdBaseAddrHi] = hi32(am_compute::kMqdPaddr);
+  const uint64_t mqd_mc_addr = mc_base + am_compute::kMqdPaddr;  // tinygrad ip.py:322 cp_mqd_base_addr = mqd_mc.
+  mqd[kMqdCpMqdBaseAddrLo] = lo32(mqd_mc_addr);
+  mqd[kMqdCpMqdBaseAddrHi] = hi32(mqd_mc_addr);
   mqd[kMqdCpHqdVmid] = am_vm::kVmid0;
   mqd[kMqdCpHqdPersistentState] = encode_hqd_persistent_state();
   mqd[kMqdCpHqdPipePriority] = am_compute::kHqdPipePriority;
@@ -1563,6 +1564,11 @@ int run_gfx_ring_registers_self_test() {
   return 0;
 }
 
+// Observed R9700 MC base (regMMMC_VM_FB_LOCATION_BASE 0x8000 << 24). The MQD
+// self-test is hardware-free, so it uses this representative value to verify
+// cp_mqd_base_addr = mc_base + kMqdPaddr (lo32 0x02003000, hi32 0x00000080).
+constexpr uint64_t kR9700ObservedMcBase = 0x0000008000000000ULL;
+
 int run_compute_mqd_encoding_self_test() {
   constexpr uint32_t kHqdPersistentState = encode_hqd_persistent_state();
   constexpr uint32_t kHqdPqDoorbellControl = encode_hqd_pq_doorbell_control();
@@ -1576,7 +1582,7 @@ int run_compute_mqd_encoding_self_test() {
       kMqdCpHqdEopBaseAddrLo - kMqdHqdRegisterCopyStart;
   constexpr std::size_t kCpHqdEopControlSpanIndex =
       kMqdCpHqdEopControl - kMqdHqdRegisterCopyStart;
-  const ComputeMqd mqd = build_compute_mqd();
+  const ComputeMqd mqd = build_compute_mqd(kR9700ObservedMcBase);
 
   if (mqd[kMqdHeader] != am_compute::kMqdHeader ||
       mqd[kMqdComputePgmLo] != lo32(am_compute::kCodeVramVa >> 8) ||
@@ -1915,6 +1921,7 @@ struct FixedVmMappingResult {
 
 struct VmHardwareLog {
   FixedVmPageTables tables;
+  uint64_t mc_base = 0;  // MC base (fb_base) from regMMMC_VM_FB_LOCATION_BASE; CPF MQD read domain.
   std::string page_tables_written = "not_run";
   std::string vmid0_context_status = "not_run";
   std::string vm_gc_context_status = "not_run";
@@ -3539,6 +3546,12 @@ bool program_mmhubs_vmid0(const RemoteClient& client, DiscoveryLog* log, std::st
     }
     const uint64_t fb_base = static_cast<uint64_t>(fb_base_reg & 0x00ffffffU) << 24;
     const uint64_t fb_end = static_cast<uint64_t>(fb_top_reg & 0x00ffffffU) << 24;
+  std::printf("mmhub_fb_base_reg: 0x%08x\n", fb_base_reg);
+  std::printf("mmhub_fb_base: 0x%016llx\n", static_cast<unsigned long long>(fb_base));
+  std::printf("mmhub_fb_end: 0x%016llx\n", static_cast<unsigned long long>(fb_end));
+  std::printf("mqd_paddr_raw: 0x%016llx\n", static_cast<unsigned long long>(am_compute::kMqdPaddr));
+  std::printf("mqd_mc_addr: 0x%016llx (tinygrad cp_mqd_base_addr = mc_base + paddr)\n",
+              static_cast<unsigned long long>(fb_base + am_compute::kMqdPaddr));
     const uint64_t vm_start = am_vm::kVaBase >> 12;
     const uint64_t vm_end = ((am_vm::kVaBase + (1ULL << 44)) - 1ULL) >> 12;
     const uint64_t root_base = log->vm.tables.root_pdb2_paddr | 1ULL;  // paddr2xgmi is identity: mmhub_4_1_0 lacks XGMI_LFB regs.
@@ -3667,6 +3680,7 @@ bool program_gc_hub_vmid0(const RemoteClient& client, DiscoveryLog* log,
   }
   const uint64_t fb_base = static_cast<uint64_t>(fb_base_reg & 0x00ffffffU) << 24;
   const uint64_t fb_end = static_cast<uint64_t>(fb_top_reg & 0x00ffffffU) << 24;
+  log->vm.mc_base = fb_base;
   const uint64_t vm_start = am_vm::kVaBase >> 12;
   const uint64_t vm_end = ((am_vm::kVaBase + (1ULL << 44)) - 1ULL) >> 12;
   const uint64_t root_base = log->vm.tables.root_pdb2_paddr | 1ULL;
@@ -4167,7 +4181,7 @@ bool compare_mqd_hqd_fields(const RemoteClient& client, const DiscoveryLog& log,
     *error_text = "ComputeDoorbellConsumptionSnapshot precondition failed: null snapshot";
     return false;
   }
-  const ComputeMqd mqd = build_compute_mqd();
+  const ComputeMqd mqd = build_compute_mqd(log.vm.mc_base);
   std::string mismatches;
   uint32_t mismatch_count = 0;
   const bool ok =
@@ -5227,7 +5241,7 @@ bool write_and_verify_compute_mqd(const RemoteClient& client, const DiscoveryLog
                   " required_at_least=" + std::to_string(am_compute::kMqdPaddr + am_compute::kMqdSize);
     return false;
   }
-  const ComputeMqd mqd = build_compute_mqd();
+  const ComputeMqd mqd = build_compute_mqd(log.vm.mc_base);
   std::vector<uint8_t> payload;
   payload.reserve(am_compute::kMqdSize);
   for (uint32_t dword : mqd) {
@@ -5492,7 +5506,7 @@ bool setup_compute_ring0(const RemoteClient& client, DiscoveryLog* log,
   }
   grbm_selected = true;
 
-  const ComputeMqd mqd = build_compute_mqd();
+  const ComputeMqd mqd = build_compute_mqd(log->vm.mc_base);
   constexpr std::size_t kHqdRegisterCopyDwordCount =
       regs_gfx1201::kCpHqdPqWptrHi.offset - regs_gfx1201::kCpMqdBaseAddr.offset + 1U;
   for (std::size_t i = 0; i < kHqdRegisterCopyDwordCount; ++i) {
