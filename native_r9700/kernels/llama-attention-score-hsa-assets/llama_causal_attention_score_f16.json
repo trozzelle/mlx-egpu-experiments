@@ -48,7 +48,7 @@
       "address": 1640,
       "image_offset": 1640,
       "name": ".dynstr",
-      "size": 97
+      "size": 98
     },
     {
       "address": 1792,
@@ -60,30 +60,30 @@
       "address": 6144,
       "image_offset": 6144,
       "name": ".text",
-      "size": 1152
+      "size": 1792
     },
     {
-      "address": 11392,
-      "image_offset": 11392,
+      "address": 12032,
+      "image_offset": 12032,
       "name": ".dynamic",
       "size": 112
     },
     {
-      "address": 11504,
-      "image_offset": 11504,
+      "address": 12144,
+      "image_offset": 12144,
       "name": ".relro_padding",
-      "size": 784
+      "size": 144
     },
     {
-      "address": 15600,
-      "image_offset": 15600,
+      "address": 16240,
+      "image_offset": 16240,
       "name": ".bss",
       "size": 1
     }
   ],
   "image_path": "llama_causal_attention_score_f16.image",
-  "image_sha256": "08b174eb596d4f1f190bb41f6dbed419aec3432cae41400b3d3ec7caf0f704fa",
-  "image_size": 15601,
+  "image_sha256": "ec202f98e61b304bc66811ae8fe099fba8d5af9f9fe52744457a02776e768b75",
+  "image_size": 16241,
   "kernarg_schema": {
     "bytes": 48,
     "fields": [
@@ -126,10 +126,10 @@
     "name": "llama-causal-attention-score-f16-v1"
   },
   "name": "llama_causal_attention_score_f16",
-  "rsrc1": 3222208513,
+  "rsrc1": 3222208514,
   "rsrc2": 132,
-  "rsrc3": 96,
+  "rsrc3": 176,
   "source_path": "native_r9700/kernels/llama_causal_attention_score_f16.cpp",
-  "source_sha256": "ef1f2edf9e4453aa5ab13e45e90cca57bf07366ba36750badb8de6a332146736",
+  "source_sha256": "650239231d9ad079e5a437d7e5c0f024fbefe0316efcae560cd5ed6c01bb847f",
   "target": "gfx1201"
 }

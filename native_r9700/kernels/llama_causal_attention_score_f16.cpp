@@ -12,6 +12,11 @@ extern "C" __attribute__((global)) void llama_causal_attention_score_f16(
   constexpr unsigned int kHeadDimension = 64U;
   constexpr unsigned int kHiddenSize = 2048U;
   constexpr unsigned int kMaximumPrefixTokens = 128U;
+  constexpr float kRopeTheta = 500000.0f;
+  constexpr float kRopeFactor = 8.0f;
+  constexpr float kOriginalContext = 8192.0f;
+  constexpr float kLowFrequencyFactor = 1.0f;
+  constexpr float kHighFrequencyFactor = 4.0f;
   if (sequence_length == 0U || sequence_length > kMaximumPrefixTokens ||
       cache_capacity_tokens == 0U || cache_capacity_tokens > kMaximumPrefixTokens ||
       (unsigned long long)position + sequence_length > cache_capacity_tokens) {
@@ -38,21 +43,48 @@ extern "C" __attribute__((global)) void llama_causal_attention_score_f16(
 
   const unsigned int kv_head = query_head / kGqaGroupSize;
   float score = 0.0f;
-  for (unsigned int dimension = 0U; dimension < kHeadDimension; ++dimension) {
-    const unsigned int q_row = query_head * kHeadDimension + dimension;
-    float q_value = 0.0f;
+  // Split-half RoPE over the query head: the query is projected on the fly and
+  // rotated with absolute_query, matching the K cache which is already rotated
+  // with each key's absolute token.
+  for (unsigned int pair = 0U; pair < kHeadDimension / 2U; ++pair) {
+    const unsigned int q_row0 = query_head * kHeadDimension + pair;
+    const unsigned int q_row1 = query_head * kHeadDimension + pair + kHeadDimension / 2U;
+    float q0 = 0.0f;
+    float q1 = 0.0f;
     for (unsigned int column = 0U; column < kHiddenSize; ++column) {
-      const float activation =
-          (float)__builtin_bit_cast(_Float16, normalized[(unsigned long long)query_token * kHiddenSize + column]);
-      const float weight = (float)__builtin_bit_cast(
-          _Float16, q_projection_weight[(unsigned long long)q_row * kHiddenSize + column]);
-      q_value += activation * weight;
+      const float activation = (float)__builtin_bit_cast(
+          _Float16, normalized[(unsigned long long)query_token * kHiddenSize + column]);
+      q0 += activation * (float)__builtin_bit_cast(
+          _Float16, q_projection_weight[(unsigned long long)q_row0 * kHiddenSize + column]);
+      q1 += activation * (float)__builtin_bit_cast(
+          _Float16, q_projection_weight[(unsigned long long)q_row1 * kHiddenSize + column]);
     }
-    const float k_value = (float)__builtin_bit_cast(
+    float inv_frequency = __builtin_powf(
+        kRopeTheta, -2.0f * (float)pair / (float)kHeadDimension);
+    const float wavelength = 6.2831853071795864769f / inv_frequency;
+    if (wavelength > kOriginalContext / kLowFrequencyFactor) {
+      inv_frequency /= kRopeFactor;
+    } else if (wavelength >= kOriginalContext / kHighFrequencyFactor) {
+      const float smooth = (kOriginalContext / wavelength - kLowFrequencyFactor) /
+                           (kHighFrequencyFactor - kLowFrequencyFactor);
+      inv_frequency = (1.0f - smooth) * inv_frequency / kRopeFactor +
+                      smooth * inv_frequency;
+    }
+    const float angle = (float)absolute_query * inv_frequency;
+    const float cosine = __builtin_cosf(angle);
+    const float sine = __builtin_sinf(angle);
+    const float q0_rope = q0 * cosine - q1 * sine;
+    const float q1_rope = q1 * cosine + q0 * sine;
+
+    const float k0 = (float)__builtin_bit_cast(
         _Float16, k_cache[((unsigned long long)kv_head * cache_capacity_tokens + key_token) *
                               kHeadDimension +
-                          dimension]);
-    score += q_value * k_value;
+                          pair]);
+    const float k1 = (float)__builtin_bit_cast(
+        _Float16, k_cache[((unsigned long long)kv_head * cache_capacity_tokens + key_token) *
+                              kHeadDimension +
+                          pair + kHeadDimension / 2U]);
+    score += q0_rope * k0 + q1_rope * k1;
   }
   attention_scores[score_offset] = score * 0.125f;
 }
