@@ -44,7 +44,7 @@ The current executor deliberately forces `sequence_length=1`, allocates one hidd
 ## Constraints
 
 - No CPU/NumPy artifact may satisfy native acceptance.
-- Block size 1 must remain a byte-for-byte control for PM4 shape and token-exact control for observable output.
+- Before any barrier-mode promotion, block size 1 with per-stage timeline writes must reproduce the frozen PM4 control byte-for-byte. After promotion, block size 1 remains the serial-native numerical oracle while the terminal-only PM4 stream is contract-locked separately.
 - No new fixed-VA or standalone sysmem mapping is introduced for profiling. The earlier kernarg-arena and IB-buffer failures make unnecessary mapping experiments unacceptable.
 - Hardware commands are serialized through the existing hardware lock. A failed or timed-out queue is not reused.
 - Numerical changes require serial-native comparison at layer/KV boundaries before C1R/C2R promotion.
