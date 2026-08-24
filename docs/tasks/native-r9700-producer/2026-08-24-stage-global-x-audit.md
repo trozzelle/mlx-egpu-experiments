@@ -123,10 +123,26 @@ correct `global_x` is always evaluated at `sequence_length = 1`.
   is correct, but layers 1–15 are wrong (they consume layer 0's gated-MLP hidden),
   so C1R prompt-0 is `P=[264,3224,7559,304]` vs `R=[12366,13,578,469]`.
 
+### Round-3 narrowing (still open)
+
+- The wrong output survives restructure: splitting the fused kernel into a
+  `gate_up` (RMSNorm + gate/up) + `mlp_down` (SiLU + down + residual) pair, and
+  separately removing the SiLU (`silu_gate = gate`), each still leave the result
+  wrong (max diff ~9.2 with SiLU, ~2.8 without). Rounding the RMSNorm output to
+  fp16 in `gate_up` does not change it. So this is **not** the fused-loop shape,
+  and **not** a simple SiLU/`expf` defect.
+- The working kernels (K/V/o projection) read weights up to 8 MiB; the failing
+  MLP kernels read 32 MiB `gate/up/down` weights. The full prefill transfers
+  ~2.07 GB (weights fully uploaded), so the remaining suspect is the resident
+  **GPU-VA/PTB mapping of the 32 MiB weight buffers** (or their SDMA chunking),
+  not the kernel arithmetic. Next: read back a 32 MiB weight span on-device and
+  compare it byte-for-byte with the safetensors shard.
+
 ## Remaining
 
-- Repair the gated-MLP kernel (restructure the fused loop or isolate the
-  `__builtin_expf`/SiLU defect), then re-verify `final_hidden` and layer 1 K/V.
-- Re-run C1R parity (prompt-0 first) once layers 1–15 match the reference.
+- Verify the 32 MiB gate/up/down weight buffers are byte-identical on-device
+  (add a weight readback or a bounded gate/up trace), then repair the mapping if
+  truncated; otherwise continue kernel-level isolation.
+- Re-verify `final_hidden` and layer 1 K/V, then re-run C1R parity (prompt-0).
 - Then layer-0 recurrence at lengths 2/6/16/64, the attention key-token span for
   length 128, and C2R.
