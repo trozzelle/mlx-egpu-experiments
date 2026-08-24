@@ -130,10 +130,15 @@ correct `global_x` is always evaluated at `sequence_length = 1`.
 
 ## Remaining
 
-- The score kernel recomputes `powf`/`cosf`/`sinf` per (head, key, pair), making
-  multi-token prefill slow; precompute the RoPE cos/sin once (host or a small
-  pre-pass) before the 16-token gate.
-- Add a 16–128-token fixture prompt (the current fixtures are S=6/222/661; the
+- **Performance (blocking 16-token).** The fused gated-MLP kernel rereads the
+  67 MiB gate/up weights once per output column (2048× redundant ≈ 137 GB per
+  dispatch over the TinyGPU PCIe link), so a single dispatch exceeds the 3 s
+  compute-timeline poll and a 16-token prefill dies at layer 4. Split it back
+  into a `gate_up` (project once) + `mlp_down` (read the 32 KiB gate/up from the
+  cache) pair — the round-3 kernel split is correct, only my reference was buggy.
+- The score kernel also recomputes `powf`/`cosf`/`sinf` per (head, key, pair);
+  precompute the RoPE cos/sin once.
+- Add a 16–128-token fixture prompt (current fixtures are S=6/222/661; the
   222/661 prompts exceed the 128-token resident cache), then run C1R at the
   meaningful 16-token length and C2R imported-cache serving.
 - Widen the attention key-token span past 64 for the full 128-token cache, then
