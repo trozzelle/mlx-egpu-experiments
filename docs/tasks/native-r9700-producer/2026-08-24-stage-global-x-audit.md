@@ -89,35 +89,44 @@ correct `global_x` is always evaluated at `sequence_length = 1`.
   `sha256 a0ab94d1…` after the rebuild — the geometry/asset changes did not move
   stage 0.
 
-### Stage-1 root cause: timeline race + K-projection fault
+### Stage-1 root cause: single-dispatch compute ring (fixed)
 
 - `--stage fresh_k` first failed closed with `trace_nonfinite`. Retaining the raw
   readback (new `.nonfinite.bin` diagnostic) showed the output is **uniform
   `0x7c00` (+Inf) across all 512 fp16 values** — an unwritten buffer, not an
   arithmetic result.
-- Root cause 1 (**fixed**): `ResidentHsaSession::dispatch` never reset the
-  completion timeline between dispatches. `poll_compute_timeline` waits for the
-  `RELEASE_MEM` value `1`, which a prior dispatch had already left in place, so
-  the second stage's poll returned immediately and the readback raced the kernel.
-  Fix: zero the timeline word before each submit (and a seq-cst fence). Verified
-  `--kernel-proof` and `--stage normalized` still pass.
-- Root cause 2 (**open**): with the race fixed, the stage-1 dispatch now
-  times out cleanly — `cp_mec_rs64_exception_status=0x0000c672` (non-zero),
-  `rptr=59 wptr=59` (ring consumed, `RELEASE_MEM` never ran), and an
-  MQD/HQD mismatch on `cp_hqd_pq_control` (`expected=0x0000050c
-  observed=0x1000850c`). The K-projection kernel faults in hardware; the +Inf was
-  the unwritten buffer masked by the race. The weight/normalized/geometry/binding
-  inputs are all correct, so the fault is inside stage 1's resident dispatch —
-  most plausibly the 2 MiB `k_proj` weight mapping or the kernel image, to be
-  isolated with the fault register decode next.
+- Root cause: the compute ring was single-dispatch. `submit_compute_dispatch`
+  wrote every PM4 batch at `ring[0]` and set `wptr = words.size()` (59) each
+  time, so after the first dispatch the CP's `rptr` was already 59 and a second
+  dispatch (`wptr` reset to 59) was invisible (`rptr == wptr`). Its `RELEASE_MEM`
+  never ran; the readback saw the unwritten buffer. Two fixes: zero the
+  completion timeline before each submit (so the poll actually waits), and make
+  the ring circular (read prior wptr, write at `wptr % ring_dwords` with wrap,
+  advance the cumulative wptr in the control mapping and the MEC doorbell).
+- Result: all ten layer-0/token-0 stages now retire finite. `hidden`, `normalized`,
+  `fresh_k` are **bit-exact** vs the CPU oracle; `fresh_v` is 1 ULP off on 1/512
+  elements; `context`/`post_attention_hidden` are ULP-level (fp16 accumulation
+  order vs NumPy matmul).
+
+### Stage-8 root cause: fused gated-MLP kernel is numerically wrong (open)
+
+- `--stage final_hidden` (new trace boundary, `layer0.hidden`) retires finite but
+  **all 2048 columns differ** from a validated NumPy recomputation (the NumPy
+  forward is bit-exact for `normalized` and `layer0_K`, so it is trustworthy).
+- The gated-MLP `.cpp` source is correct (weight shapes `(8192,2048)` gate/up and
+  `(2048,8192)` down, uint64 indexing, no scratch/spill: `private_seg_fixed=0`).
+  The wrong-but-finite output points at the COMGR-compiled 8192×2048 fused kernel
+  itself (loop-miscompilation or a `__builtin_expf`/SiLU transcendental defect —
+  `expf` is only trivially exercised at `expf(0)` by the position-0 softmax).
+- Consequence: the full 16-layer prefill now runs (`kernel_count=144`,
+  `native_prefill_acceptance=pass`, `producer_kind=r9700_native`) and layer 0 K/V
+  is correct, but layers 1–15 are wrong (they consume layer 0's gated-MLP hidden),
+  so C1R prompt-0 is `P=[264,3224,7559,304]` vs `R=[12366,13,578,469]`.
 
 ## Remaining
 
-- Decode the stage-1 fault (`cp_mec_rs64_exception_status`, `cp_mec_rs64_instr_pntr`,
-  MQD/HQD `cp_hqd_pq_control` bit 28) and repair the K-projection resident
-  dispatch, then trace `fresh_k` against the CPU oracle.
-- Then continue stage-by-stage (`fresh_v`, `k_cache`/`v_cache`,
-  `attention_scores`/`probabilities`/`context`, `post_attention_hidden`), and add a
-  trace stage for the gated-MLP output.
-- Extend the trace + oracle past position 0 for layer-0 recurrence at lengths
-  2/6/16/64, then widen the attention key-token span for length 128.
+- Repair the gated-MLP kernel (restructure the fused loop or isolate the
+  `__builtin_expf`/SiLU defect), then re-verify `final_hidden` and layer 1 K/V.
+- Re-run C1R parity (prompt-0 first) once layers 1–15 match the reference.
+- Then layer-0 recurrence at lengths 2/6/16/64, the attention key-token span for
+  length 128, and C2R.
