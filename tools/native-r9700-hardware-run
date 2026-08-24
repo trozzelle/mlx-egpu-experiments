@@ -3,15 +3,15 @@
 #
 # Usage: native-r9700-hardware-run [<socket>] <command> [args...]
 #
-# $1 is the TinyGPU socket path (the canonical default is used when unset);
-# the remaining argv is the command to run. The wrapper guarantees exactly one
-# TinyGPU server owns the socket before the command runs, removes a stale
-# socket when no live owner holds it, and never kills a live server. Server
-# startup is serialized by flock(2) on ~/.cache/native-r9700/hardware.lock so
-# two invocations cannot both spawn a server on the same socket. That lock is
-# released before the command runs: the command's own
-# native_r9700::HardwareLock takes the same lock file for the hardware command,
-# and holding both at once would self-deadlock.
+# The first argument is treated as the TinyGPU socket path only when it ends in
+# ".sock"; otherwise it is the command and the canonical default socket is
+# used. The wrapper guarantees exactly one TinyGPU server owns the socket
+# before the command runs, removes a stale socket when no live owner holds it,
+# and never kills a live server. Server startup is serialized by flock(2) on
+# ~/.cache/native-r9700/hardware.lock so two invocations cannot both spawn a
+# server on the same socket. That lock is released before the command runs:
+# the command's own native_r9700::HardwareLock takes the same lock file for the
+# hardware command, and holding both at once would self-deadlock.
 
 set -eu
 
@@ -22,10 +22,15 @@ LOCK_DIR="${HOME:?HOME is required}/.cache/native-r9700"
 LOCK_FILE="$LOCK_DIR/hardware.lock"
 
 SOCKET="$DEFAULT_SOCKET"
-if [ "$#" -ge 1 ]; then
-  SOCKET="${1:-$DEFAULT_SOCKET}"
-  shift
-fi
+# $1 names the socket only when it is recognizably a socket path (ends in
+# ".sock"); otherwise it is the command and the default socket is used. A
+# single-argument invocation is always command-only.
+case "${1-}" in
+  *.sock)
+    SOCKET="$1"
+    shift
+    ;;
+esac
 
 if [ "$#" -eq 0 ]; then
   echo "native-r9700-hardware-run: no command to run" >&2
@@ -40,6 +45,7 @@ mkdir -p "$LOCK_DIR"
 "$PYTHON" - "$SOCKET" "$SERVER_BIN" "$LOCK_FILE" <<'PY'
 import fcntl
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -47,6 +53,30 @@ import time
 socket_path, server_bin, lock_file = sys.argv[1], sys.argv[2], sys.argv[3]
 lock_fd = open(lock_file, "a+")
 fcntl.flock(lock_fd, fcntl.LOCK_EX)
+
+
+def accepts_connection(path):
+    """True when a Unix-domain socket at `path` accepts a connect()."""
+    if not os.path.exists(path):
+        return False
+    try:
+        probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        probe.settimeout(0.5)
+        probe.connect(path)
+        probe.close()
+        return True
+    except OSError:
+        return False
+
+
+def wait_ready(path):
+    for _ in range(100):
+        if accepts_connection(path):
+            return True
+        time.sleep(0.1)
+    return False
+
+
 try:
     owner = subprocess.run(
         ["pgrep", "-f", "TinyGPU server " + socket_path],
@@ -54,14 +84,10 @@ try:
         text=True,
     )
     if owner.stdout.strip():
-        # A live server already owns the socket; wait for the socket to appear.
-        for _ in range(100):
-            if os.path.exists(socket_path):
-                break
-            time.sleep(0.1)
-        if not os.path.exists(socket_path):
+        # A live server already owns the socket; wait for it to accept.
+        if not wait_ready(socket_path):
             sys.stderr.write(
-                "native-r9700-hardware-run: live TinyGPU owner has no socket at "
+                "native-r9700-hardware-run: live TinyGPU owner does not accept at "
                 + socket_path + "\n")
             sys.exit(1)
     else:
@@ -77,13 +103,9 @@ try:
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
-        for _ in range(100):
-            if os.path.exists(socket_path):
-                break
-            time.sleep(0.1)
-        if not os.path.exists(socket_path):
+        if not wait_ready(socket_path):
             sys.stderr.write(
-                "native-r9700-hardware-run: TinyGPU server did not become ready at "
+                "native-r9700-hardware-run: TinyGPU server did not accept a connection at "
                 + socket_path + "\n")
             sys.exit(1)
 finally:
