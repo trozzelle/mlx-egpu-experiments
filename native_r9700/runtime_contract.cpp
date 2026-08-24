@@ -836,28 +836,23 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
         fail(result, "resident_token_stage_scalars", detail, error_text);
         return 1;
       }
-      for (size_t stage_index = 0; stage_index < persistent_dispatch.layer_stages[layer].size();
-           ++stage_index) {
-        const ResidentHsaStage& stage = persistent_dispatch.layer_stages[layer][stage_index];
-        const std::string context =
-            "layer=" + std::to_string(layer) + " token=" + std::to_string(token) +
-            " stage=" + std::to_string(stage_index) +
-            " image=" + std::to_string(stage.hsa_image_index);
-        log_progress(context + " dispatch_begin");
-        if (!resident.dispatch(stage, &dispatch_result, &detail)) {
-          std::string close_error;
-          resident.close(&close_error);
-          const std::string failure =
-              context + " backend_failure_stage=" + dispatch_result.failure_stage +
-              " completed_dispatches=" + std::to_string(dispatch_result.pm4_dispatch_count) +
-              ": " + detail;
-          log_progress("resident_dispatch failed " + failure);
-          fail(result, "resident_dispatch", failure, error_text);
-          return 1;
-        }
-        log_progress(context + " dispatch_complete count=" +
-                     std::to_string(dispatch_result.pm4_dispatch_count));
+      log_progress("layer=" + std::to_string(layer) + " token=" + std::to_string(token) +
+                   " dispatch_batch_begin stages=" +
+                   std::to_string(persistent_dispatch.layer_stages[layer].size()));
+      if (!resident.dispatch_batch(persistent_dispatch.layer_stages[layer],
+                                   &dispatch_result, &detail)) {
+        std::string close_error;
+        resident.close(&close_error);
+        const std::string failure = "layer=" + std::to_string(layer) +
+            " token=" + std::to_string(token) +
+            " backend_failure_stage=" + dispatch_result.failure_stage + ": " + detail;
+        log_progress("resident_dispatch_batch failed " + failure);
+        fail(result, "resident_dispatch_batch", failure, error_text);
+        return 1;
       }
+      log_progress("layer=" + std::to_string(layer) + " token=" + std::to_string(token) +
+                   " dispatch_batch_complete count=" +
+                   std::to_string(dispatch_result.pm4_dispatch_count));
     }
   }
   std::vector<std::string> kv_names;
