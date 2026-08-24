@@ -77,6 +77,7 @@ enum class TraceBufferKind {
   AttentionProbabilities,
   Context,
   PostAttentionHidden,
+  FinalHidden,
 };
 
 struct LlamaStageTraceSpec {
@@ -89,7 +90,7 @@ struct LlamaStageTraceSpec {
   TraceBufferKind buffer_kind;
 };
 
-constexpr std::array<LlamaStageTraceSpec, 10> kLlamaStageTraceStages = {{
+constexpr std::array<LlamaStageTraceSpec, 11> kLlamaStageTraceStages = {{
     {"hidden", "layer0.embedding_row", "[1,2048]", "float16", 4096, -1,
      TraceBufferKind::EmbeddingRow},
     {"normalized", "layer0.normalized", "[1,2048]", "float16", 4096, 0,
@@ -109,6 +110,8 @@ constexpr std::array<LlamaStageTraceSpec, 10> kLlamaStageTraceStages = {{
     {"context", "layer0.context", "[1,32,64]", "float16", 4096, 6, TraceBufferKind::Context},
     {"post_attention_hidden", "layer0.post_attention_hidden", "[1,2048]", "float16", 4096,
      7, TraceBufferKind::PostAttentionHidden},
+    {"final_hidden", "layer0.hidden", "[1,2048]", "float16", 4096, 8,
+     TraceBufferKind::FinalHidden},
 }};
 
 const LlamaStageTraceSpec* find_trace_stage(const std::string& stage) {
@@ -120,7 +123,7 @@ const LlamaStageTraceSpec* find_trace_stage(const std::string& stage) {
 
 bool trace_buffer_index(const ResidentHsaDispatch& dispatch, TraceBufferKind kind,
                         uint32_t* buffer_index, std::string* error_text) {
-  const uint32_t indices[] = {0, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+  const uint32_t indices[] = {0, 11, 12, 13, 14, 15, 16, 17, 18, 19, 10};
   const uint32_t index = indices[static_cast<uint32_t>(kind)];
   if (index >= dispatch.buffers.size()) {
     if (error_text != nullptr) *error_text = "layer-0 trace dispatch has incomplete buffer layout";
