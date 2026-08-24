@@ -141,10 +141,21 @@ correct `global_x` is always evaluated at `sequence_length = 1`.
   `decoded_tokens == [11, 706, 28995, 12207]`) — the native producer now reaches
   token-for-token C1R/C2R parity at the meaningful 16-token length.
 
-## Remaining
+### 64/128-token full-cache acceptance (done)
+
+- Widened the attention score kernel to loop each lane over two 64-key blocks so
+  the full 128-token score buffer is populated (softmax/context already walk
+  `key_token 0..absolute_query`).
+- Added `prompt-64` (S=65) and `prompt-128` (S=129, the full 128-token resident
+  cache). **C1R is token-exact** at both:
+  `prompt-64 P==R==[279,4216,62520,9478]`, `prompt-128 P==R==[13,578,30791,17604]`.
+  **C2R prompt-128 passes** with `route=native_producer`, `accepted_cache=true`,
+  `fallback_reason=none`.
+
+## Remaining (Llama complete; Qwen next)
 
 - The score kernel still recomputes `powf`/`cosf`/`sinf` per (head, key, pair);
-  precompute the RoPE cos/sin once (performance only).
-- Widen the attention key-token span past 64 for the full 128-token cache, then
-  run the 64/128-token progression (the 222/661 fixtures also exceed the current
-  128-token cache). Qwen can then resume.
+  precompute the RoPE cos/sin once (performance only, not correctness).
+- Llama 3.2 1B native C1R/C2R acceptance is complete through the full 128-token
+  cache. Next target is the Qwen producer (`phase-qwen3-8-native-text-delivery.md`),
+  a separate target-expansion slice.
