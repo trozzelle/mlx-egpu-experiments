@@ -1924,6 +1924,10 @@ struct ScopedUsec {
   }
 };
 
+struct SdmaRingState {
+  uint64_t put_bytes = 0;
+  uint64_t next_fence = 1;
+};
 
 struct ResidentHsaSession::Impl {
   struct Image {
@@ -1970,6 +1974,7 @@ struct ResidentHsaSession::Impl {
   std::string uncertain_text;
   std::string release_error;
   bool prepared = false;
+  SdmaRingState sdma_ring;
 
   const char* first_pte_failure() const {
     if (pte_result.pte_map_status == "fail") return "pte_map";
@@ -2037,9 +2042,39 @@ struct ResidentHsaSession::Impl {
     uncertain_text.clear();
     release_error.clear();
     prepared = false;
+    sdma_ring = SdmaRingState{};
+  }
+  bool submit_sdma_chunk_persistent(uint64_t src_va, uint64_t dst_va, uint32_t byte_count,
+                                    std::string* error_text) {
+    const uint64_t submit_byte_offset = sdma_ring.put_bytes % am_sdma::kRingSize;
+    const uint32_t fence_value = static_cast<uint32_t>(sdma_ring.next_fence);
+    const std::vector<uint32_t> words =
+        build_sdma_copy_submit_words(src_va, dst_va, byte_count, am_sdma::kFenceVa, fence_value);
+    if (!write_sdma_ring_words_wrap(&sdma_control_mapping, words,
+                                    submit_byte_offset, error_text)) {
+      log.sdma.submit_status = "fail";
+      return false;
+    }
+    const uint64_t new_put_bytes =
+        sdma_ring.put_bytes + static_cast<uint64_t>(words.size()) * sizeof(uint32_t);
+    if (!write_control_u64(&sdma_control_mapping, am_sdma::kWptrOffset,
+                           new_put_bytes, error_text)) {
+      log.sdma.submit_status = "fail";
+      return false;
+    }
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    const std::vector<uint8_t> doorbell = u64_payload_le(new_put_bytes);
+    if (!client->mmio_write_fire_and_forget(2, am_sdma::kDoorbellBar2ByteOffset,
+                                            doorbell, error_text)) {
+      log.sdma.submit_status = "fail";
+      return false;
+    }
+    sdma_ring.put_bytes = new_put_bytes;
+    ++sdma_ring.next_fence;
+    log.sdma.submit_status = "pass";
+    return poll_sdma_fence(sdma_control_mapping, fence_value, error_text);
   }
 };
-
 ResidentHsaSession::ResidentHsaSession() : impl_(std::make_unique<Impl>()) {}
 
 ResidentHsaSession::~ResidentHsaSession() {
@@ -2291,6 +2326,13 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
                                                                       image_readback));
     }
   }
+  {
+    ScopedUsec timer(&state.phase_timers.sdma_setup_usec);
+    ++state.phase_timers.sdma_setup_count;
+    if (!setup_sdma_queue0(*state.client, &state.log, &detail)) {
+      return fail_after_resident("sdma_queue_setup", detail);
+    }
+  }
   for (size_t index = 0; index < request.buffers.size(); ++index) {
     state.buffer_names.push_back(request.buffers[index].name);
     state.readback_byte_counts.push_back(request.buffers[index].readback_byte_count);
@@ -2311,26 +2353,11 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
         std::memcpy(state.staging_mapping.data, upload.data() + offset, chunk);
       }
       std::atomic_thread_fence(std::memory_order_seq_cst);
-      std::memset(static_cast<uint8_t*>(state.sdma_control_mapping.data) + am_sdma::kFenceOffset, 0,
-                  sizeof(uint32_t));
-      {
-        ScopedUsec timer(&state.phase_timers.sdma_setup_usec);
-        ++state.phase_timers.sdma_setup_count;
-        if (!setup_sdma_queue0(*state.client, &state.log, &detail)) {
-          return fail_after_resident("sdma_h2d", detail);
-        }
-      }
       {
         ScopedUsec timer(&state.phase_timers.sdma_submit_usec);
-        if (!submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
-                              state.staging.gpu_va, state.buffers[index].gpu_va + offset, chunk,
-                              am_sdma::kFenceValue, 0, &detail)) {
-          return fail_after_resident("sdma_h2d", detail);
-        }
-      }
-      {
-        ScopedUsec timer(&state.phase_timers.sdma_fence_wait_usec);
-        if (!poll_sdma_fence(state.sdma_control_mapping, &detail)) {
+        if (!state.submit_sdma_chunk_persistent(state.staging.gpu_va,
+                                               state.buffers[index].gpu_va + offset, chunk,
+                                               &detail)) {
           return fail_after_resident("sdma_h2d", detail);
         }
       }
@@ -2493,26 +2520,11 @@ bool ResidentHsaSession::upload_named(const std::string& buffer_name, const uint
       std::memcpy(state.staging_mapping.data, bytes + offset, chunk);
     }
     std::atomic_thread_fence(std::memory_order_seq_cst);
-    std::memset(static_cast<uint8_t*>(state.sdma_control_mapping.data) + am_sdma::kFenceOffset, 0,
-                sizeof(uint32_t));
-    {
-      ScopedUsec timer(&state.phase_timers.sdma_setup_usec);
-      ++state.phase_timers.sdma_setup_count;
-      if (!setup_sdma_queue0(*state.client, &state.log, &detail)) {
-        return fail(detail);
-      }
-    }
     {
       ScopedUsec timer(&state.phase_timers.sdma_submit_usec);
-      if (!submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
-                            state.staging.gpu_va, state.buffers[buffer_index].gpu_va + offset, chunk,
-                            am_sdma::kFenceValue, 0, &detail)) {
-        return fail(detail);
-      }
-    }
-    {
-      ScopedUsec timer(&state.phase_timers.sdma_fence_wait_usec);
-      if (!poll_sdma_fence(state.sdma_control_mapping, &detail)) {
+      if (!state.submit_sdma_chunk_persistent(state.staging.gpu_va,
+                                              state.buffers[buffer_index].gpu_va + offset, chunk,
+                                              &detail)) {
         return fail(detail);
       }
     }
@@ -2554,26 +2566,10 @@ bool ResidentHsaSession::readback(const std::vector<std::string>& names,
     std::string detail;
     while (offset < byte_count) {
       const uint32_t chunk = static_cast<uint32_t>(std::min<uint64_t>(kPageSize, byte_count - offset));
-      std::memset(static_cast<uint8_t*>(state.sdma_control_mapping.data) + am_sdma::kFenceOffset, 0,
-                  sizeof(uint32_t));
-      {
-        ScopedUsec timer(&state.phase_timers.sdma_setup_usec);
-        ++state.phase_timers.sdma_setup_count;
-        if (!setup_sdma_queue0(*state.client, &state.log, &detail)) {
-          return fail(detail);
-        }
-      }
       {
         ScopedUsec timer(&state.phase_timers.sdma_submit_usec);
-        if (!submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
-                              state.buffers[buffer_index].gpu_va + offset, state.readback.gpu_va,
-                              chunk, am_sdma::kFenceValue, 0, &detail)) {
-          return fail(detail);
-        }
-      }
-      {
-        ScopedUsec timer(&state.phase_timers.sdma_fence_wait_usec);
-        if (!poll_sdma_fence(state.sdma_control_mapping, &detail)) {
+        if (!state.submit_sdma_chunk_persistent(state.buffers[buffer_index].gpu_va + offset,
+                                               state.readback.gpu_va, chunk, &detail)) {
           return fail(detail);
         }
       }
