@@ -6025,6 +6025,32 @@ std::vector<uint8_t> u32_words_payload_le(const std::vector<uint32_t>& words) {
   }
   return bytes;
 }
+bool write_sdma_ring_words_wrap(SysmemMapping* control_mapping,
+                                const std::vector<uint32_t>& words,
+                                uint64_t submit_byte_offset,
+                                std::string* error_text) {
+  if (control_mapping == nullptr || control_mapping->data == nullptr) {
+    *error_text = "SDMA control mapping is null";
+    return false;
+  }
+  if (words.empty()) { *error_text = "SDMA ring write has no packet words"; return false; }
+  const uint64_t ring_bytes = static_cast<uint64_t>(words.size()) * sizeof(uint32_t);
+  if (ring_bytes > am_sdma::kRingSize) {
+    *error_text = "SDMA submit exceeds ring size: " + std::to_string(ring_bytes);
+    return false;
+  }
+  const uint64_t write_byte = submit_byte_offset % am_sdma::kRingSize;
+  const uint64_t first_chunk =
+      std::min<uint64_t>(ring_bytes, am_sdma::kRingSize - write_byte);
+  const std::vector<uint8_t> bytes = u32_words_payload_le(words);
+  std::memcpy(static_cast<uint8_t*>(control_mapping->data) + write_byte,
+              bytes.data(), first_chunk);
+  if (first_chunk < ring_bytes) {
+    std::memcpy(static_cast<uint8_t*>(control_mapping->data),
+                bytes.data() + first_chunk, ring_bytes - first_chunk);
+  }
+  return true;
+}
 
 bool write_compute_control_u64(SysmemMapping* compute_control_mapping, uint64_t offset,
                                uint64_t value, std::string* error_text) {
@@ -6266,7 +6292,8 @@ bool submit_sdma_transfer(const RemoteClient& client, DiscoveryLog* log, SysmemM
   return submit_sdma_words(client, log, control_mapping, words, 0, error_text);
 }
 
-bool poll_sdma_fence(const SysmemMapping& control_mapping, std::string* error_text) {
+bool poll_sdma_fence(const SysmemMapping& control_mapping, uint32_t expected_fence,
+                     std::string* error_text) {
   if (am_sdma::kFenceOffset + sizeof(uint32_t) > control_mapping.size) {
     *error_text = "SDMA control mapping too small for fence read at offset " +
                   format_hex64(am_sdma::kFenceOffset);
@@ -6279,18 +6306,23 @@ bool poll_sdma_fence(const SysmemMapping& control_mapping, std::string* error_te
   gettimeofday(&start, nullptr);
   while (true) {
     std::atomic_thread_fence(std::memory_order_seq_cst);
-    if (*fence == am_sdma::kFenceValue) {
+    if (*fence == expected_fence) {
       return true;
     }
     timeval now{};
     gettimeofday(&now, nullptr);
     const long elapsed_usec = (now.tv_sec - start.tv_sec) * 1000000L + (now.tv_usec - start.tv_usec);
     if (elapsed_usec >= 3000000L) {
-      *error_text = "SDMA fence timeline timed out waiting for value 1";
+      *error_text = "SDMA fence timeline timed out waiting for value " +
+                    std::to_string(expected_fence);
       return false;
     }
     usleep(1000U);
   }
+}
+
+bool poll_sdma_fence(const SysmemMapping& control_mapping, std::string* error_text) {
+  return poll_sdma_fence(control_mapping, am_sdma::kFenceValue, error_text);
 }
 
 void print_vm_buffer_log(const char* prefix, const VmBufferLog& buffer) {
