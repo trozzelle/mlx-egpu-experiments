@@ -1883,6 +1883,9 @@ struct ResidentHsaSession::Impl {
   std::string uncertain_text;
   std::string release_error;
   bool prepared = false;
+  // SDMA queue-0 setup is programmed once per prepared session, not once per
+  // 1 MiB upload chunk. Reset on close so a reused session re-programs once.
+  bool sdma_queue_configured = false;
   // Monotonic RELEASE_MEM timeline value for batched dispatch. Each submitted
   // stage consumes the current value and advances it; a batch polls only the
   // last submitted value (next_timeline_value - 1). Reset per prepare/close.
@@ -1957,6 +1960,7 @@ struct ResidentHsaSession::Impl {
     uncertain_text.clear();
     release_error.clear();
     prepared = false;
+    sdma_queue_configured = false;
     next_timeline_value = 1;
     next_kernargs_slot = 0;
   }
@@ -2433,6 +2437,10 @@ bool ResidentHsaSession::upload_named(const std::string& buffer_name, const uint
 
   uint64_t offset = 0;
   std::string detail;
+  if (!state.sdma_queue_configured) {
+    if (!setup_sdma_queue0(*state.client, &state.log, &detail)) return fail(detail);
+    state.sdma_queue_configured = true;
+  }
 
   while (offset < byte_count) {
     const uint32_t chunk =
@@ -2441,8 +2449,7 @@ bool ResidentHsaSession::upload_named(const std::string& buffer_name, const uint
     std::atomic_thread_fence(std::memory_order_seq_cst);
     std::memset(static_cast<uint8_t*>(state.sdma_control_mapping.data) + am_sdma::kFenceOffset, 0,
                 sizeof(uint32_t));
-    if (!setup_sdma_queue0(*state.client, &state.log, &detail) ||
-        !submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
+    if (!submit_sdma_copy(*state.client, &state.log, &state.sdma_control_mapping,
                           state.staging.gpu_va, state.buffers[buffer_index].gpu_va + offset, chunk,
                           am_sdma::kFenceValue, 0, &detail) ||
         !poll_sdma_fence(state.sdma_control_mapping, &detail)) {
