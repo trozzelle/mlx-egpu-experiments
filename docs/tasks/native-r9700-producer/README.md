@@ -24,6 +24,7 @@ Build a tinygrad-free prefill producer on the AMD Radeon AI PRO R9700 that emits
 - `phase-qwen3-8-native-text-delivery.md` — separate Qwen target-expansion contract; it remains blocked on meaningful Llama acceptance.
 - `validation-commands.md` — exact validated commands and discovery rules.
 - `.superpowers/swarm/progress.md` — compact current swarm status.
+- `docs/superpowers/plans/2026-08-24-native-prefill-launch-transport-optimization-v2.md` — launch/transport optimization plan; golden base `d902f06` (re-certified token-exact C1R/C2R 2026-08-24).
 
 ## Current status
 
