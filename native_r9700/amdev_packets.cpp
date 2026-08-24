@@ -47,7 +47,6 @@ constexpr uint32_t kReleaseMemGcrGl1Inv = 1U << 15;
 constexpr uint32_t kReleaseMemGcrGl2Inv = 1U << 20;
 constexpr uint32_t kReleaseMemGcrGl2Wb = 1U << 21;
 constexpr uint32_t kReleaseMemGcrSeq = 1U << 22;
-constexpr uint32_t kReleaseMemTimelineValue = 1U;  // am_compute::kReleaseMemTimelineValue
 
 // Compute SET_SH_REG register offsets (probe L336-344); note the C0 segment
 // base kComputeSetShBase = 0x00002c00U is not needed here because the encoder
@@ -179,7 +178,7 @@ std::vector<uint32_t> build_pm4_dispatch_words(const Pm4DispatchConfig& config) 
   append_pm4_packet3(&words, kPacket3ReleaseMem,
                      {encode_release_mem_event(), encode_release_mem_data_sel(),
                       lo32_impl(config.timeline_va), hi32_impl(config.timeline_va),
-                      kReleaseMemTimelineValue, 0U, 0U});
+                      config.timeline_value, 0U, 0U});
   return words;
 }
 

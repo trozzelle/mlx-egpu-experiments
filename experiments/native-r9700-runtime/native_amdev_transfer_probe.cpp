@@ -6082,7 +6082,8 @@ bool write_compute_ring_words(SysmemMapping* compute_control_mapping,
 
 bool submit_compute_dispatch(const RemoteClient& client, DiscoveryLog* log,
                              SysmemMapping* compute_control_mapping,
-                             const std::vector<uint32_t>& words, std::string* error_text) {
+                             const std::vector<uint32_t>& words, std::string* error_text,
+                             bool capture_queue_snapshot = true) {
   if (log == nullptr) {
     *error_text = "DiscoveryLog precondition failed: null log";
     return false;
@@ -6118,12 +6119,16 @@ bool submit_compute_dispatch(const RemoteClient& client, DiscoveryLog* log,
     *error_text = "flush HDP after compute PM4 ring write failed: " + *error_text;
     return false;
   }
-  ComputeQueueDebugSnapshot pre_snapshot;
-  std::string pre_error;
-  if (read_compute_queue_debug_snapshot(client, *log, true, &pre_snapshot, &pre_error)) {
-    log->compute.doorbell_probe_pre = format_compute_queue_debug_snapshot(pre_snapshot);
+  if (capture_queue_snapshot) {
+    ComputeQueueDebugSnapshot pre_snapshot;
+    std::string pre_error;
+    if (read_compute_queue_debug_snapshot(client, *log, true, &pre_snapshot, &pre_error)) {
+      log->compute.doorbell_probe_pre = format_compute_queue_debug_snapshot(pre_snapshot);
+    } else {
+      log->compute.doorbell_probe_pre = "read_failed: " + pre_error;
+    }
   } else {
-    log->compute.doorbell_probe_pre = "read_failed: " + pre_error;
+    log->compute.doorbell_probe_pre = "skipped";
   }
   if (!write_compute_control_u64(compute_control_mapping, am_compute::kWptrOffset,
                                  new_wptr_dwords, error_text)) {
@@ -6136,20 +6141,26 @@ bool submit_compute_dispatch(const RemoteClient& client, DiscoveryLog* log,
     *error_text = "write compute MEC doorbell failed: " + *error_text;
     return false;
   }
-  ComputeQueueDebugSnapshot post_snapshot;
-  std::string post_error;
-  if (read_compute_queue_debug_snapshot(client, *log, false, &post_snapshot, &post_error)) {
-    log->compute.doorbell_probe_post = format_compute_queue_debug_snapshot(post_snapshot);
-    log->compute.doorbell_probe_status = "submitted";
+  if (capture_queue_snapshot) {
+    ComputeQueueDebugSnapshot post_snapshot;
+    std::string post_error;
+    if (read_compute_queue_debug_snapshot(client, *log, false, &post_snapshot, &post_error)) {
+      log->compute.doorbell_probe_post = format_compute_queue_debug_snapshot(post_snapshot);
+      log->compute.doorbell_probe_status = "submitted";
+    } else {
+      log->compute.doorbell_probe_post = "read_failed: " + post_error;
+      log->compute.doorbell_probe_status = "submitted_post_read_failed";
+    }
   } else {
-    log->compute.doorbell_probe_post = "read_failed: " + post_error;
-    log->compute.doorbell_probe_status = "submitted_post_read_failed";
+    log->compute.doorbell_probe_post = "skipped";
+    log->compute.doorbell_probe_status = "submitted";
   }
   return true;
 }
 
 bool poll_compute_timeline(const SysmemMapping& compute_control_mapping, long* elapsed_usec,
-                           std::string* error_text) {
+                           std::string* error_text,
+                           uint32_t expected_value = am_compute::kReleaseMemTimelineValue) {
   if (elapsed_usec == nullptr) {
     *error_text = "elapsed_usec precondition failed: null pointer";
     return false;
@@ -6181,12 +6192,12 @@ bool poll_compute_timeline(const SysmemMapping& compute_control_mapping, long* e
     gettimeofday(&now, nullptr);
     *elapsed_usec =
         (now.tv_sec - start.tv_sec) * 1000000L + (now.tv_usec - start.tv_usec);
-    if (observed == am_compute::kReleaseMemTimelineValue) {
+    if (observed == expected_value) {
       return true;
     }
     if (*elapsed_usec >= 3000000L) {
       *error_text = "compute timeline timed out waiting for value " +
-                    std::to_string(am_compute::kReleaseMemTimelineValue) +
+                    std::to_string(expected_value) +
                     ", observed=" + std::to_string(observed) +
                     ", rptr=" + std::to_string(static_cast<unsigned long long>(*rptr)) +
                     ", wptr=" + std::to_string(static_cast<unsigned long long>(*wptr));

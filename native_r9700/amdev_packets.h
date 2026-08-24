@@ -28,6 +28,7 @@ struct Pm4DispatchConfig {
   uint32_t global_x = 0;
   uint32_t global_y = 0;
   uint32_t global_z = 0;
+  uint32_t timeline_value = 1;  // monotonic RELEASE_MEM write payload (was fixed kReleaseMemTimelineValue)
 };
 
 // C0A25 compute dispatch stream: 12 packets and 59 dwords total. This is the

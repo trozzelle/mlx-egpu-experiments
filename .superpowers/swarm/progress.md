@@ -40,3 +40,20 @@
 - CPU/NumPy is oracle evidence only; it cannot produce an accepted native artifact.
 - Preserve `S-1` cache semantics and final-token injection.
 - Do not resume Qwen work before the 128-token Llama acceptance gate passes.
+
+## Launch/Transport Optimization (2026-08-24)
+
+Plan: `docs/superpowers/plans/2026-08-24-native-prefill-launch-transport-optimization.md`.
+Work boundary: current checkout, branch `feature/native-r9700-producer` @ `3d314bc` (no worktree fork — branch is not main/master).
+Baseline: 128-token native prefill 104.6 s wall / 12.7 s CPU; kernel_count=20480; transfer_bytes=2072649728.
+
+Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) → W3 = T4+T5 (parallel, disjoint files) → W4 = T6 (supervisor verify).
+
+| Task | Status | Owner | Deps | Report | Evidence | Blocker |
+|---|---|---|---|---|---|---|
+| T1 Monotonic PM4 timeline value | Done | — | — | opt-t1-monotonic-timeline.md | 2/2 passed; field at struct end (positional-agg safe) | — |
+| T2 Parameterize submit/poll | Done | — | — | opt-t2-transport-params.md | 24/24 passed; build exit 0 | — |
+| T3 Batched resident dispatch | Not started | — | T1, T2 | — | — | — |
+| T4 Batched SDMA upload | Not started | — | — | — | — | — |
+| T5 Wire prefill loop | Not started | — | T3 | — | — | — |
+| T6 Verify + measure | Not started | — | T1–T5 | — | — | — |
