@@ -2455,8 +2455,21 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
     store_u64_le(kernarg_request.kernargs.data() + binding.kernarg_byte_offset,
                  state.buffers[binding.buffer_index].gpu_va);
   }
+  uint32_t kernarg_slot = 0;
+  const char* slot_env = std::getenv("NATIVE_KERNARG_SLOT");
+  const bool use_slot_bind = slot_env != nullptr && slot_env[0] != '\0';
+  if (use_slot_bind) {
+    kernarg_slot = static_cast<uint32_t>(std::strtoul(slot_env, nullptr, 0));
+  }
   std::string detail;
-  if (!bind_resident_kernel_kernargs(kernarg_request, &state.compute_control_mapping, &detail)) {
+  uint64_t kernargs_va = am_compute::kKernargsVa;
+  if (use_slot_bind) {
+    if (!bind_resident_kernel_kernargs_slot(kernarg_request, &state.compute_control_mapping,
+                                            kernarg_slot, &kernargs_va, &detail)) {
+      return fail("kernarg_bind", detail);
+    }
+  } else if (!bind_resident_kernel_kernargs(kernarg_request, &state.compute_control_mapping,
+                                            &detail)) {
     return fail("kernarg_bind", detail);
   }
   for (size_t i = 0; i < state.buffers.size(); ++i) {
@@ -2478,7 +2491,7 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
                              ? static_cast<uint32_t>(std::strtoul(rsrc3_override_env, nullptr, 0))
                              : image.rsrc3;
   const Pm4DispatchConfig pm4{state.image_buffers[stage.hsa_image_index].gpu_va + stage.entry_offset,
-                              am_compute::kKernargsVa, am_compute::kTimelineVa,
+                              kernargs_va, am_compute::kTimelineVa,
                               image.rsrc1, image.rsrc2, rsrc3, image.wave32, stage.workgroup_x,
                               stage.workgroup_y, stage.workgroup_z, stage.global_x,
                               stage.global_y, stage.global_z};
