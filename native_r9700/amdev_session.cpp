@@ -20,6 +20,7 @@
 #include "amdev_session.h"
 #include "amdev_packets.h"
 #include "dynamic_page_table.h"
+#include "hardware_lock.h"
 #include "resident_memory.h"
 #include "vram_smoke_asset.h"
 
@@ -389,6 +390,14 @@ int run_streaming_transfer_proof(uint64_t byte_count, const std::vector<uint8_t>
                                   "source byte count does not match transfer byte count");
   }
 
+  HardwareLock hardware_lock;
+  std::string lock_error;
+  if (!hardware_lock.acquire(&lock_error)) {
+    return finish_stream_transfer(log, staging, readback, sdma_control, byte_count, chunk_count,
+                                  status, "hardware_ownership",
+                                  "hardware lock acquire failed: " + lock_error);
+  }
+
   UniqueFd socket_fd;
   SysmemMapping staging_mapping;
   SysmemMapping readback_mapping;
@@ -397,6 +406,11 @@ int run_streaming_transfer_proof(uint64_t byte_count, const std::vector<uint8_t>
   if (!connect_tinygpu_server(log.socket_path, &socket_fd, &connect_error)) {
     return finish_stream_transfer(log, staging, readback, sdma_control, byte_count, chunk_count,
                                   status, "tinygpu_connect", connect_error);
+  }
+  std::string health_error;
+  if (!hardware_lock_health_check(log.socket_path, &health_error)) {
+    return finish_stream_transfer(log, staging, readback, sdma_control, byte_count, chunk_count,
+                                  status, "hardware_ownership", health_error);
   }
 
   const RemoteClient client(socket_fd.get());
@@ -875,6 +889,12 @@ bool run_vram_smoke(VramSmokeResult* result, std::string* error_text) {
   VmBufferLog sdma_control{"sdma_control", am_sdma::kControlVa, kPageSize, 0, "not_run", {}};
   VmBufferLog compute_control{"compute_control", am_compute::kRptrVa,
                               am_compute::kComputeControlByteCount, 0, "not_run", {}};
+  HardwareLock hardware_lock;
+  std::string lock_error;
+  if (!hardware_lock.acquire(&lock_error)) {
+    return fail("hardware_ownership", "hardware lock acquire failed: " + lock_error);
+  }
+
   UniqueFd socket_fd;
   SysmemMapping staging_mapping;
   SysmemMapping readback_mapping;
@@ -883,6 +903,11 @@ bool run_vram_smoke(VramSmokeResult* result, std::string* error_text) {
   if (!connect_tinygpu_server(log.socket_path, &socket_fd, &detail)) {
     return fail("tinygpu_connect", detail);
   }
+  std::string health_error;
+  if (!hardware_lock_health_check(log.socket_path, &health_error)) {
+    return fail("hardware_ownership", health_error);
+  }
+
   const RemoteClient client(socket_fd.get());
   TerminalComputeQueue0Retirement compute_queue_retirement(client, log);
   RemoteRpcResult config = client.rpc_no_payload(RemoteCmd::CFG_READ, 0, 0, 4);
@@ -1291,6 +1316,12 @@ bool run_llama_embed_smoke(const LlamaEmbedSmokeDispatch& request,
   VmBufferLog sdma_control{"sdma_control", am_sdma::kControlVa, kPageSize, 0, "not_run", {}};
   VmBufferLog compute_control{"compute_control", am_compute::kRptrVa,
                               am_compute::kComputeControlByteCount, 0, "not_run", {}};
+  HardwareLock hardware_lock;
+  std::string lock_error;
+  if (!hardware_lock.acquire(&lock_error)) {
+    return fail("hardware_ownership", "hardware lock acquire failed: " + lock_error);
+  }
+
   UniqueFd socket_fd;
   SysmemMapping staging_mapping;
   SysmemMapping readback_mapping;
@@ -1300,6 +1331,11 @@ bool run_llama_embed_smoke(const LlamaEmbedSmokeDispatch& request,
   if (!connect_tinygpu_server(log.socket_path, &socket_fd, &detail)) {
     return fail("tinygpu_connect", detail);
   }
+  std::string health_error;
+  if (!hardware_lock_health_check(log.socket_path, &health_error)) {
+    return fail("hardware_ownership", health_error);
+  }
+
   const RemoteClient client(socket_fd.get());
   TerminalComputeQueue0Retirement compute_queue_retirement(client, log);
   RemoteRpcResult config = client.rpc_no_payload(RemoteCmd::CFG_READ, 0, 0, 4);
@@ -1703,6 +1739,12 @@ bool run_resident_kernel_dispatch(const ResidentKernelDispatch& request,
   VmBufferLog sdma_control{"sdma_control", am_sdma::kControlVa, kPageSize, 0, "not_run", {}};
   VmBufferLog compute_control{"compute_control", am_compute::kRptrVa,
                               am_compute::kComputeControlByteCount, 0, "not_run", {}};
+  HardwareLock hardware_lock;
+  std::string lock_error;
+  if (!hardware_lock.acquire(&lock_error)) {
+    return fail("hardware_ownership", "hardware lock acquire failed: " + lock_error);
+  }
+
   UniqueFd socket_fd;
   SysmemMapping staging_mapping;
   SysmemMapping readback_mapping;
@@ -1713,6 +1755,11 @@ bool run_resident_kernel_dispatch(const ResidentKernelDispatch& request,
   if (!connect_tinygpu_server(log.socket_path, &socket_fd, &detail)) {
     return fail("tinygpu_connect", detail);
   }
+  std::string health_error;
+  if (!hardware_lock_health_check(log.socket_path, &health_error)) {
+    return fail("hardware_ownership", health_error);
+  }
+
   const RemoteClient client(socket_fd.get());
   TerminalComputeQueue0Retirement compute_queue_retirement(client, log);
   auto fail_after_compute_queue_setup = [&](const char* stage, const std::string& text) {
@@ -1850,6 +1897,7 @@ struct ResidentHsaSession::Impl {
 
   DiscoveryLog log;
   UniqueFd socket_fd;
+  std::unique_ptr<HardwareLock> hardware_lock;
 
   std::unique_ptr<RemoteClient> client;
   VmBufferLog staging{"staging", kTransferProofVmStagingVa, kResidentStagingByteCount, 0,
@@ -1932,6 +1980,7 @@ struct ResidentHsaSession::Impl {
     sdma_control_mapping.reset();
     compute_control_mapping.reset();
     socket_fd.reset();
+    hardware_lock.reset();
     log = DiscoveryLog{};
 
     staging = VmBufferLog{"staging", kTransferProofVmStagingVa, kResidentStagingByteCount, 0,
@@ -2005,10 +2054,21 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
 
   Impl& state = *impl_;
   state.log.socket_path = tinygpu_socket_path();
+  state.hardware_lock = std::make_unique<HardwareLock>();
+  std::string lock_error;
+  if (!state.hardware_lock->acquire(&lock_error)) {
+    return fail("hardware_ownership", "hardware lock acquire failed: " + lock_error);
+  }
+
   std::string detail;
   if (!connect_tinygpu_server(state.log.socket_path, &state.socket_fd, &detail)) {
     return fail("tinygpu_connect", detail);
   }
+  std::string health_error;
+  if (!hardware_lock_health_check(state.log.socket_path, &health_error)) {
+    return fail("hardware_ownership", health_error);
+  }
+
   state.client = std::make_unique<RemoteClient>(state.socket_fd.get());
   RemoteRpcResult config = state.client->rpc_no_payload(RemoteCmd::CFG_READ, 0, 0, 4);
   if (!config.ok) return fail("config_read", rpc_failure_text("CFG_READ vendor_device", config));
@@ -2617,12 +2677,25 @@ bool AMDevSession::plan_resident_hsa_dispatch(const ResidentHsaDispatch& request
   if (!validate_resident_hsa_dispatch(request, error_text)) return false;
   DiscoveryLog log;
   log.socket_path = tinygpu_socket_path();
+  HardwareLock hardware_lock;
+  std::string lock_error;
+  if (!hardware_lock.acquire(&lock_error)) {
+    if (error_text != nullptr) *error_text = "hardware lock acquire failed: " + lock_error;
+    return false;
+  }
+
   UniqueFd socket_fd;
   std::string detail;
   if (!connect_tinygpu_server(log.socket_path, &socket_fd, &detail)) {
     if (error_text != nullptr) *error_text = detail;
     return false;
   }
+  std::string health_error;
+  if (!hardware_lock_health_check(log.socket_path, &health_error)) {
+    if (error_text != nullptr) *error_text = health_error;
+    return false;
+  }
+
   const RemoteClient client(socket_fd.get());
   RemoteRpcResult config = client.rpc_no_payload(RemoteCmd::CFG_READ, 0, 0, 4);
   if (!config.ok) {
