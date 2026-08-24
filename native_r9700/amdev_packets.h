@@ -21,6 +21,7 @@ struct Pm4DispatchConfig {
   uint32_t rsrc1 = 0;
   uint32_t rsrc2 = 0;
   uint32_t rsrc3 = 0;
+  bool wave32 = false;  // sets COMPUTE_DISPATCH_INITIATOR.CS_W32_EN (bit 15)
   uint32_t workgroup_x = 0;
   uint32_t workgroup_y = 0;
   uint32_t workgroup_z = 0;

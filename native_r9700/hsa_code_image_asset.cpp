@@ -558,6 +558,9 @@ bool load_asset(const std::filesystem::path& root, HsaCodeImageAsset* candidate)
       hex_digest(image) != kImageSha256) {
     return false;
   }
+  // ENABLE_WAVEFRONT_SIZE32 from the AMDHSA kernel descriptor (tinygrad
+  // ops_amd.py:591 derives wave32 the same way).
+  candidate->wave32 = image_is_wave32(image, kDescriptorOffset);
 
   candidate->image = std::move(image);
   candidate->image_sha256 = kImageSha256;

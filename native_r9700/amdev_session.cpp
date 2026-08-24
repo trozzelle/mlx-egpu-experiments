@@ -1204,7 +1204,7 @@ bool run_vram_smoke(VramSmokeResult* result, std::string* error_text) {
     return fail_after_compute_queue_setup("kernarg_bind", detail);
   }
   const Pm4DispatchConfig pm4{code.gpu_va, am_compute::kKernargsVa, am_compute::kTimelineVa,
-                              kernel.rsrc1, kernel.rsrc2, kernel.rsrc3, kernel.workgroup_x,
+                              kernel.rsrc1, kernel.rsrc2, kernel.rsrc3, false, kernel.workgroup_x,
                               kernel.workgroup_y, kernel.workgroup_z, kernel.global_x,
                               kernel.global_y, kernel.global_z};
   const std::vector<uint32_t> pm4_words = build_pm4_dispatch_words(pm4);
@@ -1550,7 +1550,7 @@ bool run_llama_embed_smoke(const LlamaEmbedSmokeDispatch& request,
   }
   const Pm4DispatchConfig pm4{image.gpu_va + hsa_image->entry_offset, am_compute::kKernargsVa,
                               am_compute::kTimelineVa, hsa_image->rsrc1, hsa_image->rsrc2,
-                              hsa_image->rsrc3, 256, 1, 1, 2048, 1, 1};
+                              hsa_image->rsrc3, false, 256, 1, 1, 2048, 1, 1};
   const std::vector<uint32_t> pm4_words = build_pm4_dispatch_words(pm4);
   result->pm4_dispatch_word_count = pm4_words.size();
   result->pm4_dispatch_digest = pm4_dispatch_digest(pm4_words);
@@ -1635,10 +1635,6 @@ bool validate_resident_hsa_dispatch(const ResidentHsaDispatch& request,
                                    global_x, global_y, global_z};
     for (uint32_t dimension : dimensions) {
       if (dimension == 0) return fail("HSA dispatch geometry dimensions must be nonzero");
-    }
-    if (global_x % workgroup_x != 0 || global_y % workgroup_y != 0 ||
-        global_z % workgroup_z != 0) {
-      return fail("HSA global geometry must be divisible by workgroup geometry");
     }
     std::vector<uint32_t> occupied_kernarg_offsets;
     occupied_kernarg_offsets.reserve(bindings.size());
@@ -1796,7 +1792,7 @@ bool run_resident_kernel_dispatch(const ResidentKernelDispatch& request,
   }
   const Pm4DispatchConfig pm4{am_compute::kCodeVramVa, am_compute::kKernargsVa,
                               am_compute::kTimelineVa, request.kernel.rsrc1,
-                              request.kernel.rsrc2, request.kernel.rsrc3,
+                              request.kernel.rsrc2, request.kernel.rsrc3, false,
                               request.kernel.workgroup_x, request.kernel.workgroup_y,
                               request.kernel.workgroup_z, request.kernel.global_x,
                               request.kernel.global_y, request.kernel.global_z};
@@ -1849,6 +1845,7 @@ struct ResidentHsaSession::Impl {
     uint32_t rsrc2 = 0;
     uint32_t rsrc3 = 0;
     uint64_t byte_count = 0;
+    bool wave32 = false;
   };
 
   DiscoveryLog log;
@@ -2174,7 +2171,8 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
   result->dynamic_ptb_physical_offset = state.page_table->first_dynamic_ptb_physical_offset();
   for (size_t index = 0; index < source_images.size(); ++index) {
     const HsaCodeImageAsset& image = *source_images[index];
-    state.images.push_back(Impl::Image{image.rsrc1, image.rsrc2, image.rsrc3, image.image.size()});
+    state.images.push_back(
+        Impl::Image{image.rsrc1, image.rsrc2, image.rsrc3, image.image.size(), image.wave32});
     result->hsa_image_gpu_vas.push_back(state.image_buffers[index].gpu_va);
     result->hsa_image_physical_offsets.push_back(state.image_buffers[index].allocation.physical_offset);
     if (!mmio_write_bar0(*state.client, state.image_buffers[index].allocation.physical_offset,
@@ -2254,10 +2252,6 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
   for (uint32_t dimension : dimensions) {
     if (dimension == 0) return fail("preflight", "HSA dispatch geometry dimensions must be nonzero");
   }
-  if (stage.global_x % stage.workgroup_x != 0 || stage.global_y % stage.workgroup_y != 0 ||
-      stage.global_z % stage.workgroup_z != 0) {
-    return fail("preflight", "HSA global geometry must be divisible by workgroup geometry");
-  }
   ResidentKernelDispatch kernarg_request;
   kernarg_request.kernargs = stage.kernargs;
   std::vector<uint32_t> occupied_offsets;
@@ -2281,6 +2275,17 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
   if (!bind_resident_kernel_kernargs(kernarg_request, &state.compute_control_mapping, &detail)) {
     return fail("kernarg_bind", detail);
   }
+  for (size_t i = 0; i < state.buffers.size(); ++i) {
+    std::fprintf(stderr, "DIAG buffer[%zu] gpu_va=0x%016llx phys=0x%016llx\n",
+                 i, static_cast<unsigned long long>(state.buffers[i].gpu_va),
+                 static_cast<unsigned long long>(state.buffers[i].allocation.physical_offset));
+  }
+  for (size_t i = 0; i + 8 <= kernarg_request.kernargs.size(); i += 8) {
+    uint64_t v = 0;
+    for (size_t b = 0; b < 8; ++b) v |= static_cast<uint64_t>(kernarg_request.kernargs[i + b]) << (8 * b);
+    std::fprintf(stderr, "DIAG kernarg[%zu] = 0x%016llx\n", i / 8,
+                 static_cast<unsigned long long>(v));
+  }
   const Impl::Image& image = state.images[stage.hsa_image_index];
   // Diagnostic: override COMPUTE_PGM_RSRC3 (INST_PREF_SIZE on GFX12) without
   // changing the image or its digest (PDF step 4, --override-rsrc3).
@@ -2290,7 +2295,7 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
                              : image.rsrc3;
   const Pm4DispatchConfig pm4{state.image_buffers[stage.hsa_image_index].gpu_va + stage.entry_offset,
                               am_compute::kKernargsVa, am_compute::kTimelineVa,
-                              image.rsrc1, image.rsrc2, rsrc3, stage.workgroup_x,
+                              image.rsrc1, image.rsrc2, rsrc3, image.wave32, stage.workgroup_x,
                               stage.workgroup_y, stage.workgroup_z, stage.global_x,
                               stage.global_y, stage.global_z};
   const std::vector<uint32_t> pm4_words = build_pm4_dispatch_words(pm4);

@@ -96,7 +96,9 @@ uint32_t pm4_packet3(uint32_t opcode, uint32_t count) {
   return (kPacketType3 << 30) | ((opcode & 0xffU) << 8) | ((count & 0x3fffU) << 16);
 }
 
-uint32_t encode_dispatch_initiator() { return (1U << 0) | (1U << 2); }
+uint32_t encode_dispatch_initiator(bool wave32) {
+  return (1U << 0) | (1U << 2) | (wave32 ? (1U << 15) : 0U);
+}
 
 uint32_t encode_acquire_mem_gcr_cntl_for_dispatch() {
   return (1U << kAcquireMemGcrCntlGliInvShift) | (1U << kAcquireMemGcrCntlGlmWbShift) |
@@ -172,7 +174,7 @@ std::vector<uint32_t> build_pm4_dispatch_words(const Pm4DispatchConfig& config) 
                       config.workgroup_y, config.workgroup_z, 0U, 0U});
   append_pm4_packet3(&words, kPacket3DispatchDirect,
                      {config.global_x, config.global_y, config.global_z,
-                      encode_dispatch_initiator()});
+                      encode_dispatch_initiator(config.wave32)});
   append_pm4_packet3(&words, kPacket3EventWrite, {encode_event_write_cs_partial_flush()});
   append_pm4_packet3(&words, kPacket3ReleaseMem,
                      {encode_release_mem_event(), encode_release_mem_data_sel(),
@@ -185,7 +187,7 @@ std::vector<uint32_t> build_pm4_dispatch_words(uint64_t code_va, uint64_t kernar
                                                uint64_t timeline_va) {
   return build_pm4_dispatch_words(
       {code_va, kernargs_va, timeline_va, kKernelReferenceRsrc1, kKernelReferenceRsrc2,
-       kKernelReferenceRsrc3, kDispatchLocalSizeX, kDispatchLocalSizeY, kDispatchLocalSizeZ,
+       kKernelReferenceRsrc3, false, kDispatchLocalSizeX, kDispatchLocalSizeY, kDispatchLocalSizeZ,
        kDispatchGlobalSizeX, kDispatchGlobalSizeY, kDispatchGlobalSizeZ});
 }
 

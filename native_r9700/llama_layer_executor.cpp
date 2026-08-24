@@ -152,27 +152,28 @@ struct LlamaStageAssetConfig {
   const char* schema;
   uint64_t entry_offset;
   uint32_t kernarg_bytes;
+  uint64_t descriptor_offset;
 };
 
 constexpr std::array<LlamaStageAssetConfig, 9> kLlamaStageAssetConfigs = {{
     {"llama_rmsnorm_f16", "native_r9700/kernels/llama-rmsnorm-hsa-assets",
-     "llama-rmsnorm-f16-v1", 5888, 32},
+     "llama-rmsnorm-f16-v1", 5888, 32, 1536},
     {"llama_k_projection_f16", "native_r9700/kernels/llama-k-projection-hsa-assets",
-     "llama-k-projection-f16-v1", 5888, 32},
+     "llama-k-projection-f16-v1", 5888, 32, 1600},
     {"llama_v_projection_f16", "native_r9700/kernels/llama-v-projection-hsa-assets",
-     "llama-v-projection-f16-v1", 5888, 32},
+     "llama-v-projection-f16-v1", 5888, 32, 1600},
     {"llama_rope_kv_f16", "native_r9700/kernels/llama-rope-kv-hsa-assets",
-     "llama-rope-kv-f16-v1", 5888, 48},
+     "llama-rope-kv-f16-v1", 5888, 48, 1728},
     {"llama_causal_attention_score_f16", "native_r9700/kernels/llama-attention-score-hsa-assets",
-     "llama-causal-attention-score-f16-v1", 6144, 48},
+     "llama-causal-attention-score-f16-v1", 6144, 48, 1792},
     {"llama_causal_attention_softmax_f32", "native_r9700/kernels/llama-attention-softmax-hsa-assets",
-     "llama-causal-attention-softmax-f32-v1", 5888, 32},
+     "llama-causal-attention-softmax-f32-v1", 5888, 32, 1664},
     {"llama_causal_attention_context_f16", "native_r9700/kernels/llama-attention-context-hsa-assets",
-     "llama-causal-attention-context-f16-v1", 5888, 40},
+     "llama-causal-attention-context-f16-v1", 5888, 40, 1728},
     {"llama_o_projection_f16", "native_r9700/kernels/llama-o-projection-hsa-assets",
-     "llama-o-projection-f16-v1", 5888, 40},
+     "llama-o-projection-f16-v1", 5888, 40, 1664},
     {"llama_gated_mlp_f16", "native_r9700/kernels/llama-gated-mlp-hsa-assets",
-     "llama-gated-mlp-f16-v1", 6144, 56},
+     "llama-gated-mlp-f16-v1", 6144, 56, 1792},
 }};
 constexpr LlamaStageAssetConfig kLlamaRmsNormZeroStoreTraceAssetConfig = {
     "llama_rmsnorm_zero_store_f16",
@@ -180,6 +181,7 @@ constexpr LlamaStageAssetConfig kLlamaRmsNormZeroStoreTraceAssetConfig = {
     "llama-rmsnorm-f16-v1",
     5888,
     32,
+    1600,
 };
 constexpr LlamaStageAssetConfig kLlamaRmsNormEpsilonArithmeticTraceAssetConfig = {
     "llama_rmsnorm_epsilon_arithmetic_f16",
@@ -187,6 +189,7 @@ constexpr LlamaStageAssetConfig kLlamaRmsNormEpsilonArithmeticTraceAssetConfig =
     "llama-rmsnorm-f16-v1",
     5888,
     32,
+    1664,
 };
 
 
@@ -237,6 +240,7 @@ bool build_llama_stage_dispatch(const LlamaLayer0WeightSpans& weights, uint32_t 
     image.rsrc1 = descriptor.rsrc1;
     image.rsrc2 = descriptor.rsrc2;
     image.rsrc3 = descriptor.rsrc3;
+    image.wave32 = image_is_wave32(image.image, config.descriptor_offset);
     images->push_back(std::move(image));
   }
   dispatch->hsa_images.reserve(images->size());
@@ -262,7 +266,7 @@ bool build_llama_stage_dispatch(const LlamaLayer0WeightSpans& weights, uint32_t 
   };
   // Buffer order: selected row, input/post norms, Q/K/V/O/gate/up/down,
   // hidden, normalized, fresh K/V, K/V cache, score/probability, context, post-attention.
-  append_stage(0, {{0, 0}, {1, 8}, {11, 16}}, {{24, 0x3727c5acU}}, 64);
+  append_stage(0, {{0, 0}, {1, 8}, {11, 16}}, {{24, 0x3727c5acU}}, 1);
   append_stage(1, {{11, 0}, {4, 8}, {12, 16}}, {{24, 1}}, 512);
   append_stage(2, {{11, 0}, {5, 8}, {13, 16}}, {{24, 1}}, 512);
   append_stage(3, {{12, 0}, {13, 8}, {14, 16}, {15, 24}},
@@ -412,6 +416,7 @@ bool build_llama_layer0_stage_trace_dispatch(const std::string& model_dir, uint3
   probe_image.rsrc1 = descriptor.rsrc1;
   probe_image.rsrc2 = descriptor.rsrc2;
   probe_image.rsrc3 = descriptor.rsrc3;
+  probe_image.wave32 = image_is_wave32(probe_image.image, config.descriptor_offset);
   images->front() = std::move(probe_image);
   dispatch->hsa_images.front() = &images->front();
   dispatch->stages.front().entry_offset = images->front().entry_offset;
@@ -502,6 +507,7 @@ bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
     image.rsrc1 = descriptor.rsrc1;
     image.rsrc2 = descriptor.rsrc2;
     image.rsrc3 = descriptor.rsrc3;
+    image.wave32 = image_is_wave32(image.image, config.descriptor_offset);
     candidate.images.push_back(std::move(image));
   }
   candidate.request.hsa_images.reserve(candidate.images.size());
