@@ -21,28 +21,38 @@
     },
     "prompt-16": {
       "S": 17
+    },
+    "prompt-64": {
+      "S": 65
+    },
+    "prompt-128": {
+      "S": 129
     }
   },
   "files": {
     "prompts.json": {
       "kind": "json",
-      "sha256": "e78012e14fad2061e1ba5ffd56e7bc6b4a1119017e5ef12b373a2dac17ff56ef",
-      "keys": [
-        "prompt-0",
-        "prompt-1",
-        "prompt-2",
-        "prompt-16"
-      ],
-      "note": "prompt text + mlx token ids + S"
-    },
-    "baseline_r_tokens.json": {
-      "kind": "json",
-      "sha256": "c350dd03e414f4a05a06d913c1523273000cf30b06dc42db7c2995d1313ef237",
+      "sha256": "0a3a23256917ceada14ecd0ae8097f7879a60ce17670cd1234b3b8eff9a477e7",
       "keys": [
         "prompt-0",
         "prompt-1",
         "prompt-2",
         "prompt-16",
+        "prompt-64",
+        "prompt-128"
+      ],
+      "note": "prompt text + mlx token ids + S"
+    },
+    "baseline_r_tokens.json": {
+      "kind": "json",
+      "sha256": "c465a4447656fc565848fc2a367fa2c5805b1ac1eb4019a59b6a4fffb6542668",
+      "keys": [
+        "prompt-0",
+        "prompt-1",
+        "prompt-2",
+        "prompt-16",
+        "prompt-64",
+        "prompt-128",
         "_joint_r_tokens_digest"
       ],
       "note": "mlx-lm native-baseline R token ids per prompt"

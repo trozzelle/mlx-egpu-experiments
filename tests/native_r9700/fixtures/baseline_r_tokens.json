@@ -39,5 +39,25 @@
     "max_new_tokens": 4,
     "S": 17
   },
-  "_joint_r_tokens_digest": "c2acbcee56b5f83223f816a67d351b58c286759eae922d4c75abd2d93b174630"
+  "prompt-64": {
+    "r_tokens": [
+      279,
+      4216,
+      62520,
+      9478
+    ],
+    "max_new_tokens": 4,
+    "S": 65
+  },
+  "prompt-128": {
+    "r_tokens": [
+      13,
+      578,
+      30791,
+      17604
+    ],
+    "max_new_tokens": 4,
+    "S": 129
+  },
+  "_joint_r_tokens_digest": "ae37099bc50ebfe7ee1e3155e4ef72f93879186f916f6daf4b192f22c4f6f730"
 }

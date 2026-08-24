@@ -1598,7 +1598,8 @@ def test_schema_json_matches_disk_digests():
 # ---------------------------------------------------------------------------
 def test_prompts_json_schema_and_s():
     prompts = json.load(open(_load("prompts.json")))
-    assert set(prompts.keys()) == {"prompt-0", "prompt-1", "prompt-2", "prompt-16"}
+    assert set(prompts.keys()) == {"prompt-0", "prompt-1", "prompt-2", "prompt-16",
+                                   "prompt-64", "prompt-128"}
     for name, p in prompts.items():
         assert p["S"] == rf.EXPECTED_S[name] == len(p["token_ids"])
         assert p["text"] == rf.PROMPT_TEXTS[name]
@@ -1630,8 +1631,8 @@ def test_benchmark_prompts_json_schema_and_monotonic_s():
 def test_r_tokens_json_schema():
     rt = json.load(open(_load("baseline_r_tokens.json")))
     assert set(rt.keys()) == {"prompt-0", "prompt-1", "prompt-2", "prompt-16",
-                              "_joint_r_tokens_digest"}
-    for name in ("prompt-0", "prompt-1", "prompt-2", "prompt-16"):
+                              "prompt-64", "prompt-128", "_joint_r_tokens_digest"}
+    for name in ("prompt-0", "prompt-1", "prompt-2", "prompt-16", "prompt-64", "prompt-128"):
         entry = rt[name]
         assert entry["S"] == rf.EXPECTED_S[name]
         assert entry["max_new_tokens"] == rf.DEFAULT_MAX_NEW_TOKENS
