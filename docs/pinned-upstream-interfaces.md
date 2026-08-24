@@ -282,3 +282,41 @@ GPU VA, tinygrad `mqd_mc`/`ring_addr`/`rptr_addr`/`wptr_addr`); (4) **MQD reloca
 the MQD physical allocation to an unmistakably different page and observe whether the fault VA
 follows); (5) GPU-VA alias diagnostic; (6) dump live VMID 0 context and walk the faulting VA; (7)
 PM4 A/B/C/D markers; (8) salvage candidate output on timeout.
+
+---
+
+## 11. ChatGPT R9700 diagnosis #3 — dispatch geometry + wave32 (2026-08-23)
+
+`docs/ChatGPT-Diagnose R9700 Mapping Issues-20260823-2224.pdf`.
+
+Confirms the MQD fix (fault moved CPF→TCP) but catches two launch defects that precede the
+transcendental work:
+
+- **Definite geometry bug:** direct-PM4 `PACKET3_DISPATCH_DIRECT` dimensions are **workgroup
+  counts**, not work-items. `build_llama_stage_dispatch` sets stage 0 `global_x=64` with
+  `workgroup_x=64`, so the RMSNorm probe launches **64 workgroups × 64 threads**, not 64 threads.
+  The epsilon kernel computes `row = workgroup_id_x`, `row_offset = row*2048`, and the output buffer
+  is one row (2048 fp16 = 4096 B), so workgroups 1–63 write past the buffer. Fix: stage 0
+  `group_count_x = 1` (local_x stays 64). Audit each stage's indexing model before touching its
+  count — do not blanket-divide by 64.
+- **Fault address implicates an invalid `workgroup_id_x`:** captured VAs
+  `0x…6851f000`/`0x…68530000` minus the output base `0x…7628000` = `0x60ef7000`/`0x60f08000`, which
+  are exactly `397047×4096` / `397064×4096` — the kernel's per-row stride is 2048×2 = 4096 B. The
+  two implied workgroup IDs differ by 17 (a small row count), not a random pointer. So the write is
+  `output_base + garbage_row×4096`, not a corrupted base pointer.
+- **wave32 not set:** `encode_dispatch_initiator()` = `(1<<0)|(1<<2)` = `0x5`
+  (compute_shader_en + force_start_at_000); the canonical `CS_W32_EN` (bit 15) is absent — a wave32
+  image needs `0x8005`. tinygrad derives it: `regCOMPUTE_DISPATCH_INITIATOR.encode(cs_w32_en=int(prg.wave32),
+  force_start_at_000=1, compute_shader_en=1)`. Decode `ENABLE_WAVEFRONT_SIZE32` from the descriptor
+  and set the bit; don't hard-code another literal.
+- **RSRC2=0x84** → `USER_SGPR_COUNT=2`, `TGID_X_EN=1`. Expected launch SGPR layout: `s[0:1]`
+  kernarg pointer, `s[2]` workgroup_id_x. CP supplies user-data SGPRs, ADC supplies workgroup IDs,
+  SPI supplies workitem IDs.
+
+Sequence: (1) fix stage-0 group count to 1 + no-hardware PM4 assert; (2) decode/program wave32 from
+the descriptor (log RSRC1/2/3, wave32, initiator, USER_SGPR_COUNT, TGID_X_EN); (3) A/B kernels
+through the resident path at one workgroup — A pointer-only constant store, B workgroup-ID sentinel
+(`out[0]=workgroup_id_x`, `out[1]=workitem_id_x`, fixed indices), C epsilon with `row=0` hard-coded;
+(4) clean-state baseline (dequeue/reset HQD, verify `CP_HQD_ACTIVE==0`, clear + verify GCVM/RS64
+fault registers, resident sentinel). Pause: MEC firmware `0xc67`, one-op microkernels, LLVM
+division-lowering, cache invalidation, RSRC3 overrides.
