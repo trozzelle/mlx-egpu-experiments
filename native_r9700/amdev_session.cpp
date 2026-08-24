@@ -2299,6 +2299,15 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
                               stage.workgroup_y, stage.workgroup_z, stage.global_x,
                               stage.global_y, stage.global_z};
   const std::vector<uint32_t> pm4_words = build_pm4_dispatch_words(pm4);
+  // Reset the completion timeline before submit: the RELEASE_MEM in this
+  // dispatch writes kReleaseMemTimelineValue, and the poll below waits for that
+  // value. Without a reset, a prior dispatch's completed timeline leaves the
+  // value already at 1, so the poll returns before THIS dispatch retires and
+  // the readback races the kernel (observed as an all-Inf stage-1 readback).
+  std::memset(static_cast<uint8_t*>(state.compute_control_mapping.data) +
+                  am_compute::kTimelineOffset,
+              0, sizeof(uint32_t));
+  std::atomic_thread_fence(std::memory_order_seq_cst);
   if (!submit_compute_dispatch_with_post_doorbell_diagnostics(
           *state.client, &state.log, &state.compute_control_mapping, pm4_words, &detail)) {
     return fail("pm4_submit", detail);

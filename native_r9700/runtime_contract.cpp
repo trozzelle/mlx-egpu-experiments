@@ -1144,6 +1144,15 @@ int run_llama_stage_trace(const LlamaStageTraceRequest& request, LlamaStageTrace
   if (!count_finite_values(bytes, spec->dtype, &finite_count) ||
       finite_count != spec->byte_count / (std::string(spec->dtype) == "float16" ? 2U : 4U)) {
     if (trace_stage != nullptr) {
+      // Diagnostic: retain the raw readback so the non-finite pattern
+      // (all-NaN vs half-written vs sparse) is inspectable without re-running.
+      std::filesystem::create_directories(trace_root, filesystem_error);
+      const std::filesystem::path nonfinite_bin = trace_root / (file_stem + ".nonfinite.bin");
+      std::ofstream nonfinite_output(nonfinite_bin, std::ios::binary);
+      if (nonfinite_output) {
+        nonfinite_output.write(reinterpret_cast<const char*>(bytes.data()),
+                               static_cast<std::streamsize>(bytes.size()));
+      }
       if (!complete_nonfinite_trace(trace_root, trace_failure_staging, trace_failure,
                                     failure_diagnostic.json, kTracePublicationOps, result,
                                     error_text)) {
