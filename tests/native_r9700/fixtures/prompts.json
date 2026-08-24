@@ -12,7 +12,7 @@
     "S": 6
   },
   "prompt-1": {
-    "text": "The Swiss cheese industry, rooted in the alpine cantons of the nineteenth century, grew out of small farmhouse dairies that needed a way to preserve surplus milk through the long winter months. Cooperative creameries pooled resources, sharing techniques for coagulation, pressing, and aging that had been passed down through generations. By the end of the century, exports of Emmental and Gruyère had reached markets across Europe, carried by rail and steamer to cities where aged cheese was considered a luxury. The distinctive eyes in Emmental, formed by carbon dioxide released during fermentation, became a point of national pride and a subject of scientific curiosity. Bacteriologists studied the cultures with new rigor, identifying the microbes responsible for flavor and texture. The cooperative model proved remarkably durable, weathering economic depressions and two world wars while keeping small mountain farms economically viable. Today the tradition continues under protected designation of origin, a legal framework that ties each wheel of cheese to its specific valley. The modern industry balances century-old recipes against industrialized production, and its exports remain a celebrated cornerstone of the national economy.",
+    "text": "The Swiss cheese industry, rooted in the alpine cantons of the nineteenth century, grew out of small farmhouse dairies that needed a way to preserve surplus milk through the long winter months. Cooperative creameries pooled resources, sharing techniques for coagulation, pressing, and aging that had been passed down through generations. By the end of the century, exports of Emmental and Gruy\u00e8re had reached markets across Europe, carried by rail and steamer to cities where aged cheese was considered a luxury. The distinctive eyes in Emmental, formed by carbon dioxide released during fermentation, became a point of national pride and a subject of scientific curiosity. Bacteriologists studied the cultures with new rigor, identifying the microbes responsible for flavor and texture. The cooperative model proved remarkably durable, weathering economic depressions and two world wars while keeping small mountain farms economically viable. Today the tradition continues under protected designation of origin, a legal framework that ties each wheel of cheese to its specific valley. The modern industry balances century-old recipes against industrialized production, and its exports remain a celebrated cornerstone of the national economy.",
     "token_ids": [
       128000,
       791,
@@ -905,5 +905,28 @@
       13
     ],
     "S": 661
+  },
+  "prompt-16": {
+    "text": "",
+    "token_ids": [
+      128000,
+      791,
+      30791,
+      17604,
+      5064,
+      11,
+      41976,
+      304,
+      279,
+      453,
+      39138,
+      16869,
+      2439,
+      315,
+      279,
+      66089,
+      9478
+    ],
+    "S": 17
   }
 }
