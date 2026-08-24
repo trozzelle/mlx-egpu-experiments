@@ -6039,7 +6039,8 @@ bool write_compute_control_u64(SysmemMapping* compute_control_mapping, uint64_t 
 }
 
 bool write_compute_ring_words(SysmemMapping* compute_control_mapping,
-                              const std::vector<uint32_t>& words, std::string* error_text) {
+                              const std::vector<uint32_t>& words, uint64_t start_dword,
+                              std::string* error_text) {
   if (compute_control_mapping == nullptr || compute_control_mapping->data == nullptr) {
     *error_text = "compute ring mapping precondition failed: null SysmemMapping";
     return false;
@@ -6055,17 +6056,27 @@ bool write_compute_ring_words(SysmemMapping* compute_control_mapping,
                   " ring_size=" + std::to_string(am_compute::kRingSize);
     return false;
   }
-  const uint64_t start = am_compute::kComputeControlRingCpuOffset;
-  if (start > compute_control_mapping->size ||
-      ring_bytes > compute_control_mapping->size - start) {
+  const uint64_t ring_base = am_compute::kComputeControlRingCpuOffset;
+  const uint64_t ring_span_bytes = am_compute::kComputeControlRingByteCount;
+  if (ring_base > compute_control_mapping->size ||
+      ring_span_bytes > compute_control_mapping->size - ring_base) {
     *error_text = "compute ring write exceeds sysmem ring span: mapped_size=" +
                   std::to_string(compute_control_mapping->size) + " ring_start=" +
-                  std::to_string(start) + " ring_write_bytes=" + std::to_string(ring_bytes);
+                  std::to_string(ring_base) + " ring_write_bytes=" + std::to_string(ring_bytes);
     return false;
   }
   const std::vector<uint8_t> bytes = u32_words_payload_le(words);
-  std::memcpy(static_cast<uint8_t*>(compute_control_mapping->data) + start, bytes.data(),
-              bytes.size());
+  const uint64_t ring_dwords = ring_span_bytes / sizeof(uint32_t);
+  const uint64_t write_byte =
+      ring_base + (start_dword % ring_dwords) * sizeof(uint32_t);
+  const uint64_t first_chunk =
+      std::min<uint64_t>(ring_bytes, ring_base + ring_span_bytes - write_byte);
+  std::memcpy(static_cast<uint8_t*>(compute_control_mapping->data) + write_byte, bytes.data(),
+              first_chunk);
+  if (first_chunk < ring_bytes) {
+    std::memcpy(static_cast<uint8_t*>(compute_control_mapping->data) + ring_base,
+                bytes.data() + first_chunk, ring_bytes - first_chunk);
+  }
   return true;
 }
 
@@ -6082,7 +6093,25 @@ bool submit_compute_dispatch(const RemoteClient& client, DiscoveryLog* log,
                   " observed=" + std::to_string(words.size());
     return false;
   }
-  if (!write_compute_ring_words(compute_control_mapping, words, error_text)) {
+  // Circular compute ring: the host advances a cumulative write pointer and the
+  // CP advances its read pointer in lockstep. Reading the prior wptr and adding
+  // this dispatch keeps successive submissions from aliasing (a second dispatch
+  // written at ring[0] with wptr reset to 59 is invisible to the CP because its
+  // rptr is already 59).
+  uint64_t current_wptr_dwords = 0;
+  if (compute_control_mapping == nullptr || compute_control_mapping->data == nullptr ||
+      am_compute::kWptrOffset > compute_control_mapping->size ||
+      sizeof(uint64_t) > compute_control_mapping->size - am_compute::kWptrOffset) {
+    *error_text = "compute control mapping cannot hold the ring write pointer";
+    return false;
+  }
+  std::memcpy(&current_wptr_dwords,
+              static_cast<const uint8_t*>(compute_control_mapping->data) +
+                  am_compute::kWptrOffset,
+              sizeof(uint64_t));
+  const uint64_t new_wptr_dwords = current_wptr_dwords + words.size();
+  if (!write_compute_ring_words(compute_control_mapping, words, current_wptr_dwords,
+                                error_text)) {
     return false;
   }
   if (!flush_hdp(client, *log, error_text)) {
@@ -6096,13 +6125,12 @@ bool submit_compute_dispatch(const RemoteClient& client, DiscoveryLog* log,
   } else {
     log->compute.doorbell_probe_pre = "read_failed: " + pre_error;
   }
-  const uint64_t wptr_dwords = static_cast<uint64_t>(words.size());
-  if (!write_compute_control_u64(compute_control_mapping, am_compute::kWptrOffset, wptr_dwords,
-                                 error_text)) {
+  if (!write_compute_control_u64(compute_control_mapping, am_compute::kWptrOffset,
+                                 new_wptr_dwords, error_text)) {
     return false;
   }
   std::atomic_thread_fence(std::memory_order_seq_cst);
-  const std::vector<uint8_t> doorbell_payload = u64_payload_le(wptr_dwords);
+  const std::vector<uint8_t> doorbell_payload = u64_payload_le(new_wptr_dwords);
   if (!client.mmio_write_fire_and_forget(2, am_compute::kMecDoorbellBar2ByteOffset,
                                          doorbell_payload, error_text)) {
     *error_text = "write compute MEC doorbell failed: " + *error_text;
