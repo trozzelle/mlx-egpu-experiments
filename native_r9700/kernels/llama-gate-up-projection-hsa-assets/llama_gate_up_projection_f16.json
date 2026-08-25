@@ -19,34 +19,35 @@
     "symbol_target_count": 1
   },
   "entry_offset": 6144,
+  "group_segment_bytes": 4100,
   "image_layout": [
     {
       "address": 568,
       "image_offset": 568,
       "name": ".note",
-      "size": 936
+      "size": 940
     },
     {
-      "address": 1504,
-      "image_offset": 1504,
+      "address": 1512,
+      "image_offset": 1512,
       "name": ".dynsym",
       "size": 96
     },
     {
-      "address": 1600,
-      "image_offset": 1600,
+      "address": 1608,
+      "image_offset": 1608,
       "name": ".gnu.hash",
       "size": 40
     },
     {
-      "address": 1640,
-      "image_offset": 1640,
+      "address": 1648,
+      "image_offset": 1648,
       "name": ".hash",
       "size": 40
     },
     {
-      "address": 1680,
-      "image_offset": 1680,
+      "address": 1688,
+      "image_offset": 1688,
       "name": ".dynstr",
       "size": 90
     },
@@ -60,30 +61,32 @@
       "address": 6144,
       "image_offset": 6144,
       "name": ".text",
-      "size": 1536
+      "size": 2944
     },
     {
-      "address": 11776,
-      "image_offset": 11776,
+      "address": 13184,
+      "image_offset": 13184,
       "name": ".dynamic",
       "size": 112
     },
     {
-      "address": 11888,
-      "image_offset": 11888,
+      "address": 13296,
+      "image_offset": 13296,
       "name": ".relro_padding",
-      "size": 400
+      "size": 3088
     },
     {
-      "address": 15984,
-      "image_offset": 15984,
+      "address": 17392,
+      "image_offset": 17392,
       "name": ".bss",
       "size": 1
     }
   ],
   "image_path": "llama_gate_up_projection_f16.image",
-  "image_sha256": "0c0a6da2e7ef1378ef0cfa735f096ceeb58772be8a7d6324166117d421d01a0c",
-  "image_size": 15985,
+  "image_sha256": "b1c6b3eb34427a206f06c39c535c4862f2c183dd9ddd387efc4b03eecf5a0421",
+  "image_size": 17393,
+  "kernarg_bytes": 56,
+  "kernarg_preload_bytes": 0,
   "kernarg_schema": {
     "bytes": 56,
     "fields": [
@@ -125,11 +128,13 @@
     ],
     "name": "llama-gate-up-projection-f16-v1"
   },
+  "kernel_code_properties": 1032,
   "name": "llama_gate_up_projection_f16",
-  "rsrc1": 3222208514,
+  "private_segment_bytes": 0,
+  "rsrc1": 3222208515,
   "rsrc2": 132,
-  "rsrc3": 144,
+  "rsrc3": 320,
   "source_path": "native_r9700/kernels/llama_gate_up_projection_f16.cpp",
-  "source_sha256": "5d5bba42ec81d52aeb40852ba3a9c2d67a5b031208cc704c74f45e776e39d2c8",
+  "source_sha256": "bdd37d4fc61cc62519b7e541eef73a5bbc0597fc738ecc0a6c3914ced8db7f3b",
   "target": "gfx1201"
 }

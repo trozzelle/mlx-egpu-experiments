@@ -12,6 +12,7 @@ AMDEV_SESSION_SOURCE = Path("native_r9700/amdev_session.cpp")
 AMDEV_PACKET_SOURCE = Path("native_r9700/amdev_packets.cpp")
 MODEL_WEIGHT_BINDER_SOURCE = Path("native_r9700/model_weight_binder.cpp")
 DEVICE_MEMORY_SOURCE = Path("native_r9700/device_memory.cpp")
+HARDWARE_LOCK_SOURCE = Path("native_r9700/hardware_lock.cpp")
 VRAM_CLOSURE_SOURCES = (
     Path("native_r9700/vram_layout.cpp"),
     Path("native_r9700/vram_allocator.cpp"),
@@ -33,6 +34,7 @@ def compile_layer0_probe(tmp_path: Path) -> Path:
         DEVICE_MEMORY_SOURCE,
         MODEL_WEIGHT_BINDER_SOURCE,
         AMDEV_PACKET_SOURCE,
+        HARDWARE_LOCK_SOURCE,
         *VRAM_CLOSURE_SOURCES,
     )
     assert all(path.is_file() for path in required_sources), "layer-0 executor sources are missing"
@@ -356,6 +358,17 @@ int persistent_dispatch_layer_major_structure(const char* work_dir) {
   if (dispatch.layer_stages.size() != 16 || dispatch.layer_stages[5].size() != 10) return 12;
 
   const std::vector<native_r9700::ResidentHsaStage>& stages = dispatch.layer_stages[5];
+  const native_r9700::LlamaKernelAsset* gate_up_asset =
+      native_r9700::find_llama_kernel_asset("llama_gate_up_projection_f16");
+  if (gate_up_asset == nullptr || gate_up_asset->location.lds_bytes != 4100 ||
+      gate_up_asset->descriptor.kernarg_bytes != 56) {
+    return 19;
+  }
+  if (dispatch.images.size() != 10 || stages[8].hsa_image_index != 8 ||
+      stages[8].workgroup_x != 64 || stages[8].global_x != 128 ||
+      stages[8].kernargs.size() != 56 || stages[8].kernarg_bindings.size() != 6) {
+    return 20;
+  }
   const uint32_t first_hidden = dispatch.token_blocks[0].hidden_buffer_index;
   for (const auto& slot : dispatch.hidden_binding_slots) {
     const native_r9700::ResidentHsaStage& stage = stages[slot.first];
@@ -424,6 +437,7 @@ int main(int argc, char** argv) {
             str(KERNEL_CATALOG_SOURCE),
             str(MODEL_WEIGHT_BINDER_SOURCE),
             str(AMDEV_PACKET_SOURCE),
+            str(HARDWARE_LOCK_SOURCE),
             *map(str, VRAM_CLOSURE_SOURCES),
             str(LAYER_EXECUTOR_SOURCE),
             str(probe_source),

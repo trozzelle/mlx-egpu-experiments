@@ -37,6 +37,7 @@ def compile_token_block_probe(tmp_path: Path) -> Path:
 #include <vector>
 
 #include "llama_layer_executor.h"
+#include "kernel_assets.h"
 
 namespace {
 
@@ -173,6 +174,17 @@ int geometry_and_scalars(const std::filesystem::path& work_dir) {
     return 1;
   }
   std::vector<native_r9700::ResidentHsaStage>& stages = dispatch.layer_stages[0];
+  const native_r9700::LlamaKernelAsset* gate_up_asset =
+      native_r9700::find_llama_kernel_asset("llama_gate_up_projection_f16");
+  if (gate_up_asset == nullptr || gate_up_asset->location.lds_bytes != 4100 ||
+      gate_up_asset->descriptor.kernarg_bytes != 56) {
+    return 15;
+  }
+  if (stages.size() != 10 || dispatch.images.size() != 10 ||
+      stages[8].hsa_image_index != 8 || stages[8].workgroup_x != 64 ||
+      stages[8].kernargs.size() != 56 || stages[8].kernarg_bindings.size() != 6) {
+    return 16;
+  }
   native_r9700::LlamaTokenBlock full = dispatch.token_blocks[0];
   full.position = 16;
   full.token_count = 8;

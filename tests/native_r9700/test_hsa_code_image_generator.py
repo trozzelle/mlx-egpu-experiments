@@ -397,7 +397,7 @@ def _stub_successful_generation(generator: ModuleType, monkeypatch: pytest.Monke
     monkeypatch.setattr(generator, "_apply_relocations", lambda *_args: 0)
     monkeypatch.setattr(generator, "_kernel_symbol", lambda *_args: (0, 1, 1))
     monkeypatch.setattr(
-        generator, "_descriptor", lambda *_args: {"rsrc1": 1, "rsrc2": 1, "rsrc3": 1}
+        generator, "_descriptor", lambda *_args, **_kwargs: {"rsrc1": 1, "rsrc2": 1, "rsrc3": 1}
     )
 
 
@@ -618,6 +618,66 @@ def test_source_profile_rejects_digraph_and_trigraph_preprocessor_directives(
 
     with pytest.raises(generator.GenerationError, match="preprocessor.*directive"):
         generator.validate_source_profile(source_with_directive)
+
+def test_source_profile_allows_shared_storage_only_with_explicit_lds_admission() -> None:
+    """Shared source is rejected by default and admitted only for an LDS-reviewed asset."""
+    generator = _load_generator_module()
+    source = FRESH_HIP_SOURCE.read_text(encoding="utf-8").replace(
+        "{\n", "{\n  __attribute__((shared)) unsigned short reviewed_tile[2048];\n", 1
+    )
+
+    with pytest.raises(generator.GenerationError, match="shared storage"):
+        generator.validate_source_profile(source)
+    generator.validate_source_profile(source, expected_group_segment_bytes=4100)
+
+
+def test_group_segment_admission_defaults_to_zero_and_is_gate_up_only() -> None:
+    """No reviewed source except gate/up may request the exact 4100-byte LDS layout."""
+    generator = _load_generator_module()
+
+    assert generator._expected_group_segment_bytes(generator.KERNEL_NAME) == 0
+    assert (
+        generator._expected_group_segment_bytes(generator.GATE_UP_PROJECTION_KERNEL_NAME)
+        == 4100
+    )
+
+
+def test_descriptor_requires_exact_expected_group_segment_bytes() -> None:
+    """Compiler-emitted LDS is accepted only when it exactly matches the narrow request."""
+    generator = _load_generator_module()
+    image = bytearray(64)
+    struct.pack_into("<IIQ", image, 0, 4100, 0, 56)
+    struct.pack_into("<q", image, 16, 0)
+    struct.pack_into("<I", image, 44, 0x90)
+    struct.pack_into("<I", image, 48, 0xC00F0002)
+    struct.pack_into("<I", image, 52, 0x184)
+    struct.pack_into("<HH", image, 56, 0x408, 0)
+    rodata = generator.ElfSection(
+        1, ".rodata", generator.SHT_PROGBITS, generator.SHF_ALLOC,
+        0, 0, 64, bytes(image), 0, 0, 8, 0,
+    )
+
+    with pytest.raises(generator.GenerationError, match="group segment"):
+        generator._descriptor(image, rodata, 0, 0, {"bytes": 56}, 56)
+    with pytest.raises(generator.GenerationError, match="group segment"):
+        generator._descriptor(
+            image, rodata, 0, 0, {"bytes": 56}, 56,
+            expected_group_segment_bytes=4096,
+        )
+    resources = generator._descriptor(
+        image, rodata, 0, 0, {"bytes": 56}, 56,
+        expected_group_segment_bytes=4100,
+    )
+    assert resources == {
+        "group_segment_bytes": 4100,
+        "private_segment_bytes": 0,
+        "kernarg_bytes": 56,
+        "kernel_code_properties": 0x408,
+        "kernarg_preload_bytes": 0,
+        "rsrc1": 0xC00F0002,
+        "rsrc2": 0x184,
+        "rsrc3": 0x90,
+    }
 
 
 def test_admission_requires_relro_padding_to_be_nobits() -> None:

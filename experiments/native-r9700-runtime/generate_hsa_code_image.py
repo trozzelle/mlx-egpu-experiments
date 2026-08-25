@@ -252,6 +252,7 @@ SHF_TLS = 0x400
 R_AMDGPU_REL64 = 5
 DESCRIPTOR_SIZE = 64
 KERNEL_CODE_PROPERTIES = 0x408
+GATE_UP_EXPECTED_GROUP_SEGMENT_BYTES = 2048 * 2 + 4
 MAX_ELF_BYTES = 8 * 1024 * 1024
 MAX_ELF_SECTIONS = 1024
 MAX_ELF_SYMBOLS = 1024
@@ -560,6 +561,14 @@ def _source_without_comments(source_text: str) -> str:
     return "".join(source)
 
 
+def _expected_group_segment_bytes(kernel_name: str) -> int:
+    return (
+        GATE_UP_EXPECTED_GROUP_SEGMENT_BYTES
+        if kernel_name == GATE_UP_PROJECTION_KERNEL_NAME
+        else 0
+    )
+
+
 def validate_source_profile(
     source_text: str,
     kernel_name: str = KERNEL_NAME,
@@ -569,6 +578,8 @@ def validate_source_profile(
         "selected_row",
     ),
     scalar_parameters: tuple[tuple[str, str], ...] = (),
+    *,
+    expected_group_segment_bytes: int = 0,
 ) -> None:
     """Require one fresh, freestanding reviewed HIP kernel source."""
     source = _source_without_comments(source_text)
@@ -591,6 +602,13 @@ def validate_source_profile(
     for marker, description in forbidden.items():
         if marker in lower:
             raise GenerationError(f"source profile forbids {description}: {marker}")
+    uses_shared_attribute = re.search(
+        r"__attribute__\s*\(\(\s*shared\s*\)\)", source
+    ) is not None
+    if uses_shared_attribute and expected_group_segment_bytes == 0:
+        raise GenerationError("source profile forbids shared storage without explicit LDS admission")
+    if expected_group_segment_bytes < 0:
+        raise GenerationError("expected group segment bytes must be nonnegative")
     signature = re.findall(
         rf'extern\s+"C"\s+__attribute__\s*\(\(\s*global\s*\)\)\s+void\s+'
         rf'{kernel_name}\s*\(([^)]*)\)',
@@ -996,6 +1014,8 @@ def _descriptor(
     entry_offset: int,
     kernarg_schema: dict[str, Any],
     compiler_kernarg_bytes: int,
+    *,
+    expected_group_segment_bytes: int = 0,
 ) -> dict[str, int]:
     if rodata.size != DESCRIPTOR_SIZE:
         raise GenerationError(".rodata must contain exactly one 64-byte AMDHSA kernel descriptor")
@@ -1009,8 +1029,12 @@ def _descriptor(
     properties, preload = struct.unpack_from("<HH", image, descriptor_offset + 56)
     if kernarg != compiler_kernarg_bytes:
         raise GenerationError("AMDHSA descriptor kernarg size disagrees with the reviewed ABI")
-    if group or private or preload:
-        raise GenerationError("AMDHSA descriptor must not use group, private, or preload storage")
+    if group != expected_group_segment_bytes:
+        raise GenerationError(
+            "AMDHSA descriptor group segment does not match the explicit LDS admission"
+        )
+    if private or preload:
+        raise GenerationError("AMDHSA descriptor must not use private or preload storage")
     if properties != KERNEL_CODE_PROPERTIES:
         raise GenerationError("AMDHSA descriptor has unexpected kernel-code properties")
     if descriptor_offset + delta != entry_offset:
@@ -1019,7 +1043,16 @@ def _descriptor(
         raise GenerationError("AMDHSA descriptor resources must be positive")
     if kernarg != kernarg_schema["bytes"]:
         struct.pack_into("<I", image, descriptor_offset + 8, kernarg_schema["bytes"])
-    return {"rsrc1": rsrc1, "rsrc2": rsrc2, "rsrc3": rsrc3}
+    return {
+        "group_segment_bytes": group,
+        "private_segment_bytes": private,
+        "kernarg_bytes": kernarg_schema["bytes"],
+        "kernel_code_properties": properties,
+        "kernarg_preload_bytes": preload,
+        "rsrc1": rsrc1,
+        "rsrc2": rsrc2,
+        "rsrc3": rsrc3,
+    }
 
 
 def _reviewed_asset(
@@ -1291,8 +1324,13 @@ def generate(
         source_text = source_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise GenerationError("checked-in reviewed HIP source is not UTF-8") from exc
+    expected_group_segment_bytes = _expected_group_segment_bytes(kernel_name)
     validate_source_profile(
-        source_text, kernel_name, pointer_parameters, scalar_parameters
+        source_text,
+        kernel_name,
+        pointer_parameters,
+        scalar_parameters,
+        expected_group_segment_bytes=expected_group_segment_bytes,
     )
 
     compile_hip = _load_direct_comgr(tinygrad_root)
@@ -1329,6 +1367,7 @@ def generate(
         entry_offset,
         kernarg_schema,
         compiler_kernarg_bytes,
+        expected_group_segment_bytes=expected_group_segment_bytes,
     )
 
     layout = [
