@@ -368,6 +368,14 @@ constexpr uint64_t kRingVa = am_vm::kVaBase + (7ULL * kPageSize);
 constexpr uint64_t kRptrVa = am_vm::kVaBase + (15ULL * kPageSize);
 constexpr uint64_t kWptrVa = kRptrVa + 8ULL;
 constexpr uint64_t kTimelineVa = kRptrVa + 16ULL;
+constexpr uint64_t kGpuTimestampCpuOffset = 0x100ULL;
+constexpr uint64_t kGpuTimestampVa = kRptrVa + kGpuTimestampCpuOffset;
+constexpr uint32_t kGpuTimestampBoundaryCount = 11U;
+constexpr uint64_t kGpuTimestampByteCount = 11ULL * sizeof(uint64_t);
+static_assert(kGpuTimestampCpuOffset + kGpuTimestampByteCount <= kPageSize,
+              "GPU timestamp boundaries overflow compute-control page 0");
+static_assert(kGpuTimestampCpuOffset >= 20ULL,
+              "GPU timestamp boundaries overlap compute queue control words");
 constexpr uint64_t kEopVa = am_vm::kVaBase + (16ULL * kPageSize);
 // All fixed mappings must stay inside the first PDB0 2 MiB span (512 PTB
 // entries); resident payloads own PDB0 index 1 and beyond.

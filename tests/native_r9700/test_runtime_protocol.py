@@ -624,6 +624,7 @@ def test_native_prefill_proof_redacts_token_ids_from_stdout_and_hardware_log(
     log_text = log_path.read_text(encoding="utf-8")
     assert "token_ids_json: <redacted>" in log_text
     assert "[1,2,3]" not in log_text
+    assert "gpu_stage_profile_sample_count: 0" in completed.stdout
 
 
 def test_native_prefill_proof_rejects_equal_output_and_log_paths(tmp_path, monkeypatch):
@@ -859,3 +860,44 @@ def test_native_prefill_proof_rejects_log_symlink_to_absent_output_target(
     assert "failure_stage: output_path_conflict" in completed.stdout
     assert "native_prefill_acceptance: pass" not in completed.stdout
     assert not out_path.exists()
+
+
+@pytest.mark.parametrize(
+    "final_argument,expected_failure_stage",
+    [
+        ("--gpu-stage-profile", "layer_weight_table"),
+        ("--gpu-stage-profile=1", "native_prefill_request"),
+        ("--unknown", "native_prefill_request"),
+    ],
+)
+def test_native_prefill_gpu_stage_profile_is_a_strict_optional_final_flag(
+    tmp_path, final_argument, expected_failure_stage
+):
+    exe = compile_runner(tmp_path)
+    out_path = tmp_path / "native-prefill.npz"
+    log_path = tmp_path / "native-prefill.log"
+
+    completed = subprocess.run(
+        [
+            str(exe),
+            "--native-prefill-proof",
+            "--model",
+            "synthetic-model",
+            "--token-ids-json",
+            "[1,2,3]",
+            "--out",
+            str(out_path),
+            "--log",
+            str(log_path),
+            final_argument,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode != 0
+    assert f"failure_stage: {expected_failure_stage}" in completed.stdout
+    assert "token_ids_json: <redacted>" in completed.stdout
+    assert "[1,2,3]" not in completed.stdout
+    assert "gpu_stage_profile_sample_count: 0" in completed.stdout

@@ -31,6 +31,12 @@ constexpr std::array<const char*, 14> kRpcOperationNames = {
     "reset",      "mmio_read",   "mmio_write",    "map_sysmem",  "sysmem_read",
     "sysmem_write", "resize_bar", "ping",          "unknown",
 };
+constexpr std::array<const char*, 10> kGpuStageNames = {
+    "rmsnorm",          "k_projection",       "v_projection",
+    "rope_kv",          "attention_score",    "attention_softmax",
+    "attention_context", "o_projection",       "gate_up_projection",
+    "mlp_down",
+};
 
 
 
@@ -50,8 +56,8 @@ void print_help(const char* argv0) {
   std::printf("  --legacy-primitive-diagnostic <name>\n");
   std::printf("                         run only an explicitly injected historical primitive executable\n");
   std::printf("                         (requires NATIVE_R9700_C1_PRIMITIVE_BRIDGE; not a product proof)\n");
-  std::printf("  --native-prefill-proof --model <mlx-model-dir> --token-ids-json '[...]' --out <npz> --log <path>\n");
-  std::printf("                         16-layer streamed HSA Llama prefill (fail-closed until accepted)\n");
+  std::printf("  --native-prefill-proof --model <mlx-model-dir> --token-ids-json '[...]' --out <npz> --log <path> [--gpu-stage-profile]\n");
+  std::printf("                         16-layer streamed HSA Llama prefill; optional raw GPU stage ticks\n");
   std::printf("  --llama-stage-trace --model <dir> --token-id <uint32> --layer 0 --position 0 \\\n");
   std::printf("      --stage <boundary> --trace-dir <dir> [--rmsnorm-unit-scale [--rmsnorm-zero-input [--rmsnorm-output-sentinel [--rmsnorm-zero-store]]]]\n");
   std::printf("                         trace one layer-0/token-0 resident boundary; zero-store requires normalized zero-input unit-scale sentinel\n");
@@ -167,6 +173,75 @@ double tokens_per_sec(const native_r9700::NativePrefillResult& result) {
          static_cast<double>(result.wall_usec);
 }
 
+void append_gpu_stage_profile_key_value(
+    const native_r9700::NativePrefillResult& result, std::string* output) {
+  output->append("gpu_stage_profile_sample_count: ");
+  output->append(std::to_string(result.gpu_stage_profile_sample_count));
+  output->push_back('\n');
+  if (result.gpu_stage_profile_sample_count == 0) return;
+  uint64_t summed_stage_ticks = 0;
+  for (uint64_t total : result.gpu_stage_tick_total) summed_stage_ticks += total;
+  for (std::size_t stage = 0; stage < kGpuStageNames.size(); ++stage) {
+    const double mean =
+        static_cast<double>(result.gpu_stage_tick_total[stage]) /
+        static_cast<double>(result.gpu_stage_profile_sample_count);
+    const double share =
+        summed_stage_ticks == 0
+            ? 0.0
+            : static_cast<double>(result.gpu_stage_tick_total[stage]) /
+                  static_cast<double>(summed_stage_ticks);
+    const std::string prefix = "gpu_stage_profile " + std::string(kGpuStageNames[stage]) + " ";
+    output->append(prefix + "total_ticks: " +
+                   std::to_string(result.gpu_stage_tick_total[stage]) + "\n");
+    output->append(prefix + "min_ticks: " +
+                   std::to_string(result.gpu_stage_tick_min[stage]) + "\n");
+    output->append(prefix + "mean_ticks: " + std::to_string(mean) + "\n");
+    output->append(prefix + "max_ticks: " +
+                   std::to_string(result.gpu_stage_tick_max[stage]) + "\n");
+    output->append(prefix + "sample_count: " +
+                   std::to_string(result.gpu_stage_profile_sample_count) + "\n");
+    output->append(prefix + "share: " + std::to_string(share) + "\n");
+  }
+}
+
+void append_gpu_stage_profile_json(const native_r9700::NativePrefillResult& result,
+                                   std::string* output) {
+  output->append(",\"gpu_stage_profile_sample_count\":");
+  output->append(std::to_string(result.gpu_stage_profile_sample_count));
+  output->append(",\"gpu_stage_profile\":[");
+  uint64_t summed_stage_ticks = 0;
+  for (uint64_t total : result.gpu_stage_tick_total) summed_stage_ticks += total;
+  for (std::size_t stage = 0;
+       stage < kGpuStageNames.size() && result.gpu_stage_profile_sample_count != 0;
+       ++stage) {
+    if (stage != 0) output->push_back(',');
+    const double mean =
+        static_cast<double>(result.gpu_stage_tick_total[stage]) /
+        static_cast<double>(result.gpu_stage_profile_sample_count);
+    const double share =
+        summed_stage_ticks == 0
+            ? 0.0
+            : static_cast<double>(result.gpu_stage_tick_total[stage]) /
+                  static_cast<double>(summed_stage_ticks);
+    output->append("{\"stage\":\"");
+    output->append(kGpuStageNames[stage]);
+    output->append("\",\"total_ticks\":");
+    output->append(std::to_string(result.gpu_stage_tick_total[stage]));
+    output->append(",\"min_ticks\":");
+    output->append(std::to_string(result.gpu_stage_tick_min[stage]));
+    output->append(",\"mean_ticks\":");
+    output->append(std::to_string(mean));
+    output->append(",\"max_ticks\":");
+    output->append(std::to_string(result.gpu_stage_tick_max[stage]));
+    output->append(",\"sample_count\":");
+    output->append(std::to_string(result.gpu_stage_profile_sample_count));
+    output->append(",\"share\":");
+    output->append(std::to_string(share));
+    output->push_back('}');
+  }
+  output->push_back(']');
+}
+
 std::string native_prefill_key_value(const native_r9700::NativePrefillResult& result) {
   std::string output =
       "producer_kind: " + log_value(result.producer_kind) + "\n" +
@@ -214,6 +289,7 @@ std::string native_prefill_key_value(const native_r9700::NativePrefillResult& re
     output += "rpc_usec_" + std::string(kRpcOperationNames[i]) + ": " +
               std::to_string(result.phase_timers.rpc_operations[i].usec) + "\n";
   }
+  append_gpu_stage_profile_key_value(result, &output);
   output += "failure_stage: " + log_value(result.failure_stage) + "\n" +
             "failure_text: " + log_value(result.failure_text) + "\n" +
             "exit_status: " + std::to_string(result.exit_status) + "\n";
@@ -266,6 +342,7 @@ std::string native_prefill_json(const native_r9700::NativePrefillResult& result)
     output += ",\"rpc_usec_" + std::string(kRpcOperationNames[i]) + "\":" +
               std::to_string(result.phase_timers.rpc_operations[i].usec);
   }
+  append_gpu_stage_profile_json(result, &output);
   output += ",\"failure_stage\":\"" + json_escape(result.failure_stage) +
             "\",\"failure_text\":\"" + json_escape(result.failure_text) +
             "\",\"exit_status\":" + std::to_string(result.exit_status) + "}\n";
@@ -638,13 +715,15 @@ int main(int argc, char** argv) {
   }
   if (std::strcmp(argv[1], "--native-prefill-proof") == 0) {
     native_r9700::NativePrefillResult result;
-    if (argc != 10 || std::strcmp(argv[2], "--model") != 0 ||
-        std::strcmp(argv[4], "--token-ids-json") != 0 || std::strcmp(argv[6], "--out") != 0 ||
-        std::strcmp(argv[8], "--log") != 0) {
+    const bool gpu_stage_profile =
+        argc == 11 && std::strcmp(argv[10], "--gpu-stage-profile") == 0;
+    if ((argc != 10 && !gpu_stage_profile) || std::strcmp(argv[2], "--model") != 0 ||
+        std::strcmp(argv[4], "--token-ids-json") != 0 ||
+        std::strcmp(argv[6], "--out") != 0 || std::strcmp(argv[8], "--log") != 0) {
       result.failure_stage = "native_prefill_request";
       result.failure_text =
           "--native-prefill-proof expects --model <mlx-model-dir> --token-ids-json '[...]' "
-          "--out <npz> --log <path>";
+          "--out <npz> --log <path> [--gpu-stage-profile]";
       result.exit_status = 2;
       print_native_prefill_result(result);
       return result.exit_status;
@@ -654,6 +733,7 @@ int main(int argc, char** argv) {
     request.model_dir = argv[3];
     request.out_npz_path = argv[7];
     request.log_path = argv[9];
+    request.gpu_stage_profile = gpu_stage_profile;
     std::string parse_error;
     const bool parsed_tokens = parse_token_ids_json(argv[5], &request.token_ids, &parse_error);
     if (!parsed_tokens) request.token_ids.clear();

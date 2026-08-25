@@ -2,6 +2,7 @@
 
 #include "runtime.h"
 
+#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <cstdint>
@@ -914,8 +915,9 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
                      " block_position=" + std::to_string(block.position) +
                      " dispatch_batch_begin stages=" +
                      std::to_string(persistent_dispatch.layer_stages[layer].size()));
-        if (!resident.dispatch_batch(persistent_dispatch.layer_stages[layer],
-                                     &dispatch_result, &detail)) {
+        if (!resident.dispatch_batch(
+                persistent_dispatch.layer_stages[layer], &dispatch_result, &detail,
+                ResidentHsaBatchOptions{request.gpu_stage_profile})) {
           compute_failure = 2;
           failed_position = block.position;
           break;
@@ -942,6 +944,30 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
       log_progress("resident_dispatch_batch failed " + failure);
       fail(result, "resident_dispatch_batch", failure, error_text);
       return 1;
+    }
+  }
+  if (request.gpu_stage_profile) {
+    for (const GpuStageTickSample& sample : dispatch_result.gpu_stage_tick_samples) {
+      std::array<uint64_t, 10> stage_ticks{};
+      if (!gpu_stage_tick_deltas(sample, &stage_ticks, &detail)) {
+        std::string close_error;
+        close_resident_and_snapshot(&close_error);
+        fail(result, "gpu_timestamp_validation", detail, error_text);
+        return 1;
+      }
+      for (size_t stage = 0; stage < stage_ticks.size(); ++stage) {
+        result->gpu_stage_tick_total[stage] += stage_ticks[stage];
+        if (result->gpu_stage_profile_sample_count == 0) {
+          result->gpu_stage_tick_min[stage] = stage_ticks[stage];
+          result->gpu_stage_tick_max[stage] = stage_ticks[stage];
+        } else {
+          result->gpu_stage_tick_min[stage] =
+              std::min(result->gpu_stage_tick_min[stage], stage_ticks[stage]);
+          result->gpu_stage_tick_max[stage] =
+              std::max(result->gpu_stage_tick_max[stage], stage_ticks[stage]);
+        }
+      }
+      ++result->gpu_stage_profile_sample_count;
     }
   }
   std::vector<std::string> kv_names;

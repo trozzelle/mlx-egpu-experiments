@@ -2446,7 +2446,7 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
 
 bool ResidentHsaSession::build_stage_pm4(const ResidentHsaStage& stage, uint32_t slot,
                                          std::vector<uint32_t>* words,
-                                         std::string* error_text) {
+                                         std::string* error_text, bool write_timeline) {
   Impl& state = *impl_;
   // preflight: image index, entry offset (256-aligned), nonempty kernargs <= slot,
   // nonzero geometry, in-bounds non-overlapping bindings — the former dispatch()
@@ -2519,15 +2519,20 @@ bool ResidentHsaSession::build_stage_pm4(const ResidentHsaStage& stage, uint32_t
                               slot_va, am_compute::kTimelineVa,
                               image.rsrc1, image.rsrc2, rsrc3, image.wave32, stage.workgroup_x,
                               stage.workgroup_y, stage.workgroup_z, stage.global_x,
-                              stage.global_y, stage.global_z, state.next_timeline_value++};
-  const std::vector<uint32_t> stage_words = build_pm4_dispatch_words(pm4);
+                              stage.global_y, stage.global_z, state.next_timeline_value};
+  const std::vector<uint32_t> stage_words =
+      write_timeline
+          ? build_pm4_dispatch_words(pm4)
+          : build_pm4_dispatch_words(pm4, Pm4StageTail{true, true, false});
+  if (write_timeline) ++state.next_timeline_value;
   words->insert(words->end(), stage_words.begin(), stage_words.end());
   return true;
 }
 
 bool ResidentHsaSession::dispatch_batch(const std::vector<ResidentHsaStage>& stages,
                                         ResidentHsaDispatchResult* result,
-                                        std::string* error_text) {
+                                        std::string* error_text,
+                                        const ResidentHsaBatchOptions& options) {
   auto fail = [&](const char* failure_stage, const std::string& text) {
     if (result != nullptr) result->failure_stage = failure_stage;
     if (error_text != nullptr) *error_text = text;
@@ -2539,15 +2544,43 @@ bool ResidentHsaSession::dispatch_batch(const std::vector<ResidentHsaStage>& sta
   if (stages.empty()) return fail("preflight", "dispatch batch has no stages");
   if (stages.size() > am_compute::kKernargSlotCount)
     return fail("preflight", "dispatch batch exceeds the 10 in-page kernarg slots");
+  if (options.capture_gpu_timestamps &&
+      stages.size() + 1U != am_compute::kGpuTimestampBoundaryCount)
+    return fail("preflight", "GPU stage profiling requires exactly 10 stages");
 
   std::vector<uint32_t> batch;
   batch.reserve(stages.size() * am_compute::kPm4DispatchDwordCount);
+  uint32_t expected_timeline_value = 0;
   {
     ScopedUsec timer(&state.phase_timers.pm4_build_usec);
-    for (size_t index = 0; index < stages.size(); ++index) {
-      std::string detail;
-      if (!build_stage_pm4(stages[index], static_cast<uint32_t>(index), &batch, &detail))
-        return fail("preflight", detail);
+    if (!options.capture_gpu_timestamps) {
+      // Keep the production stream on the frozen per-stage PM4 path.
+      for (size_t index = 0; index < stages.size(); ++index) {
+        std::string detail;
+        if (!build_stage_pm4(stages[index], static_cast<uint32_t>(index), &batch, &detail))
+          return fail("preflight", detail);
+      }
+      expected_timeline_value = state.next_timeline_value - 1U;
+    } else {
+      uint8_t* const timestamp_bytes =
+          static_cast<uint8_t*>(state.compute_control_mapping.data) +
+          am_compute::kGpuTimestampCpuOffset;
+      std::memset(timestamp_bytes, 0, am_compute::kGpuTimestampByteCount);
+      const auto append_words = [&](const std::vector<uint32_t>& words) {
+        batch.insert(batch.end(), words.begin(), words.end());
+      };
+      append_words(build_pm4_gpu_timestamp_words(am_compute::kGpuTimestampVa));
+      for (size_t index = 0; index < stages.size(); ++index) {
+        std::string detail;
+        if (!build_stage_pm4(stages[index], static_cast<uint32_t>(index), &batch, &detail,
+                             false))
+          return fail("preflight", detail);
+        append_words(build_pm4_gpu_timestamp_words(
+            am_compute::kGpuTimestampVa + (index + 1U) * sizeof(uint64_t)));
+      }
+      expected_timeline_value = state.next_timeline_value++;
+      append_words(build_pm4_timeline_signal_words(am_compute::kTimelineVa,
+                                                   expected_timeline_value));
     }
   }
 
@@ -2582,8 +2615,19 @@ bool ResidentHsaSession::dispatch_batch(const std::vector<ResidentHsaStage>& sta
     ScopedUsec timer(&state.phase_timers.timeline_wait_usec);
     if (!poll_compute_timeline_with_consumption_diagnostics(
             *state.client, &state.log, state.compute_control_mapping, &elapsed_usec, &detail,
-            state.next_timeline_value - 1))
+            expected_timeline_value))
       return fail("compute_fence_poll", detail);
+  }
+  if (options.capture_gpu_timestamps) {
+    GpuStageTickSample sample;
+    std::memcpy(sample.boundaries.data(),
+                static_cast<const uint8_t*>(state.compute_control_mapping.data) +
+                    am_compute::kGpuTimestampCpuOffset,
+                am_compute::kGpuTimestampByteCount);
+    std::array<uint64_t, 10> stage_ticks{};
+    if (!gpu_stage_tick_deltas(sample, &stage_ticks, &detail))
+      return fail("gpu_timestamp_validation", detail);
+    result->gpu_stage_tick_samples.push_back(sample);
   }
   result->pm4_dispatch_count += static_cast<uint32_t>(stages.size());
   result->pm4_dispatch_word_count += static_cast<uint64_t>(batch.size());

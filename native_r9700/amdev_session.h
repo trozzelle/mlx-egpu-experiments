@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -127,6 +128,35 @@ struct ResidentHsaDispatch {
   std::vector<ResidentHsaStage> stages;
 };
 
+struct GpuStageTickSample {
+  std::array<uint64_t, 11> boundaries{};
+};
+
+inline bool gpu_stage_tick_deltas(const GpuStageTickSample& sample,
+                                  std::array<uint64_t, 10>* stage_ticks,
+                                  std::string* error_text) {
+  if (stage_ticks == nullptr) return false;
+  if (sample.boundaries[0] == 0) {
+    if (error_text != nullptr)
+      *error_text = "gpu timestamp boundaries are not strictly increasing";
+    return false;
+  }
+  for (std::size_t index = 0; index < stage_ticks->size(); ++index) {
+    if (sample.boundaries[index + 1] <= sample.boundaries[index]) {
+      if (error_text != nullptr)
+        *error_text = "gpu timestamp boundaries are not strictly increasing";
+      return false;
+    }
+    (*stage_ticks)[index] = sample.boundaries[index + 1] - sample.boundaries[index];
+  }
+  if (error_text != nullptr) error_text->clear();
+  return true;
+}
+
+struct ResidentHsaBatchOptions {
+  bool capture_gpu_timestamps = false;
+};
+
 struct ResidentHsaDispatchResult {
   std::string hardware_identity;
   uint64_t hsa_image_gpu_va = 0;
@@ -145,6 +175,7 @@ struct ResidentHsaDispatchResult {
   uint64_t sdma_upload_bytes = 0;
   uint64_t sdma_download_bytes = 0;
   uint64_t pm4_dispatch_word_count = 0;
+  std::vector<GpuStageTickSample> gpu_stage_tick_samples;
 
   std::string pm4_dispatch_digest = "not_run";
   uint64_t pm4_dispatch_count = 0;
@@ -176,7 +207,8 @@ class ResidentHsaSession {
   // in-page slot i, so the single-stage path (slot 0, timeline_value 1) is
   // byte-identical to dispatch.
   bool dispatch_batch(const std::vector<ResidentHsaStage>& stages,
-                      ResidentHsaDispatchResult* result, std::string* error_text);
+                      ResidentHsaDispatchResult* result, std::string* error_text,
+                      const ResidentHsaBatchOptions& options = {});
   // Reads the live compute ring rptr/wptr (in dwords) from the control page.
   // Must be called before close; close resets the control mapping.
   bool compute_ring_pointers(uint64_t* rptr_dwords, uint64_t* wptr_dwords,
@@ -192,10 +224,12 @@ class ResidentHsaSession {
   bool close(std::string* error_text);
 
  private:
-  // Per-stage PM4 transform (preflight, kernarg slot bind, build). Appends 59
-  // dwords to *words and advances next_timeline_value.
+  // Per-stage PM4 transform (preflight, kernarg slot bind, build). The frozen
+  // path appends 59 dwords and advances next_timeline_value; the profiled path
+  // keeps cache completion but leaves the host timeline for the batch terminal.
   bool build_stage_pm4(const ResidentHsaStage& stage, uint32_t slot,
-                       std::vector<uint32_t>* words, std::string* error_text);
+                       std::vector<uint32_t>* words, std::string* error_text,
+                       bool write_timeline = true);
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

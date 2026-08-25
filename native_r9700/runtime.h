@@ -6245,6 +6245,7 @@ struct NativePrefillRequest {
   std::vector<uint32_t> token_ids;
   std::string out_npz_path;
   std::string log_path;
+  bool gpu_stage_profile = false;
 };
 
 struct NativePrefillResult {
@@ -6267,6 +6268,10 @@ struct NativePrefillResult {
   uint64_t wall_usec = 0;
   // Number of prompt tokens prefilled (S-1 cache prefix length).
   uint32_t n_prefix = 0;
+  std::array<uint64_t, 10> gpu_stage_tick_total{};
+  std::array<uint64_t, 10> gpu_stage_tick_min{};
+  std::array<uint64_t, 10> gpu_stage_tick_max{};
+  uint64_t gpu_stage_profile_sample_count = 0;
   int exit_status = 1;
 };
 
