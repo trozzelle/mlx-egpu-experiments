@@ -14,6 +14,7 @@ namespace {
 
 constexpr uint32_t kNumLayers = 16;
 constexpr uint32_t kKvHeads = 8;
+constexpr uint32_t kCacheCapacityTokens = 128;
 constexpr uint32_t kHeadDim = 64;
 constexpr char kProducerKind[] = "r9700_native";
 
@@ -238,6 +239,53 @@ bool write_stored_zip(const std::vector<ZipEntry>& entries, const std::string& o
 
 }  // namespace
 
+bool validate_native_prefill_kv_finite(
+    const NativePrefillNpzPayload& payload, std::string* error_text) {
+  if (payload.n_prefix == 0 ||
+      payload.cache_capacity_tokens != kCacheCapacityTokens ||
+      payload.n_prefix > payload.cache_capacity_tokens) {
+    return fail(error_text,
+                "NPZ payload requires cache capacity 128 and a positive live prefix");
+  }
+  if (payload.kv_readback_bytes.size() != 2U * kNumLayers) {
+    return fail(error_text, "NPZ payload requires exactly 32 K/V readback buffers");
+  }
+  const uint64_t expected_cache_bytes =
+      static_cast<uint64_t>(payload.cache_capacity_tokens) * kKvHeads *
+      kHeadDim * sizeof(uint16_t);
+  for (std::size_t buffer_index = 0;
+       buffer_index < payload.kv_readback_bytes.size(); ++buffer_index) {
+    const std::vector<uint8_t>& buffer =
+        payload.kv_readback_bytes[buffer_index];
+    if (buffer.size() != expected_cache_bytes) {
+      return fail(error_text,
+                  "NPZ payload K/V readback buffer byte count mismatch");
+    }
+    for (uint32_t head = 0; head < kKvHeads; ++head) {
+      const uint64_t head_base =
+          static_cast<uint64_t>(head) * payload.cache_capacity_tokens *
+          kHeadDim * sizeof(uint16_t);
+      const uint64_t live_value_count =
+          static_cast<uint64_t>(payload.n_prefix) * kHeadDim;
+      for (uint64_t value_index = 0; value_index < live_value_count;
+           ++value_index) {
+        const uint64_t byte_offset =
+            head_base + value_index * sizeof(uint16_t);
+        const uint16_t bits =
+            static_cast<uint16_t>(buffer[byte_offset]) |
+            static_cast<uint16_t>(
+                static_cast<uint16_t>(buffer[byte_offset + 1U]) << 8U);
+        if ((bits & 0x7C00U) == 0x7C00U) {
+          return fail(error_text,
+                      "NPZ payload live K/V prefix contains non-finite fp16");
+        }
+      }
+    }
+  }
+  if (error_text != nullptr) error_text->clear();
+  return true;
+}
+
 bool write_native_prefill_npz(const NativePrefillNpzPayload& payload,
                               const std::string& out_path, std::string* error_text) {
   if (payload.model.empty()) return fail(error_text, "NPZ payload model must be non-empty");
@@ -256,6 +304,7 @@ bool write_native_prefill_npz(const NativePrefillNpzPayload& payload,
       return fail(error_text, "NPZ payload K/V readback buffer byte count mismatch");
     }
   }
+  if (!validate_native_prefill_kv_finite(payload, error_text)) return false;
   if (out_path.empty()) return fail(error_text, "NPZ output path must be non-empty");
 
   std::vector<ZipEntry> entries;

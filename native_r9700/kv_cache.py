@@ -96,6 +96,8 @@ def _require_layer_array(layer_index: int, name: str, value: Any, n_prefix: int)
         raise KVCacheError(
             f"layer {layer_index} {name} shape must be {expected_shape} with 8 KV heads and head_dim 64, got {value.shape}"
         )
+    if not np.isfinite(value).all():
+        raise KVCacheError(f"layer {layer_index} {name} values must be finite")
     return value
 
 

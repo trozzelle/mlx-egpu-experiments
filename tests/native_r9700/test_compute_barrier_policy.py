@@ -1,5 +1,6 @@
 """Hardware-free contracts for compute batch completion and barrier policies."""
 
+import json
 from pathlib import Path
 import subprocess
 
@@ -39,6 +40,7 @@ PACKET3_ACQUIRE_MEM = 0x58
 PACKET3_SET_SH_REG = 0x76
 RELEASE_MEM_DATA_SEL_NONE = 0
 RELEASE_MEM_DATA_SEL_SEND_32_BIT_LOW = 1
+RELEASE_MEM_DATA_SEL_SEND_GPU_CLOCK = 3
 COMPUTE_PGM_LO_SET_SH_OFFSET = 0x20C
 CACHE_FLUSH_RELEASE_EVENT = 0x0070F514
 
@@ -264,26 +266,80 @@ def test_policy_selection_does_not_change_stage_order(encoded_streams, stream_na
     assert code_addresses == [(stage + 1) << 8 for stage in range(10)]
 
 
-@pytest.mark.parametrize(
-    "stream_name",
-    ["profile_per_stage_full", "profile_terminal_full"],
-)
-def test_gpu_profile_composes_with_policy_without_duplicate_terminal_signal(
-    encoded_streams, stream_name
-):
-    packets = _decode_packets(encoded_streams[stream_name])
-    release_selectors = [
-        _release_data_selector(payload)
-        for opcode, payload in packets
+def _release_records(words: tuple[int, ...]) -> list[tuple[int, int, int]]:
+    return [
+        (
+            _release_data_selector(payload),
+            payload[2] | (payload[3] << 32),
+            payload[4],
+        )
+        for opcode, payload in _decode_packets(words)
         if opcode == PACKET3_RELEASE_MEM
     ]
-    cache_completion_selectors = [
+
+
+def test_profiled_completion_policies_remain_distinct_and_keep_ordered_timestamps(
+    encoded_streams,
+):
+    per_stage = encoded_streams["profile_per_stage_full"]
+    terminal = encoded_streams["profile_terminal_full"]
+    assert per_stage != terminal
+
+    expected_timestamp_destinations = [0x400000 + index * 8 for index in range(11)]
+    for words in (per_stage, terminal):
+        timestamp_destinations = [
+            destination
+            for selector, destination, _ in _release_records(words)
+            if selector == RELEASE_MEM_DATA_SEL_SEND_GPU_CLOCK
+        ]
+        assert timestamp_destinations == expected_timestamp_destinations
+
+    per_stage_signals = [
+        (destination, value)
+        for selector, destination, value in _release_records(per_stage)
+        if selector == RELEASE_MEM_DATA_SEL_SEND_32_BIT_LOW
+    ]
+    terminal_signals = [
+        (destination, value)
+        for selector, destination, value in _release_records(terminal)
+        if selector == RELEASE_MEM_DATA_SEL_SEND_32_BIT_LOW
+    ]
+    assert per_stage_signals == [(0x300000, value) for value in range(1, 12)]
+    assert terminal_signals == [(0x300000, 1)]
+
+    for words in (per_stage, terminal):
+        records = _release_records(words)
+        final_timestamp = (
+            RELEASE_MEM_DATA_SEL_SEND_GPU_CLOCK,
+            expected_timestamp_destinations[-1],
+            0,
+        )
+        final_signal_index = max(
+            index
+            for index, (selector, destination, _) in enumerate(records)
+            if selector == RELEASE_MEM_DATA_SEL_SEND_32_BIT_LOW
+            and destination == 0x300000
+        )
+        assert records.index(final_timestamp) < final_signal_index
+
+
+def test_profiled_barrier_policy_does_not_change_completion_signal_policy(encoded_streams):
+    per_stage_packets = _decode_packets(encoded_streams["profile_per_stage_full"])
+    terminal_packets = _decode_packets(encoded_streams["profile_terminal_full"])
+    per_stage_cache_selectors = [
         _release_data_selector(payload)
-        for opcode, payload in packets
+        for opcode, payload in per_stage_packets
         if opcode == PACKET3_RELEASE_MEM and payload[0] == CACHE_FLUSH_RELEASE_EVENT
     ]
-    assert release_selectors.count(RELEASE_MEM_DATA_SEL_SEND_32_BIT_LOW) == 1
-    assert cache_completion_selectors.count(RELEASE_MEM_DATA_SEL_NONE) == 10
+    terminal_cache_selectors = [
+        _release_data_selector(payload)
+        for opcode, payload in terminal_packets
+        if opcode == PACKET3_RELEASE_MEM and payload[0] == CACHE_FLUSH_RELEASE_EVENT
+    ]
+    assert per_stage_cache_selectors == [RELEASE_MEM_DATA_SEL_SEND_32_BIT_LOW] * 11
+    assert terminal_cache_selectors == [RELEASE_MEM_DATA_SEL_NONE] * 10 + [
+        RELEASE_MEM_DATA_SEL_SEND_32_BIT_LOW
+    ]
 
 
 @pytest.fixture(scope="module")
@@ -377,6 +433,59 @@ def test_runner_rejects_malformed_or_duplicate_compute_ab_policy_flags(
     )
     assert completed.returncode == 2
     assert "failure_stage: native_prefill_request" in completed.stdout
+
+@pytest.mark.parametrize(
+    ("optional_arguments", "completion", "barrier"),
+    [
+        ([], "per-stage", "full"),
+        (["--completion-policy", "per-stage"], "per-stage", "full"),
+        (["--completion-policy", "terminal"], "terminal", "full"),
+        (["--barrier-policy", "full"], "per-stage", "full"),
+        (["--barrier-policy", "overlap-kv"], "per-stage", "overlap-kv"),
+        (
+            ["--completion-policy", "per-stage", "--barrier-policy", "full",
+             "--gpu-stage-profile"],
+            "per-stage",
+            "full",
+        ),
+        (
+            ["--completion-policy", "per-stage", "--barrier-policy", "overlap-kv",
+             "--gpu-stage-profile"],
+            "per-stage",
+            "overlap-kv",
+        ),
+        (
+            ["--completion-policy", "terminal", "--barrier-policy", "full",
+             "--gpu-stage-profile"],
+            "terminal",
+            "full",
+        ),
+        (
+            ["--completion-policy", "terminal", "--barrier-policy", "overlap-kv",
+             "--gpu-stage-profile"],
+            "terminal",
+            "overlap-kv",
+        ),
+    ],
+)
+def test_runner_records_effective_compute_policies_in_every_summary(
+    runner, tmp_path, optional_arguments, completion, barrier
+):
+    completed = subprocess.run(
+        _prefill_command(runner, tmp_path) + optional_arguments,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    json_result = json.loads(completed.stdout.splitlines()[-1])
+    assert json_result["compute_completion_policy"] == completion
+    assert json_result["compute_barrier_policy"] == barrier
+    assert f"compute_completion_policy: {completion}\n" in completed.stdout
+    assert f"compute_barrier_policy: {barrier}\n" in completed.stdout
+    hardware_log = (tmp_path / "run.log").read_text(encoding="utf-8")
+    assert f"compute_completion_policy: {completion}\n" in hardware_log
+    assert f"compute_barrier_policy: {barrier}\n" in hardware_log
     assert "[1]" not in completed.stdout
 
 

@@ -199,9 +199,30 @@ void append_gpu_stage_profile_key_value(
     output->append(prefix + "mean_ticks: " + std::to_string(mean) + "\n");
     output->append(prefix + "max_ticks: " +
                    std::to_string(result.gpu_stage_tick_max[stage]) + "\n");
+    output->append(prefix + "p50_ticks: " +
+                   std::to_string(result.gpu_stage_tick_p50[stage]) + "\n");
+    output->append(prefix + "p95_ticks: " +
+                   std::to_string(result.gpu_stage_tick_p95[stage]) + "\n");
     output->append(prefix + "sample_count: " +
                    std::to_string(result.gpu_stage_profile_sample_count) + "\n");
     output->append(prefix + "share: " + std::to_string(share) + "\n");
+  }
+  for (std::size_t sample_index = 0;
+       sample_index < result.gpu_stage_profile_samples.size(); ++sample_index) {
+    const native_r9700::GpuStageProfileSample& sample =
+        result.gpu_stage_profile_samples[sample_index];
+    const std::string prefix =
+        "gpu_stage_profile_sample " + std::to_string(sample_index) + " ";
+    output->append(prefix + "layer_index: " +
+                   std::to_string(sample.layer_index) + "\n");
+    output->append(prefix + "block_position: " +
+                   std::to_string(sample.block_position) + "\n");
+    output->append(prefix + "block_token_count: " +
+                   std::to_string(sample.block_token_count) + "\n");
+    for (std::size_t stage = 0; stage < kGpuStageNames.size(); ++stage) {
+      output->append(prefix + kGpuStageNames[stage] + "_ticks: " +
+                     std::to_string(sample.stage_ticks[stage]) + "\n");
+    }
   }
 }
 
@@ -234,11 +255,35 @@ void append_gpu_stage_profile_json(const native_r9700::NativePrefillResult& resu
     output->append(std::to_string(mean));
     output->append(",\"max_ticks\":");
     output->append(std::to_string(result.gpu_stage_tick_max[stage]));
+    output->append(",\"p50_ticks\":");
+    output->append(std::to_string(result.gpu_stage_tick_p50[stage]));
+    output->append(",\"p95_ticks\":");
+    output->append(std::to_string(result.gpu_stage_tick_p95[stage]));
     output->append(",\"sample_count\":");
     output->append(std::to_string(result.gpu_stage_profile_sample_count));
     output->append(",\"share\":");
     output->append(std::to_string(share));
     output->push_back('}');
+  }
+  output->push_back(']');
+  output->append(",\"gpu_stage_profile_samples\":[");
+  for (std::size_t sample_index = 0;
+       sample_index < result.gpu_stage_profile_samples.size(); ++sample_index) {
+    if (sample_index != 0U) output->push_back(',');
+    const native_r9700::GpuStageProfileSample& sample =
+        result.gpu_stage_profile_samples[sample_index];
+    output->append("{\"layer_index\":");
+    output->append(std::to_string(sample.layer_index));
+    output->append(",\"block_position\":");
+    output->append(std::to_string(sample.block_position));
+    output->append(",\"block_token_count\":");
+    output->append(std::to_string(sample.block_token_count));
+    output->append(",\"stage_ticks\":[");
+    for (std::size_t stage = 0; stage < sample.stage_ticks.size(); ++stage) {
+      if (stage != 0U) output->push_back(',');
+      output->append(std::to_string(sample.stage_ticks[stage]));
+    }
+    output->append("]}");
   }
   output->push_back(']');
 }
@@ -248,6 +293,12 @@ std::string native_prefill_key_value(const native_r9700::NativePrefillResult& re
       "producer_kind: " + log_value(result.producer_kind) + "\n" +
       "runtime_substrate: " + std::string(native_r9700::kRuntimeSubstrate) + "\n" +
       "hardware_log_path: " + log_value(result.hardware_log_path) + "\n" +
+      "compute_completion_policy: " +
+      std::string(native_r9700::compute_completion_policy_name(
+          result.compute_completion_policy)) + "\n" +
+      "compute_barrier_policy: " +
+      std::string(native_r9700::compute_barrier_policy_name(
+          result.compute_barrier_policy)) + "\n" +
       "acceptance_scope: native_prefill_npz\n" +
       "native_prefill_acceptance: " + log_value(result.native_prefill_acceptance) + "\n" +
       "native_prefill_full_layer_loop_status: " +
@@ -306,6 +357,12 @@ std::string native_prefill_json(const native_r9700::NativePrefillResult& result)
       "\",\"runtime_substrate\":\"" + json_escape(native_r9700::kRuntimeSubstrate) +
       "\",\"prefill_npz_path\":\"" + json_escape(result.prefill_npz_path) +
       "\",\"hardware_log_path\":\"" + json_escape(result.hardware_log_path) +
+      "\",\"compute_completion_policy\":\"" +
+      json_escape(native_r9700::compute_completion_policy_name(
+          result.compute_completion_policy)) +
+      "\",\"compute_barrier_policy\":\"" +
+      json_escape(native_r9700::compute_barrier_policy_name(
+          result.compute_barrier_policy)) +
       "\",\"native_prefill_full_layer_loop_status\":\"" +
       json_escape(result.native_prefill_full_layer_loop_status) +
       "\",\"native_prefill_blocker_source\":\"" +

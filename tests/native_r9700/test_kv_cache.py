@@ -241,6 +241,14 @@ def test_prefill_result_from_npz_fixture_round_trips_when_mlx_lm_available(tmp_p
             id="wrong-dtype-fp32",
         ),
         pytest.param(
+            lambda result: result["layers"][0]["K"].reshape(-1).__setitem__(
+                0, np.float16(np.nan)
+            ),
+            lambda tmp_path: tmp_path / "nonfinite.safetensors",
+            "(?i)finite|nan|infinity",
+            id="nonfinite-kv",
+        ),
+        pytest.param(
             lambda result: result["layers"][0].__setitem__(
                 "K", result["layers"][0]["K"][:, :7, :, :]
             ),

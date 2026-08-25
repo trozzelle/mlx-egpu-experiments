@@ -8,6 +8,7 @@ import shlex
 import numpy as np
 import subprocess
 from pathlib import Path
+import zipfile
 from typing import Mapping, Sequence
 
 R9700_NATIVE_PRODUCER_KIND = "r9700_native"
@@ -21,6 +22,15 @@ _NUM_LAYERS = 16
 _BATCH = 1
 _N_KV_HEADS = 8
 _HEAD_DIM = 64
+_MAX_EVIDENCE_BYTES = 1024 * 1024
+_MAX_STRING_EVIDENCE_BYTES = 16 * 1024
+_INTEGER_ABI_RANGES = {
+    "kernel_count": (0, (1 << 64) - 1),
+    "transfer_bytes": (0, (1 << 64) - 1),
+    "exit_status": (-(1 << 31), (1 << 31) - 1),
+    "block_tokens": (0, (1 << 32) - 1),
+    "block_count": (0, (1 << 32) - 1),
+}
 
 _REQUIRED_FIELDS = (
     "producer_kind",
@@ -85,6 +95,15 @@ _OPTIONAL_EVIDENCE_FIELDS = (
     "layer0_resident_dataflow_status",
 )
 _PARSED_FIELDS = (*_REQUIRED_FIELDS, "failure_text", *_OPTIONAL_EVIDENCE_FIELDS)
+_STRING_EVIDENCE_FIELDS = frozenset(
+    field
+    for field in _PARSED_FIELDS
+    if field not in _INTEGER_ABI_RANGES
+)
+
+
+class EvidenceValidationError(ValueError):
+    """Raised when bounded external runner evidence is corrupt."""
 
 
 
@@ -110,37 +129,75 @@ def run_native_prefill(
 
     out_path = Path(out_npz)
     log = Path(log_path)
-    expected_block_tokens, block_tokens_override = _configured_block_tokens()
-    command = _build_runner_command_with_override(
-        model_dir, token_ids, out_path, log, block_tokens_override
-    )
+    accepted = False
+    command: list[str] = []
     try:
-        completed = subprocess.run(command, capture_output=True, text=True, check=False)
-    except OSError as exc:
-        result = _open_result(
-            exit_status=1,
-            log_path=log,
-            failure_stage="runner_launch",
-            failure_text=str(exc),
-        )
-        _remove_unaccepted_npz(out_path)
-        _write_result_log(log, command, result)
-        return result
+        try:
+            expected_block_tokens, block_tokens_override = _configured_block_tokens()
+            command = _build_runner_command_with_override(
+                model_dir, token_ids, out_path, log, block_tokens_override
+            )
+        except (TypeError, ValueError, OverflowError, UnicodeError) as exc:
+            result = _open_result(
+                exit_status=1,
+                log_path=log,
+                failure_stage="native_prefill_request",
+                failure_text=str(exc),
+            )
+            _write_result_log(log, command, result)
+            return result
 
-    parsed = _parse_worker_result(completed.stdout, completed.stderr, log)
-    result = _normalize_result(
-        parsed,
-        completed.returncode,
-        out_path,
-        log,
-        len(token_ids),
-        model_dir,
-        expected_block_tokens,
-    )
-    if result["native_prefill_acceptance"] != _PASS_ACCEPTANCE:
-        _remove_unaccepted_npz(out_path)
-        _write_result_log(log, command, result)
-    return result
+        try:
+            completed = subprocess.run(
+                command, capture_output=True, text=True, check=False
+            )
+        except OSError as exc:
+            result = _open_result(
+                exit_status=1,
+                log_path=log,
+                failure_stage="runner_launch",
+                failure_text=str(exc),
+            )
+            _write_result_log(log, command, result)
+            return result
+        except UnicodeError as exc:
+            result = _open_result(
+                exit_status=1,
+                log_path=log,
+                failure_stage="worker_result_validation",
+                failure_text=str(exc),
+            )
+            _write_result_log(log, command, result)
+            return result
+
+        try:
+            parsed = _parse_worker_result(completed.stdout, completed.stderr, log)
+            result = _normalize_result(
+                parsed,
+                completed.returncode,
+                out_path,
+                log,
+                len(token_ids),
+                model_dir,
+                expected_block_tokens,
+            )
+        except (EvidenceValidationError, UnicodeError, OSError) as exc:
+            result = _open_result(
+                exit_status=1,
+                log_path=log,
+                failure_stage="worker_result_validation",
+                failure_text=str(exc),
+            )
+            _write_result_log(log, command, result)
+            return result
+
+        accepted = result["native_prefill_acceptance"] == _PASS_ACCEPTANCE
+        if not accepted:
+            _write_result_log(log, command, result)
+        return result
+    finally:
+        if not accepted:
+            _remove_unaccepted_npz(out_path)
 
 
 def _build_runner_command(
@@ -253,7 +310,20 @@ def validate_native_prefill_npz(
                         problems.append(
                             f"{key} shape must be {expected_shape}, got {tuple(array.shape)}"
                         )
-    except Exception as exc:
+                    try:
+                        finite = bool(np.isfinite(array).all())
+                    except TypeError:
+                        finite = False
+                    if not finite:
+                        problems.append(f"{key} values must be finite")
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        EOFError,
+        zipfile.BadZipFile,
+        UnicodeError,
+    ) as exc:
         problems.append(f"prefill_npz_path is not a readable strict NPZ: {exc}")
     return problems
 
@@ -275,21 +345,90 @@ def _scalar_npz_int(array: np.ndarray, name: str, problems: list[str]) -> int:
         return -1
     try:
         return int(array.item())
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         problems.append(f"NPZ {name} must be an int scalar: {exc}")
         return -1
 
 
 
+def _utf8_size(text: str) -> int:
+    try:
+        return len(text.encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise EvidenceValidationError(
+            "runner evidence must be valid UTF-8"
+        ) from exc
+
+
+def _read_admitted_log_text(
+    stdout: str, stderr: str, log_path: Path
+) -> str:
+    admitted_bytes = _utf8_size(stdout) + _utf8_size(stderr)
+    if admitted_bytes > _MAX_EVIDENCE_BYTES:
+        raise EvidenceValidationError(
+            "aggregate runner evidence exceeds the evidence admission limit"
+        )
+    if not log_path.is_file():
+        return ""
+    remaining = _MAX_EVIDENCE_BYTES - admitted_bytes
+    with log_path.open("rb") as handle:
+        log_bytes = handle.read(min(_MAX_EVIDENCE_BYTES + 1, remaining + 1))
+    if len(log_bytes) > remaining:
+        raise EvidenceValidationError(
+            "aggregate runner evidence exceeds the evidence admission limit"
+        )
+    try:
+        return log_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise EvidenceValidationError(
+            "requested hardware log evidence must be valid UTF-8"
+        ) from exc
+
+
+def _merge_evidence_source(
+    result: dict[str, object],
+    source: Mapping[str, object],
+    log_path: Path,
+) -> None:
+    problems = _evidence_field_problems(source)
+    if source.get("native_prefill_acceptance") == _PASS_ACCEPTANCE:
+        if source.get("failure_stage") not in (None, ""):
+            problems.append("successful result failure_stage must be empty")
+        if source.get("failure_text") not in (None, ""):
+            problems.append("successful result failure_text must be empty")
+    source_log_path = source.get("hardware_log_path")
+    if (
+        type(source_log_path) is str
+        and source_log_path
+        and os.path.realpath(source_log_path) != os.path.realpath(log_path)
+    ):
+        problems.append("hardware_log_path does not match requested log path")
+    if problems:
+        raise EvidenceValidationError(
+            "invalid runner evidence source: " + "; ".join(problems)
+        )
+    for key, value in source.items():
+        if key in result and result[key] != value:
+            if key in {"failure_stage", "failure_text"}:
+                detail = f"successful result {key} must be empty"
+            else:
+                detail = f"conflicting runner evidence for {key}"
+            raise EvidenceValidationError(detail)
+        result[key] = value
+
+
 def _parse_worker_result(stdout: str, stderr: str, log_path: Path) -> dict[str, object]:
     result: dict[str, object] = {}
-    if log_path.is_file():
-        result.update(_parse_key_value_text(log_path.read_text(encoding="utf-8")))
-    for text in (stdout, stderr):
-        result.update(_parse_key_value_text(text))
+    log_text = _read_admitted_log_text(stdout, stderr, log_path)
+    for text in (stdout, stderr, log_text):
+        if not text:
+            continue
+        key_value_result = _parse_key_value_text(text)
+        if key_value_result:
+            _merge_evidence_source(result, key_value_result, log_path)
         json_result = _parse_json_text(text)
         if json_result:
-            result.update(json_result)
+            _merge_evidence_source(result, json_result, log_path)
     return result
 
 
@@ -297,17 +436,45 @@ def _parse_json_text(text: str) -> dict[str, object]:
     stripped = text.strip()
     if not stripped:
         return {}
-    candidates = [stripped, *[line.strip() for line in stripped.splitlines() if line.strip()]]
+    if stripped.startswith("{"):
+        candidates = [stripped]
+    else:
+        candidates = [
+            line.strip()
+            for line in stripped.splitlines()
+            if line.strip().startswith("{")
+        ]
+    result: dict[str, object] = {}
     for candidate in candidates:
-        if not (candidate.startswith("{") and candidate.endswith("}")):
-            continue
         try:
             parsed = json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return dict(parsed)
-    return {}
+        except (json.JSONDecodeError, ValueError, RecursionError) as exc:
+            raise EvidenceValidationError(
+                f"corrupt JSON-looking runner evidence: {exc}"
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise EvidenceValidationError(
+                "JSON-looking runner evidence must be an object"
+            )
+        result.update(parsed)
+    return result
+
+
+def _parse_bounded_decimal(key: str, text: str) -> int | str:
+    lower, upper = _INTEGER_ABI_RANGES[key]
+    digit_text = text[1:] if key == "exit_status" and text.startswith("-") else text
+    max_digits = max(len(str(abs(lower))), len(str(upper)))
+    if (
+        not digit_text
+        or not digit_text.isascii()
+        or not digit_text.isdecimal()
+        or len(digit_text) > max_digits
+    ):
+        return text
+    try:
+        return int(text)
+    except ValueError:
+        return text
 
 
 def _parse_key_value_text(text: str) -> dict[str, object]:
@@ -319,18 +486,42 @@ def _parse_key_value_text(text: str) -> dict[str, object]:
         key = key.strip()
         if key in _PARSED_FIELDS:
             stripped_value = value.strip()
-            if (
-                key in {"block_tokens", "block_count"}
-                and stripped_value.isascii()
-                and stripped_value.isdecimal()
-            ):
-                try:
-                    result[key] = int(stripped_value)
-                except ValueError:
-                    result[key] = stripped_value
-            else:
-                result[key] = stripped_value
+            result[key] = (
+                _parse_bounded_decimal(key, stripped_value)
+                if key in _INTEGER_ABI_RANGES
+                else stripped_value
+            )
     return result
+
+
+def _evidence_field_problems(parsed: Mapping[str, object]) -> list[str]:
+    problems: list[str] = []
+    for key, (lower, upper) in _INTEGER_ABI_RANGES.items():
+        if key not in parsed:
+            continue
+        value = parsed[key]
+        if type(value) is not int:
+            label = f"reported {key}" if key in {"block_tokens", "block_count"} else key
+            problems.append(f"{label} must be an exact integer")
+        elif value < lower or value > upper:
+            problems.append(f"{key} is outside its ABI range")
+    for key in _STRING_EVIDENCE_FIELDS:
+        if key not in parsed:
+            continue
+        value = parsed[key]
+        if type(value) is not str:
+            problems.append(f"{key} must be a string")
+            continue
+        try:
+            byte_count = len(value.encode("utf-8"))
+        except UnicodeEncodeError:
+            problems.append(f"{key} must be valid UTF-8")
+            continue
+        if byte_count > _MAX_STRING_EVIDENCE_BYTES:
+            problems.append(
+                f"{key} exceeds {_MAX_STRING_EVIDENCE_BYTES} bytes"
+            )
+    return problems
 
 
 def _normalize_result(
@@ -342,6 +533,11 @@ def _normalize_result(
     expected_model: str,
     expected_block_tokens: int,
 ) -> dict[str, object]:
+    field_problems = _evidence_field_problems(parsed)
+    claimed_success = (
+        runner_exit_status == 0
+        and parsed.get("native_prefill_acceptance") == _PASS_ACCEPTANCE
+    )
     result: dict[str, object] = {
         "producer_kind": _string_field(parsed, "producer_kind", "unknown"),
         "native_prefill_acceptance": _string_field(parsed, "native_prefill_acceptance", _OPEN_ACCEPTANCE),
@@ -366,20 +562,20 @@ def _normalize_result(
         result["exit_status"] = int(runner_exit_status)
 
 
-    problems = _acceptance_problems(
+    problems = field_problems + _acceptance_problems(
         result,
         out_npz,
+        log_path,
         expected_n_prefix,
         expected_model,
         expected_block_tokens,
     )
     if problems:
         result["native_prefill_acceptance"] = _OPEN_ACCEPTANCE
-        if not result["failure_stage"]:
-            if _has_npz_schema_problem(problems):
-                result["failure_stage"] = "prefill_npz_schema_validation"
-            else:
-                result["failure_stage"] = "worker_result_validation"
+        if _has_npz_schema_problem(problems):
+            result["failure_stage"] = "prefill_npz_schema_validation"
+        elif field_problems or claimed_success or not result["failure_stage"]:
+            result["failure_stage"] = "worker_result_validation"
         validation_text = "; ".join(problems)
         if result["failure_text"]:
             result["failure_text"] = f"{result['failure_text']}; {validation_text}"
@@ -393,6 +589,7 @@ def _normalize_result(
 def _acceptance_problems(
     result: Mapping[str, object],
     out_npz: Path,
+    log_path: Path,
     expected_n_prefix: int,
     expected_model: str,
     expected_block_tokens: int = 1,
@@ -415,6 +612,9 @@ def _acceptance_problems(
     if not hardware_log_path:
         problems.append("missing hardware_log_path evidence")
         metadata_accepts = False
+    elif os.path.realpath(hardware_log_path) != os.path.realpath(log_path):
+        problems.append("hardware_log_path does not match requested log path")
+        metadata_accepts = False
     elif not Path(hardware_log_path).is_file():
         problems.append("hardware_log_path evidence does not exist")
         metadata_accepts = False
@@ -427,6 +627,13 @@ def _acceptance_problems(
     if int(result["transfer_bytes"]) <= 0:
         problems.append("missing nonzero transfer_bytes hardware evidence")
         metadata_accepts = False
+    if result["native_prefill_acceptance"] == _PASS_ACCEPTANCE:
+        if result["failure_stage"]:
+            problems.append("successful result failure_stage must be empty")
+            metadata_accepts = False
+        if result.get("failure_text"):
+            problems.append("successful result failure_text must be empty")
+            metadata_accepts = False
     reported_block_tokens = result.get("block_tokens")
     if type(reported_block_tokens) is not int:
         problems.append("reported block_tokens must be an exact integer")
@@ -496,15 +703,15 @@ def _open_result(
 
 def _string_field(parsed: Mapping[str, object], key: str, default: str) -> str:
     value = parsed.get(key, default)
-    return str(value)
+    return value if type(value) is str else default
 
 
 def _int_field(parsed: Mapping[str, object], key: str, default: int) -> int:
     value = parsed.get(key, default)
-    try:
-        return int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    if type(value) is not int:
         return default
+    lower, upper = _INTEGER_ABI_RANGES[key]
+    return value if lower <= value <= upper else default
 
 
 def _remove_unaccepted_npz(out_path: Path) -> None:

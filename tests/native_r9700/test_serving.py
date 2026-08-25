@@ -77,12 +77,17 @@ class FakeTokenizer:
 class KVCache:
     """Test double whose type name and state mirror mlx-lm's KVCache contract."""
 
-    def __init__(self, n_prefix: int, *, layer_index: int, bad_shape: bool = False, bad_offset: bool = False):
+    def __init__(
+        self, n_prefix: int, *, layer_index: int, bad_shape: bool = False,
+        bad_offset: bool = False, nonfinite: bool = False
+    ):
         shape = (1, _EXPECTED_N_KV_HEADS, n_prefix, _EXPECTED_HEAD_DIM)
         if bad_shape and layer_index == 0:
             shape = (1, _EXPECTED_N_KV_HEADS - 1, n_prefix, _EXPECTED_HEAD_DIM)
         self.keys = np.zeros(shape, dtype=np.float16)
         self.values = np.ones(shape, dtype=np.float16)
+        if nonfinite and layer_index == 0:
+            self.keys.reshape(-1)[0] = np.float16(np.nan)
         self.state = (self.keys, self.values)
         self.offset = n_prefix - 1 if bad_offset and layer_index == 0 else n_prefix
         self.size = self.offset
@@ -686,6 +691,7 @@ def test_producer_failure_before_acceptance_falls_back_to_native_full_prompt_and
         ),
         pytest.param(None, "bad_shape", id="layer-shape-mismatch"),
         pytest.param(None, "bad_offset", id="layer-offset-mismatch"),
+        pytest.param(None, "nonfinite", id="layer-nonfinite"),
     ],
 )
 def test_malformed_cache_before_acceptance_falls_back_without_accepting_cache(
@@ -705,6 +711,8 @@ def test_malformed_cache_before_acceptance_falls_back_without_accepting_cache(
             return _valid_cache(n_prefix, bad_shape=True), _valid_metadata(n_prefix)
         if cache_layers == "bad_offset":
             return _valid_cache(n_prefix, bad_offset=True), _valid_metadata(n_prefix)
+        if cache_layers == "nonfinite":
+            return _valid_cache(n_prefix, nonfinite=True), _valid_metadata(n_prefix)
         return _valid_cache(n_prefix), metadata
 
     def fake_generate_step(prompt_arg, model, **kwargs):

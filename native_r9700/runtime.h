@@ -36,6 +36,7 @@
 #ifndef NATIVE_R9700_RUNTIME_H_
 #define NATIVE_R9700_RUNTIME_H_
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -6252,11 +6253,21 @@ struct NativePrefillRequest {
   uint32_t block_tokens = 1;
 };
 
+struct GpuStageProfileSample {
+  uint32_t layer_index = 0;
+  uint32_t block_position = 0;
+  uint32_t block_token_count = 0;
+  std::array<uint64_t, 10> stage_ticks{};
+};
+
 struct NativePrefillResult {
   std::string producer_kind = "r9700_native";
   std::string native_prefill_acceptance = "open";
   std::string prefill_npz_path;
   std::string hardware_log_path;
+  ComputeCompletionPolicy compute_completion_policy =
+      ComputeCompletionPolicy::PerStageTimeline;
+  ComputeBarrierPolicy compute_barrier_policy = ComputeBarrierPolicy::Full;
   uint64_t kernel_count = 0;
   uint32_t block_tokens = 1;
   uint32_t block_count = 0;
@@ -6277,9 +6288,66 @@ struct NativePrefillResult {
   std::array<uint64_t, 10> gpu_stage_tick_total{};
   std::array<uint64_t, 10> gpu_stage_tick_min{};
   std::array<uint64_t, 10> gpu_stage_tick_max{};
+  std::array<uint64_t, 10> gpu_stage_tick_p50{};
+  std::array<uint64_t, 10> gpu_stage_tick_p95{};
   uint64_t gpu_stage_profile_sample_count = 0;
+  std::vector<GpuStageProfileSample> gpu_stage_profile_samples;
   int exit_status = 1;
 };
+
+inline bool append_gpu_stage_profile_sample(
+    NativePrefillResult* result, uint32_t layer_index, uint32_t block_position,
+    uint32_t block_token_count, const GpuStageTickSample& raw_sample,
+    std::string* error_text) {
+  if (result == nullptr) {
+    if (error_text != nullptr) *error_text = "native prefill result is required";
+    return false;
+  }
+  std::array<uint64_t, 10> stage_ticks{};
+  if (!gpu_stage_tick_deltas(raw_sample, &stage_ticks, error_text)) return false;
+
+  const bool first_sample = result->gpu_stage_profile_samples.empty();
+  for (std::size_t stage = 0; stage < stage_ticks.size(); ++stage) {
+    result->gpu_stage_tick_total[stage] += stage_ticks[stage];
+    if (first_sample) {
+      result->gpu_stage_tick_min[stage] = stage_ticks[stage];
+      result->gpu_stage_tick_max[stage] = stage_ticks[stage];
+    } else {
+      result->gpu_stage_tick_min[stage] =
+          std::min(result->gpu_stage_tick_min[stage], stage_ticks[stage]);
+      result->gpu_stage_tick_max[stage] =
+          std::max(result->gpu_stage_tick_max[stage], stage_ticks[stage]);
+    }
+  }
+  result->gpu_stage_profile_samples.push_back(
+      {layer_index, block_position, block_token_count, stage_ticks});
+  result->gpu_stage_profile_sample_count =
+      static_cast<uint64_t>(result->gpu_stage_profile_samples.size());
+  if (error_text != nullptr) error_text->clear();
+  return true;
+}
+
+inline void finalize_gpu_stage_profile_percentiles(
+    NativePrefillResult* result) {
+  if (result == nullptr) return;
+  result->gpu_stage_tick_p50 = {};
+  result->gpu_stage_tick_p95 = {};
+  if (result->gpu_stage_profile_samples.empty()) return;
+
+  std::vector<uint64_t> ticks(result->gpu_stage_profile_samples.size());
+  const std::size_t p50_rank = (50U * ticks.size() + 99U) / 100U;
+  const std::size_t p95_rank = (95U * ticks.size() + 99U) / 100U;
+  for (std::size_t stage = 0; stage < 10U; ++stage) {
+    for (std::size_t sample_index = 0; sample_index < ticks.size();
+         ++sample_index) {
+      ticks[sample_index] =
+          result->gpu_stage_profile_samples[sample_index].stage_ticks[stage];
+    }
+    std::sort(ticks.begin(), ticks.end());
+    result->gpu_stage_tick_p50[stage] = ticks[p50_rank - 1U];
+    result->gpu_stage_tick_p95[stage] = ticks[p95_rank - 1U];
+  }
+}
 
 // Runs the fail-closed native prefill worker. It validates request and output
 // ownership before reporting the first unimplemented production layer-execution

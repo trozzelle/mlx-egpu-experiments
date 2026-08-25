@@ -20,18 +20,39 @@ def _write_native_prefill_npz(
     dtype=np.float16,
     shape: tuple[int, ...] | None = None,
     num_layers: int = 16,
+    kv_value: float = 0.0,
+    num_layers_scalar: object | None = None,
 ) -> None:
     tensor_shape = shape or (1, 8, n_prefix, 64)
     arrays: dict[str, object] = {
         "model": model,
         "n_prefix": np.array(n_prefix),
-        "num_layers": np.array(num_layers),
+        "num_layers": np.array(
+            num_layers if num_layers_scalar is None else num_layers_scalar
+        ),
         "producer_kind": producer_kind,
     }
     for layer_index in range(num_layers):
-        arrays[f"layer{layer_index}_K"] = np.zeros(tensor_shape, dtype=dtype)
-        arrays[f"layer{layer_index}_V"] = np.zeros(tensor_shape, dtype=dtype)
+        arrays[f"layer{layer_index}_K"] = np.full(
+            tensor_shape, kv_value, dtype=dtype
+        )
+        arrays[f"layer{layer_index}_V"] = np.full(
+            tensor_shape, kv_value, dtype=dtype
+        )
     np.savez(path, **arrays)
+
+@pytest.mark.parametrize("kv_value", [np.nan, np.inf, -np.inf])
+def test_validate_native_prefill_npz_rejects_nonfinite_layer_kv(
+    tmp_path: Path, kv_value: float
+) -> None:
+    from native_r9700 import native_worker
+
+    out_path = tmp_path / "native-prefill.npz"
+    _write_native_prefill_npz(out_path, n_prefix=2, kv_value=kv_value)
+    problems = native_worker.validate_native_prefill_npz(
+        out_path, 2, "synthetic-model"
+    )
+    assert any("layer0_K values must be finite" in problem for problem in problems)
 
 
 
@@ -133,6 +154,7 @@ def test_native_worker_rejects_pass_without_full_layer_loop_evidence(tmp_path):
             "exit_status": 0,
         },
         out_path,
+        log_path,
         2,
         "synthetic-model",
     )
@@ -627,13 +649,15 @@ def test_native_worker_omits_block_override_when_environment_is_absent(
 
 
 @pytest.mark.parametrize("invalid_value", ["", "0", "3", "129", "-1", "eight"])
-def test_native_worker_rejects_invalid_block_capacity_before_subprocess(
+def test_native_worker_rejects_invalid_block_capacity_and_removes_stale_output(
     monkeypatch, tmp_path, invalid_value
 ):
-    """Invalid diagnostic environment cannot reach the native subprocess."""
+    """Invalid diagnostic environment fails as a request and cleans stale output."""
     from native_r9700 import native_worker
 
     runner_calls = []
+    out_path = tmp_path / "block-prefill.npz"
+    out_path.write_bytes(b"stale")
 
     def fake_run(*args, **kwargs):
         runner_calls.append((args, kwargs))
@@ -642,15 +666,18 @@ def test_native_worker_rejects_invalid_block_capacity_before_subprocess(
     monkeypatch.setenv("NATIVE_R9700_PREFILL_BLOCK_TOKENS", invalid_value)
     monkeypatch.setattr(native_worker.subprocess, "run", fake_run)
 
-    with pytest.raises(ValueError, match="NATIVE_R9700_PREFILL_BLOCK_TOKENS"):
-        native_worker.run_native_prefill(
-            "synthetic-model",
-            [1, 2],
-            tmp_path / "block-prefill.npz",
-            tmp_path / "block-prefill.log",
-        )
+    result = native_worker.run_native_prefill(
+        "synthetic-model",
+        [1, 2],
+        out_path,
+        tmp_path / "block-prefill.log",
+    )
 
     assert runner_calls == []
+    assert result["native_prefill_acceptance"] == "open"
+    assert result["failure_stage"] == "native_prefill_request"
+    assert "NATIVE_R9700_PREFILL_BLOCK_TOKENS" in result["failure_text"]
+    assert not out_path.exists()
 
 
 _MISSING_BLOCK_EVIDENCE = object()
@@ -889,4 +916,364 @@ def test_native_worker_rejects_oversized_decimal_key_value_evidence_with_cleanup
     assert result["native_prefill_acceptance"] == "open"
     assert result["failure_stage"] == "worker_result_validation"
     assert f"reported {field_name} must be an exact integer" in result["failure_text"]
+    assert not out_path.exists()
+
+
+def _strict_success_evidence(out_path: Path, log_path: Path) -> dict[str, object]:
+    return {
+        "producer_kind": "r9700_native",
+        "native_prefill_acceptance": "pass",
+        "native_prefill_full_layer_loop_status": "pass",
+        "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+        "hardware_log_path": str(log_path),
+        "prefill_npz_path": str(out_path),
+        "kernel_count": 4,
+        "transfer_bytes": 4096,
+        "block_tokens": 1,
+        "block_count": 2,
+        "failure_stage": "",
+        "failure_text": "",
+        "exit_status": 0,
+    }
+
+
+def _run_worker_with_evidence(
+    tmp_path: Path,
+    monkeypatch,
+    *,
+    evidence_override: dict[str, object] | None = None,
+    stdout: str | None = None,
+    stderr: str = "",
+    log_bytes: bytes = b"",
+    npz_options: dict[str, object] | None = None,
+):
+    from native_r9700 import native_worker
+
+    out_path = tmp_path / "strict-output.npz"
+    log_path = tmp_path / "strict-output.log"
+
+    def fake_run(argv, capture_output, text, check):
+        _write_native_prefill_npz(
+            out_path, n_prefix=2, **(npz_options or {})
+        )
+        evidence = _strict_success_evidence(out_path, log_path)
+        if evidence_override:
+            evidence.update(evidence_override)
+        log_path.write_bytes(log_bytes)
+        rendered_stdout = json.dumps(evidence) if stdout is None else stdout
+        return subprocess.CompletedProcess(
+            argv, 0, stdout=rendered_stdout, stderr=stderr
+        )
+
+    monkeypatch.setenv(
+        "NATIVE_R9700_PREFILL_RUNNER", "/tmp/fake-native-prefill-runner"
+    )
+    monkeypatch.delenv("NATIVE_R9700_PREFILL_BLOCK_TOKENS", raising=False)
+    monkeypatch.setattr(native_worker.subprocess, "run", fake_run)
+    result = native_worker.run_native_prefill(
+        "synthetic-model", [1, 2], out_path, log_path
+    )
+    return result, out_path, log_path
+
+
+def test_native_worker_rejects_5000_digit_json_integer_and_cleans_output(
+    tmp_path, monkeypatch
+):
+    out_path = tmp_path / "strict-output.npz"
+    log_path = tmp_path / "strict-output.log"
+    evidence = _strict_success_evidence(out_path, log_path)
+    fields = [
+        f'"{key}":{json.dumps(value)}'
+        for key, value in evidence.items()
+        if key != "kernel_count"
+    ]
+    stdout = '{"kernel_count":' + ("9" * 5000) + "," + ",".join(fields) + "}"
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, stdout=stdout
+    )
+    assert result["failure_stage"] == "worker_result_validation"
+    assert "JSON" in result["failure_text"]
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize(
+    "stdout",
+    [
+        '{"producer_kind":\nproducer_kind: r9700_native',
+        '{"nested":' + ("[" * 2000) + "0" + ("]" * 2000) + "}",
+    ],
+    ids=("malformed-json-plus-key-value", "recursive-json"),
+)
+def test_native_worker_treats_json_looking_corruption_as_fatal_and_cleans_output(
+    tmp_path, monkeypatch, stdout
+):
+    stdout += "\nproducer_kind: r9700_native\n"
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, stdout=stdout
+    )
+    assert result["failure_stage"] == "worker_result_validation"
+    assert "JSON" in result["failure_text"]
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize("source", ["stdout", "stderr", "log"])
+@pytest.mark.parametrize("extra", [0, 1], ids=("limit", "limit-plus-one"))
+def test_worker_evidence_admission_limit_is_exact_for_each_source(
+    tmp_path, source, extra
+):
+    from native_r9700 import native_worker
+
+    size = native_worker._MAX_EVIDENCE_BYTES + extra
+    stdout = " " * size if source == "stdout" else ""
+    stderr = " " * size if source == "stderr" else ""
+    log_path = tmp_path / "evidence.log"
+    if source == "log":
+        log_path.write_bytes(b" " * size)
+    if extra == 0:
+        assert native_worker._parse_worker_result(stdout, stderr, log_path) == {}
+    else:
+        with pytest.raises(ValueError, match="evidence.*limit"):
+            native_worker._parse_worker_result(stdout, stderr, log_path)
+
+
+@pytest.mark.parametrize("source", ["stdout", "stderr", "log"])
+def test_native_worker_cleans_output_when_evidence_source_exceeds_limit(
+    tmp_path, monkeypatch, source
+):
+    from native_r9700 import native_worker
+
+    oversized_text = " " * (native_worker._MAX_EVIDENCE_BYTES + 1)
+    kwargs = {
+        "stdout": oversized_text if source == "stdout" else "",
+        "stderr": oversized_text if source == "stderr" else "",
+        "log_bytes": (
+            oversized_text.encode("utf-8") if source == "log" else b""
+        ),
+    }
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, **kwargs
+    )
+    assert result["failure_stage"] == "worker_result_validation"
+    assert "evidence admission limit" in result["failure_text"]
+    assert not out_path.exists()
+
+
+_BAD_JSON_NUMBER_TYPES = [True, 1.0, "1", [], {}]
+_JSON_INTEGER_FIELDS = [
+    "kernel_count", "transfer_bytes", "exit_status", "block_tokens", "block_count"
+]
+
+
+@pytest.mark.parametrize("field_name", _JSON_INTEGER_FIELDS)
+@pytest.mark.parametrize(
+    "bad_value",
+    _BAD_JSON_NUMBER_TYPES,
+    ids=("boolean", "float", "string", "list", "mapping"),
+)
+def test_native_worker_rejects_non_exact_json_integer_types_and_cleans_output(
+    tmp_path, monkeypatch, field_name, bad_value
+):
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, evidence_override={field_name: bad_value}
+    )
+    assert result["failure_stage"] == "worker_result_validation"
+    assert f"{field_name} must be an exact integer" in result["failure_text"]
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("field_name", "bad_value"),
+    [
+        ("kernel_count", -1),
+        ("kernel_count", 1 << 64),
+        ("transfer_bytes", -1),
+        ("transfer_bytes", 1 << 64),
+        ("exit_status", -(1 << 31) - 1),
+        ("exit_status", 1 << 31),
+        ("block_tokens", -1),
+        ("block_tokens", 1 << 32),
+        ("block_count", -1),
+        ("block_count", 1 << 32),
+    ],
+)
+def test_native_worker_rejects_json_integer_values_outside_abi_ranges(
+    tmp_path, monkeypatch, field_name, bad_value
+):
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, evidence_override={field_name: bad_value}
+    )
+    assert result["failure_stage"] == "worker_result_validation"
+    assert f"{field_name} is outside its ABI range" in result["failure_text"]
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("field_name", "bad_value", "problem"),
+    [
+        ("producer_kind", True, "producer_kind must be a string"),
+        ("producer_kind", "x" * (16 * 1024 + 1), "producer_kind exceeds 16384 bytes"),
+    ],
+)
+def test_native_worker_rejects_untyped_or_oversized_string_evidence(
+    tmp_path, monkeypatch, field_name, bad_value, problem
+):
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, evidence_override={field_name: bad_value}
+    )
+    assert result["failure_stage"] == "worker_result_validation"
+    assert problem in result["failure_text"]
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("evidence_override", "problem"),
+    [
+        ({"hardware_log_path": "/tmp/stale-hardware.log"},
+         "hardware_log_path does not match requested log path"),
+        ({"failure_stage": "stale"}, "successful result failure_stage must be empty"),
+        ({"failure_text": "stale"}, "successful result failure_text must be empty"),
+    ],
+)
+def test_native_worker_rejects_stale_log_identity_or_success_failure_fields(
+    tmp_path, monkeypatch, evidence_override, problem
+):
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, evidence_override=evidence_override
+    )
+    assert result["native_prefill_acceptance"] == "open"
+    assert result["failure_stage"] == "worker_result_validation"
+    assert problem in result["failure_text"]
+    assert not out_path.exists()
+
+
+def test_native_worker_cleans_output_before_propagating_programmer_exception(
+    tmp_path, monkeypatch
+):
+    from native_r9700 import native_worker
+
+    out_path = tmp_path / "programmer-error.npz"
+    log_path = tmp_path / "programmer-error.log"
+
+    def fake_run(argv, capture_output, text, check):
+        out_path.write_bytes(b"runner output")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    def raise_programmer_error(*args, **kwargs):
+        raise RuntimeError("programmer defect")
+
+    monkeypatch.setenv(
+        "NATIVE_R9700_PREFILL_RUNNER", "/tmp/fake-native-prefill-runner"
+    )
+    monkeypatch.setattr(native_worker.subprocess, "run", fake_run)
+    monkeypatch.setattr(native_worker, "_parse_worker_result", raise_programmer_error)
+    with pytest.raises(RuntimeError, match="programmer defect"):
+        native_worker.run_native_prefill(
+            "synthetic-model", [1, 2], out_path, log_path
+        )
+    assert not out_path.exists()
+
+
+def test_native_worker_contains_invalid_utf8_log_and_cleans_output(
+    tmp_path, monkeypatch
+):
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, log_bytes=b"\xff"
+    )
+    assert result["failure_stage"] == "worker_result_validation"
+    assert "UTF-8" in result["failure_text"]
+    assert not out_path.exists()
+
+
+def test_native_worker_contains_subprocess_decode_error_and_cleans_output(
+    tmp_path, monkeypatch
+):
+    from native_r9700 import native_worker
+
+    out_path = tmp_path / "decode-error.npz"
+    log_path = tmp_path / "decode-error.log"
+
+    def fake_run(argv, capture_output, text, check):
+        out_path.write_bytes(b"runner output")
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setenv(
+        "NATIVE_R9700_PREFILL_RUNNER", "/tmp/fake-native-prefill-runner"
+    )
+    monkeypatch.setattr(native_worker.subprocess, "run", fake_run)
+    result = native_worker.run_native_prefill(
+        "synthetic-model", [1, 2], out_path, log_path
+    )
+    assert result["failure_stage"] == "worker_result_validation"
+    assert not out_path.exists()
+
+
+def test_native_worker_does_not_swallow_npz_validator_programmer_exception(
+    tmp_path, monkeypatch
+):
+    from native_r9700 import native_worker
+
+    def raise_programmer_error(*args, **kwargs):
+        raise RuntimeError("npz validator programmer defect")
+
+    monkeypatch.setattr(native_worker.np, "isfinite", raise_programmer_error)
+    with pytest.raises(RuntimeError, match="npz validator programmer defect"):
+        _run_worker_with_evidence(tmp_path, monkeypatch)
+    assert not (tmp_path / "strict-output.npz").exists()
+
+
+def test_native_worker_rejects_stale_failure_fields_in_requested_log(
+    tmp_path, monkeypatch
+):
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path,
+        monkeypatch,
+        log_bytes=b"failure_stage: stale\nfailure_text: stale\n",
+    )
+    assert result["native_prefill_acceptance"] == "open"
+    assert result["failure_stage"] == "worker_result_validation"
+    assert "successful result failure_stage must be empty" in result["failure_text"]
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize(
+    "corrupt_override",
+    [
+        {"kernel_count": True},
+        {"failure_stage": "stale"},
+        {"hardware_log_path": "/tmp/stale-hardware.log"},
+    ],
+    ids=("typed-integer", "failure-stage", "log-identity"),
+)
+def test_native_worker_rejects_corrupt_source_even_when_log_overwrites_it(
+    tmp_path, monkeypatch, corrupt_override
+):
+    out_path = tmp_path / "strict-output.npz"
+    log_path = tmp_path / "strict-output.log"
+    valid = _strict_success_evidence(out_path, log_path)
+    corrupt = dict(valid)
+    corrupt.update(corrupt_override)
+    log_bytes = (
+        "\n".join(f"{key}: {value}" for key, value in valid.items()) + "\n"
+    ).encode("utf-8")
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path,
+        monkeypatch,
+        stdout=json.dumps(corrupt),
+        log_bytes=log_bytes,
+    )
+    assert result["failure_stage"] == "worker_result_validation"
+    assert "runner evidence" in result["failure_text"]
+    assert not out_path.exists()
+
+
+def test_native_worker_contains_overflowing_npz_integer_metadata(
+    tmp_path, monkeypatch
+):
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path,
+        monkeypatch,
+        npz_options={"num_layers_scalar": np.inf},
+    )
+    assert result["failure_stage"] == "prefill_npz_schema_validation"
+    assert "num_layers must be an int scalar" in result["failure_text"]
     assert not out_path.exists()

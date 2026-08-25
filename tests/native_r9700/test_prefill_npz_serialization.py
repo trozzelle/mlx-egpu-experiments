@@ -32,6 +32,7 @@ _PROBE_SOURCE = r"""
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <cstring>
 
 namespace {
 constexpr uint32_t kCapacity = 128;
@@ -41,10 +42,17 @@ constexpr uint64_t kCacheBytes =
 void fill_cache(uint32_t slot, std::vector<uint8_t>* bytes) {
   bytes->resize(kCacheBytes);
   for (uint64_t element = 0; element < kCacheBytes / 2; ++element) {
-    const uint16_t value = static_cast<uint16_t>((element + slot * 1009) & 0xFFFFu);
-    (*bytes)[element * 2] = static_cast<uint8_t>(value & 0xFFu);
-    (*bytes)[element * 2 + 1] = static_cast<uint8_t>(value >> 8);
+    const uint16_t value =
+        static_cast<uint16_t>((element + slot * 1009) & 0x7BFFu);
+    std::memcpy(bytes->data() + element * sizeof(value), &value, sizeof(value));
   }
+}
+
+void set_fp16(std::vector<uint8_t>* bytes, uint32_t head, uint32_t token,
+              uint32_t dim, uint16_t bits) {
+  const uint64_t element =
+      (static_cast<uint64_t>(head) * kCapacity + token) * 64 + dim;
+  std::memcpy(bytes->data() + element * sizeof(bits), &bits, sizeof(bits));
 }
 }  // namespace
 
@@ -59,7 +67,24 @@ int main(int argc, char** argv) {
     fill_cache(slot, &cache);
     payload.kv_readback_bytes.push_back(std::move(cache));
   }
-  if (argc == 3) payload.kv_readback_bytes.back().resize(kCacheBytes - 2);
+  if (argc == 3) {
+    const std::string mode(argv[2]);
+    if (mode == "truncate") {
+      payload.kv_readback_bytes.back().resize(kCacheBytes - 2);
+    } else if (mode == "nan") {
+      set_fp16(&payload.kv_readback_bytes[0], 7, 1, 63, 0x7F88u);
+    } else if (mode == "positive-infinity") {
+      set_fp16(&payload.kv_readback_bytes[0], 0, 0, 0, 0x7C00u);
+    } else if (mode == "negative-infinity") {
+      set_fp16(&payload.kv_readback_bytes[0], 2, 1, 9, 0xFC00u);
+    } else if (mode == "finite-subnormal") {
+      set_fp16(&payload.kv_readback_bytes[0], 4, 0, 3, 0x0001u);
+    } else if (mode == "unused-suffix-nan") {
+      set_fp16(&payload.kv_readback_bytes[0], 3, 2, 0, 0x7E00u);
+    } else {
+      return 2;
+    }
+  }
   std::string error;
   if (!native_r9700::write_native_prefill_npz(payload, argv[1], &error)) {
     std::fprintf(stderr, "%s\n", error.c_str());
@@ -114,7 +139,7 @@ def _expected_cache_bits(slot: int, n_prefix: int) -> np.ndarray:
     tokens = np.arange(n_prefix, dtype=np.uint64).reshape(1, n_prefix, 1)
     dims = np.arange(_HEAD_DIM, dtype=np.uint64).reshape(1, 1, _HEAD_DIM)
     flat = (heads * _CAPACITY + tokens) * _HEAD_DIM + dims
-    return ((flat + slot * 1009) & 0xFFFF).astype(np.uint16)
+    return ((flat + slot * 1009) & 0x7BFF).astype(np.uint16)
 
 
 def test_npz_roundtrip_validates_with_strict_schema(tmp_path: Path) -> None:
@@ -174,3 +199,25 @@ def test_npz_write_is_atomic_and_fail_closed(tmp_path: Path) -> None:
     assert rejected.returncode == 1
     assert not bad_path.exists()
     assert [path for path in tmp_path.glob("*.npz*") if path.name not in {out_path.name}] == []
+
+@pytest.mark.parametrize("mode", ["nan", "positive-infinity", "negative-infinity"])
+def test_npz_rejects_nonfinite_live_prefix_fp16_without_publication(
+    tmp_path: Path, mode: str
+) -> None:
+    exe = _compile_probe(tmp_path)
+    out_path = tmp_path / f"{mode}.npz"
+    completed = _run_probe(exe, out_path, mode)
+    assert completed.returncode == 1
+    assert "non-finite" in completed.stderr
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize("mode", ["finite-subnormal", "unused-suffix-nan"])
+def test_npz_finiteness_scan_accepts_finite_live_values_and_ignores_unused_suffix(
+    tmp_path: Path, mode: str
+) -> None:
+    exe = _compile_probe(tmp_path)
+    out_path = tmp_path / f"{mode}.npz"
+    completed = _run_probe(exe, out_path, mode)
+    assert completed.returncode == 0, completed.stderr
+    assert out_path.is_file()

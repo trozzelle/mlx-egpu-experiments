@@ -164,6 +164,16 @@ enum class ComputeBarrierPolicy {
   OverlapKvProjections,
 };
 
+inline const char* compute_completion_policy_name(
+    ComputeCompletionPolicy policy) {
+  return policy == ComputeCompletionPolicy::PerStageTimeline ? "per-stage"
+                                                              : "terminal";
+}
+
+inline const char* compute_barrier_policy_name(ComputeBarrierPolicy policy) {
+  return policy == ComputeBarrierPolicy::Full ? "full" : "overlap-kv";
+}
+
 struct ResidentHsaBatchOptions {
   bool capture_gpu_timestamps = false;
   ComputeCompletionPolicy completion_policy =
@@ -179,9 +189,8 @@ inline Pm4StageTail compute_stage_tail(const ResidentHsaBatchOptions& options,
       options.barrier_policy != ComputeBarrierPolicy::OverlapKvProjections ||
           stage_index != 1U,
       true,
-      !options.capture_gpu_timestamps &&
-          (options.completion_policy == ComputeCompletionPolicy::PerStageTimeline ||
-           terminal_stage),
+      options.completion_policy == ComputeCompletionPolicy::PerStageTimeline ||
+          (!options.capture_gpu_timestamps && terminal_stage),
   };
 }
 
@@ -193,11 +202,14 @@ inline bool compute_batch_uses_terminal_timeline_signal(
 inline std::size_t compute_batch_host_signal_count(
     const ResidentHsaBatchOptions& options, std::size_t stage_count) {
   if (stage_count == 0U) return 0U;
-  if (compute_batch_uses_terminal_timeline_signal(options) ||
-      options.completion_policy == ComputeCompletionPolicy::TerminalTimeline) {
-    return 1U;
+  if (options.capture_gpu_timestamps) {
+    return options.completion_policy == ComputeCompletionPolicy::PerStageTimeline
+               ? stage_count + 1U
+               : 1U;
   }
-  return stage_count;
+  return options.completion_policy == ComputeCompletionPolicy::PerStageTimeline
+             ? stage_count
+             : 1U;
 }
 
 struct ResidentHsaDispatchResult {

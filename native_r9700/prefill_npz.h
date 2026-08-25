@@ -21,6 +21,11 @@ struct NativePrefillNpzPayload {
   std::vector<std::vector<uint8_t>> kv_readback_bytes;
 };
 
+// Validates only the live fp16 prefix in each full-capacity head-major K/V
+// readback buffer. Unused cache suffix bytes are intentionally ignored.
+bool validate_native_prefill_kv_finite(
+    const NativePrefillNpzPayload& payload, std::string* error_text);
+
 // Writes the strict prefill NPZ consumed by
 // native_worker.validate_native_prefill_npz and kv_cache.py: stored (not
 // compressed) zip entries model.npy, n_prefix.npy, num_layers.npy,

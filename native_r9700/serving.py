@@ -459,6 +459,22 @@ def _layer_size(layer: Any) -> int:
         raise NativePrefillError(f"prompt cache layer size must be an integer, got {size!r}") from exc
 
 
+def _require_finite_prompt_cache_array(
+    value: Any, layer_index: int, name: str
+) -> None:
+    try:
+        array = np.asarray(value)
+        finite = bool(np.isfinite(array).all())
+    except (TypeError, ValueError) as exc:
+        raise NativePrefillError(
+            f"prompt cache layer {layer_index} {name} values are not readable numeric data"
+        ) from exc
+    if not finite:
+        raise NativePrefillError(
+            f"prompt cache layer {layer_index} {name} values must be finite"
+        )
+
+
 def _validate_prompt_cache(cache: Sequence[Any], metadata: Mapping[str, Any], n_prefix: int) -> None:
     if not isinstance(metadata, Mapping):
         raise NativePrefillError("prompt cache metadata must be a mapping")
@@ -486,6 +502,8 @@ def _validate_prompt_cache(cache: Sequence[Any], metadata: Mapping[str, Any], n_
             raise NativePrefillError(
                 f"prompt cache layer {layer_index} V shape must be {expected_shape}, got {getattr(value, 'shape', None)}"
             )
+        _require_finite_prompt_cache_array(key, layer_index, "K")
+        _require_finite_prompt_cache_array(value, layer_index, "V")
         if int(getattr(layer, "offset", -1)) != n_prefix:
             raise NativePrefillError(f"prompt cache layer {layer_index} offset mismatch")
         if _layer_size(layer) != n_prefix:

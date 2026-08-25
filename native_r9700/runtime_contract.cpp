@@ -734,6 +734,8 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
     fail(result, "native_prefill_request", "hardware log path must be nonempty", error_text);
     return 1;
   }
+  result->compute_completion_policy = request.compute_completion_policy;
+  result->compute_barrier_policy = request.compute_barrier_policy;
 
 
   std::error_code output_status_error;
@@ -955,6 +957,8 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
           failed_position = block.position;
           break;
         }
+        const std::size_t profile_sample_count_before =
+            dispatch_result.gpu_stage_tick_samples.size();
         log_progress("layer=" + std::to_string(layer) +
                      " block_position=" + std::to_string(block.position) +
                      " dispatch_batch_begin stages=" +
@@ -969,6 +973,22 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
           compute_failure = 2;
           failed_position = block.position;
           break;
+        }
+        if (request.gpu_stage_profile) {
+          if (dispatch_result.gpu_stage_tick_samples.size() !=
+              profile_sample_count_before + 1U) {
+            detail = "profiled dispatch must produce exactly one GPU timestamp sample";
+            compute_failure = 3;
+            failed_position = block.position;
+            break;
+          }
+          if (!append_gpu_stage_profile_sample(
+                  result, layer, block.position, block.token_count,
+                  dispatch_result.gpu_stage_tick_samples.back(), &detail)) {
+            compute_failure = 3;
+            failed_position = block.position;
+            break;
+          }
         }
         log_progress("layer=" + std::to_string(layer) +
                      " block_position=" + std::to_string(block.position) +
@@ -993,30 +1013,18 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
       fail(result, "resident_dispatch_batch", failure, error_text);
       return 1;
     }
+    if (compute_failure == 3) {
+      std::string close_error;
+      close_resident_and_snapshot(&close_error);
+      const std::string failure = "layer=" + std::to_string(layer) +
+          " block_position=" + std::to_string(failed_position) + ": " + detail;
+      log_progress("gpu_timestamp_validation failed " + failure);
+      fail(result, "gpu_timestamp_validation", failure, error_text);
+      return 1;
+    }
   }
   if (request.gpu_stage_profile) {
-    for (const GpuStageTickSample& sample : dispatch_result.gpu_stage_tick_samples) {
-      std::array<uint64_t, 10> stage_ticks{};
-      if (!gpu_stage_tick_deltas(sample, &stage_ticks, &detail)) {
-        std::string close_error;
-        close_resident_and_snapshot(&close_error);
-        fail(result, "gpu_timestamp_validation", detail, error_text);
-        return 1;
-      }
-      for (size_t stage = 0; stage < stage_ticks.size(); ++stage) {
-        result->gpu_stage_tick_total[stage] += stage_ticks[stage];
-        if (result->gpu_stage_profile_sample_count == 0) {
-          result->gpu_stage_tick_min[stage] = stage_ticks[stage];
-          result->gpu_stage_tick_max[stage] = stage_ticks[stage];
-        } else {
-          result->gpu_stage_tick_min[stage] =
-              std::min(result->gpu_stage_tick_min[stage], stage_ticks[stage]);
-          result->gpu_stage_tick_max[stage] =
-              std::max(result->gpu_stage_tick_max[stage], stage_ticks[stage]);
-        }
-      }
-      ++result->gpu_stage_profile_sample_count;
-    }
+    finalize_gpu_stage_profile_percentiles(result);
   }
   std::vector<std::string> kv_names;
   kv_names.reserve(persistent_dispatch.k_cache_buffers.size() * 2);
