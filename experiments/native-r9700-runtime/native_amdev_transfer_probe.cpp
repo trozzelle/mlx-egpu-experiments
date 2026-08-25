@@ -72,6 +72,59 @@ enum class RemoteCmd : uint8_t {
   PING,
 };
 
+constexpr std::size_t kRpcOperationCount = 14;
+constexpr std::array<const char*, kRpcOperationCount> kRpcOperationNames = {
+    "probe",      "map_bar",     "map_sysmem_fd", "cfg_read",    "cfg_write",
+    "reset",      "mmio_read",   "mmio_write",    "map_sysmem",  "sysmem_read",
+    "sysmem_write", "resize_bar", "ping",          "unknown",
+};
+
+constexpr std::size_t rpc_operation_index(RemoteCmd cmd) {
+  const std::size_t index = static_cast<std::size_t>(cmd);
+  return index < kRpcOperationCount - 1 ? index : kRpcOperationCount - 1;
+}
+
+struct RemoteRpcCounters {
+  std::array<uint64_t, kRpcOperationCount> counts{};
+  std::array<uint64_t, kRpcOperationCount> usecs{};
+
+  void record(RemoteCmd cmd, uint64_t usec) {
+    const std::size_t index = rpc_operation_index(cmd);
+    ++counts[index];
+    usecs[index] += usec;
+  }
+
+  uint64_t count(RemoteCmd cmd) const { return counts[rpc_operation_index(cmd)]; }
+  uint64_t usec(RemoteCmd cmd) const { return usecs[rpc_operation_index(cmd)]; }
+
+  uint64_t total_count() const {
+    uint64_t total = 0;
+    for (uint64_t count : counts) total += count;
+    return total;
+  }
+};
+
+class ScopedRemoteRpcTimer {
+ public:
+  ScopedRemoteRpcTimer(RemoteRpcCounters* counters, RemoteCmd cmd)
+      : counters_(counters), cmd_(cmd) {
+    gettimeofday(&start_, nullptr);
+  }
+
+  ~ScopedRemoteRpcTimer() {
+    timeval now{};
+    gettimeofday(&now, nullptr);
+    const int64_t elapsed = (now.tv_sec - start_.tv_sec) * 1000000LL +
+                            (now.tv_usec - start_.tv_usec);
+    counters_->record(cmd_, elapsed > 0 ? static_cast<uint64_t>(elapsed) : 0);
+  }
+
+ private:
+  RemoteRpcCounters* counters_;
+  RemoteCmd cmd_;
+  timeval start_{};
+};
+
 constexpr std::size_t kRemoteCmdFrameSize = 33;
 constexpr uint32_t kTargetVendor = 0x1002U;
 constexpr uint32_t kTargetDevice = 0x7551U;
@@ -2246,18 +2299,16 @@ struct RemoteSysmemFdResult {
 
 class RemoteClient {
  public:
-  // Additive-only counter: incremented once per socket RPC issued (send_all),
-  // never changes any RPC argument, return value, or wire byte.
-  mutable uint64_t rpc_count = 0;
+  mutable RemoteRpcCounters rpc_counters;
   explicit RemoteClient(int fd) : fd_(fd) {}
 
   RemoteRpcResult rpc(RemoteCmd cmd, uint32_t bar, uint64_t arg0, uint64_t arg1, uint64_t arg2,
                       const std::vector<uint8_t>& payload, uint64_t readout_size) const {
-    ++rpc_count;
     RemoteRpcResult result;
     const RemoteCmdFrame frame = build_remote_cmd_frame(cmd, kRemoteDevId, bar, arg0, arg1, arg2);
     std::vector<uint8_t> request(frame.begin(), frame.end());
     request.insert(request.end(), payload.begin(), payload.end());
+    ScopedRemoteRpcTimer timer(&rpc_counters, cmd);
 
     if (!send_all(fd_, request.data(), request.size(), &result.error_text)) {
       result.error_text = "RemoteCmd send failed: " + result.error_text;
@@ -2319,7 +2370,6 @@ class RemoteClient {
 
   bool mmio_write_fire_and_forget(uint32_t bar, uint64_t offset, const std::vector<uint8_t>& payload,
                                   std::string* error_text) const {
-    ++rpc_count;
     // tinygrad/runtime/support/system.py:388-390 RemotePCIDevice._bulk_write sends
     // RemoteCmd::MMIO_WRITE as <BIIQQQ> args (offset, len(data), 0) plus payload and
     // intentionally reads no response header.
@@ -2327,6 +2377,7 @@ class RemoteClient {
                                                         offset, payload.size(), 0);
     std::vector<uint8_t> request(frame.begin(), frame.end());
     request.insert(request.end(), payload.begin(), payload.end());
+    ScopedRemoteRpcTimer timer(&rpc_counters, RemoteCmd::MMIO_WRITE);
     if (!send_all(fd_, request.data(), request.size(), error_text)) {
       *error_text = "RemoteCmd MMIO_WRITE send failed: " + *error_text;
       return false;
@@ -2335,7 +2386,6 @@ class RemoteClient {
   }
 
   RemoteSysmemFdResult rpc_sysmem_fd(uint64_t size, bool contiguous) const {
-    ++rpc_count;
     RemoteSysmemFdResult result;
     if (size > 0xffffffffULL) {
       result.error_text = "MAP_SYSMEM_FD size exceeds 32-bit RPC size field: " + std::to_string(size);
@@ -2345,6 +2395,7 @@ class RemoteClient {
     const RemoteCmdFrame frame =
         build_remote_cmd_frame(RemoteCmd::MAP_SYSMEM_FD, kRemoteDevId, 0, size,
                                contiguous ? 1ULL : 0ULL, 0);
+    ScopedRemoteRpcTimer timer(&rpc_counters, RemoteCmd::MAP_SYSMEM_FD);
     if (!send_all(fd_, frame.data(), frame.size(), &result.error_text)) {
       result.error_text = "RemoteCmd MAP_SYSMEM_FD send failed: " + result.error_text;
       return result;

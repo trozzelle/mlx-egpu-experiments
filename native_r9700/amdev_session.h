@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -9,6 +10,11 @@
 #include "kernel_catalog.h"
 namespace native_r9700 {
 struct VramLayout;
+
+struct RpcOperationTiming {
+  uint64_t count = 0;
+  uint64_t usec = 0;
+};
 
 // Per-phase wall-clock timing (usec) + submission counters accumulated by a
 // resident session. Exposed so the native-prefill result can report the
@@ -38,6 +44,7 @@ struct PhaseTimers {
   uint64_t sdma_setup_count = 0;
   uint64_t compute_submit_count = 0;
   uint64_t socket_rpc_count = 0;
+  std::array<RpcOperationTiming, 14> rpc_operations{};
 };
 
 void finalize_phase_accounting(uint64_t wall_usec, PhaseTimers* timers);

@@ -10,6 +10,7 @@
 // wraps the C1R-4 streaming memory-transfer bridge for fixture/layer-sized byte
 // round trips. Hardware modes are gated and skipped by hardware-free focused tests.
 
+#include <array>
 #include <cctype>
 #include <cerrno>
 #include <cstdio>
@@ -25,6 +26,12 @@
 #include "runtime.h"
 #include "llama_layer_executor.h"
 namespace {
+constexpr std::array<const char*, 14> kRpcOperationNames = {
+    "probe",      "map_bar",     "map_sysmem_fd", "cfg_read",    "cfg_write",
+    "reset",      "mmio_read",   "mmio_write",    "map_sysmem",  "sysmem_read",
+    "sysmem_write", "resize_bar", "ping",          "unknown",
+};
+
 
 
 void print_help(const char* argv0) {
@@ -161,92 +168,108 @@ double tokens_per_sec(const native_r9700::NativePrefillResult& result) {
 }
 
 std::string native_prefill_key_value(const native_r9700::NativePrefillResult& result) {
-  return "producer_kind: " + log_value(result.producer_kind) + "\n" +
-         "runtime_substrate: " + std::string(native_r9700::kRuntimeSubstrate) + "\n" +
-         "hardware_log_path: " + log_value(result.hardware_log_path) + "\n" +
-         "acceptance_scope: native_prefill_npz\n" +
-         "native_prefill_acceptance: " + log_value(result.native_prefill_acceptance) + "\n" +
-         "native_prefill_full_layer_loop_status: " +
-         log_value(result.native_prefill_full_layer_loop_status) + "\n" +
-         "native_prefill_blocker_source: " + log_value(result.native_prefill_blocker_source) + "\n" +
-         "token_ids_json: <redacted>\n" +
-         "prefill_npz_path: " + log_value(result.prefill_npz_path) + "\n" +
-         "kernel_count: " + std::to_string(result.kernel_count) + "\n" +
-         "transfer_bytes: " + std::to_string(result.transfer_bytes) + "\n" +
-         "n_prefix: " + std::to_string(result.n_prefix) + "\n" +
-         "wall_usec: " + std::to_string(result.wall_usec) + "\n" +
-         "tokens_per_sec: " + std::to_string(tokens_per_sec(result)) + "\n" +
-         "phase_timer model_load_usec: " + std::to_string(result.phase_timers.model_load_usec) + "\n" +
-         "phase_timer staging_copy_usec: " + std::to_string(result.phase_timers.staging_copy_usec) + "\n" +
-         "phase_timer sdma_setup_usec: " + std::to_string(result.phase_timers.sdma_setup_usec) + "\n" +
-         "phase_timer sdma_submit_inclusive_usec: " + std::to_string(result.phase_timers.sdma_submit_inclusive_usec) + "\n" +
-         "phase_timer sdma_fence_wait_usec: " + std::to_string(result.phase_timers.sdma_fence_wait_usec) + "\n" +
-         "phase_timer sdma_submit_exclusive_usec: " + std::to_string(result.phase_timers.sdma_submit_exclusive_usec) + "\n" +
-         "phase_timer model_bind_inclusive_usec: " + std::to_string(result.phase_timers.model_bind_inclusive_usec) + "\n" +
-         "phase_timer dispatch_build_inclusive_usec: " + std::to_string(result.phase_timers.dispatch_build_inclusive_usec) + "\n" +
-         "phase_timer device_prepare_inclusive_usec: " + std::to_string(result.phase_timers.device_prepare_inclusive_usec) + "\n" +
-         "phase_timer embedding_upload_inclusive_usec: " + std::to_string(result.phase_timers.embedding_upload_inclusive_usec) + "\n" +
-         "phase_timer weight_upload_inclusive_usec: " + std::to_string(result.phase_timers.weight_upload_inclusive_usec) + "\n" +
-         "phase_timer compute_loop_inclusive_usec: " + std::to_string(result.phase_timers.compute_loop_inclusive_usec) + "\n" +
-         "phase_timer kv_readback_inclusive_usec: " + std::to_string(result.phase_timers.kv_readback_inclusive_usec) + "\n" +
-         "phase_timer session_close_inclusive_usec: " + std::to_string(result.phase_timers.session_close_inclusive_usec) + "\n" +
-         "phase_timer npz_serialization_inclusive_usec: " + std::to_string(result.phase_timers.npz_serialization_inclusive_usec) + "\n" +
-         "phase_timer measured_exclusive_total_usec: " + std::to_string(result.phase_timers.measured_exclusive_total_usec) + "\n" +
-         "phase_timer unattributed_usec: " + std::to_string(result.phase_timers.unattributed_usec) + "\n" +
-         "phase_timer pm4_build_usec: " + std::to_string(result.phase_timers.pm4_build_usec) + "\n" +
-         "phase_timer hdp_flush_usec: " + std::to_string(result.phase_timers.hdp_flush_usec) + "\n" +
-         "phase_timer doorbell_usec: " + std::to_string(result.phase_timers.doorbell_usec) + "\n" +
-         "phase_timer timeline_wait_usec: " + std::to_string(result.phase_timers.timeline_wait_usec) + "\n" +
-         "phase_counter sdma_setup_count: " + std::to_string(result.phase_timers.sdma_setup_count) + "\n" +
-         "phase_counter compute_submit_count: " + std::to_string(result.phase_timers.compute_submit_count) + "\n" +
-         "phase_counter socket_rpc_count: " + std::to_string(result.phase_timers.socket_rpc_count) + "\n" +
-         "failure_stage: " + log_value(result.failure_stage) + "\n" +
-         "failure_text: " + log_value(result.failure_text) + "\n" +
-         "exit_status: " + std::to_string(result.exit_status) + "\n";
+  std::string output =
+      "producer_kind: " + log_value(result.producer_kind) + "\n" +
+      "runtime_substrate: " + std::string(native_r9700::kRuntimeSubstrate) + "\n" +
+      "hardware_log_path: " + log_value(result.hardware_log_path) + "\n" +
+      "acceptance_scope: native_prefill_npz\n" +
+      "native_prefill_acceptance: " + log_value(result.native_prefill_acceptance) + "\n" +
+      "native_prefill_full_layer_loop_status: " +
+      log_value(result.native_prefill_full_layer_loop_status) + "\n" +
+      "native_prefill_blocker_source: " + log_value(result.native_prefill_blocker_source) + "\n" +
+      "token_ids_json: <redacted>\n" +
+      "prefill_npz_path: " + log_value(result.prefill_npz_path) + "\n" +
+      "kernel_count: " + std::to_string(result.kernel_count) + "\n" +
+      "transfer_bytes: " + std::to_string(result.transfer_bytes) + "\n" +
+      "n_prefix: " + std::to_string(result.n_prefix) + "\n" +
+      "wall_usec: " + std::to_string(result.wall_usec) + "\n" +
+      "tokens_per_sec: " + std::to_string(tokens_per_sec(result)) + "\n" +
+      "phase_timer model_load_usec: " + std::to_string(result.phase_timers.model_load_usec) + "\n" +
+      "phase_timer staging_copy_usec: " + std::to_string(result.phase_timers.staging_copy_usec) + "\n" +
+      "phase_timer sdma_setup_usec: " + std::to_string(result.phase_timers.sdma_setup_usec) + "\n" +
+      "phase_timer sdma_submit_inclusive_usec: " + std::to_string(result.phase_timers.sdma_submit_inclusive_usec) + "\n" +
+      "phase_timer sdma_fence_wait_usec: " + std::to_string(result.phase_timers.sdma_fence_wait_usec) + "\n" +
+      "phase_timer sdma_submit_exclusive_usec: " + std::to_string(result.phase_timers.sdma_submit_exclusive_usec) + "\n" +
+      "phase_timer model_bind_inclusive_usec: " + std::to_string(result.phase_timers.model_bind_inclusive_usec) + "\n" +
+      "phase_timer dispatch_build_inclusive_usec: " + std::to_string(result.phase_timers.dispatch_build_inclusive_usec) + "\n" +
+      "phase_timer device_prepare_inclusive_usec: " + std::to_string(result.phase_timers.device_prepare_inclusive_usec) + "\n" +
+      "phase_timer embedding_upload_inclusive_usec: " + std::to_string(result.phase_timers.embedding_upload_inclusive_usec) + "\n" +
+      "phase_timer weight_upload_inclusive_usec: " + std::to_string(result.phase_timers.weight_upload_inclusive_usec) + "\n" +
+      "phase_timer compute_loop_inclusive_usec: " + std::to_string(result.phase_timers.compute_loop_inclusive_usec) + "\n" +
+      "phase_timer kv_readback_inclusive_usec: " + std::to_string(result.phase_timers.kv_readback_inclusive_usec) + "\n" +
+      "phase_timer session_close_inclusive_usec: " + std::to_string(result.phase_timers.session_close_inclusive_usec) + "\n" +
+      "phase_timer npz_serialization_inclusive_usec: " + std::to_string(result.phase_timers.npz_serialization_inclusive_usec) + "\n" +
+      "phase_timer measured_exclusive_total_usec: " + std::to_string(result.phase_timers.measured_exclusive_total_usec) + "\n" +
+      "phase_timer unattributed_usec: " + std::to_string(result.phase_timers.unattributed_usec) + "\n" +
+      "phase_timer pm4_build_usec: " + std::to_string(result.phase_timers.pm4_build_usec) + "\n" +
+      "phase_timer hdp_flush_usec: " + std::to_string(result.phase_timers.hdp_flush_usec) + "\n" +
+      "phase_timer doorbell_usec: " + std::to_string(result.phase_timers.doorbell_usec) + "\n" +
+      "phase_timer timeline_wait_usec: " + std::to_string(result.phase_timers.timeline_wait_usec) + "\n" +
+      "phase_counter sdma_setup_count: " + std::to_string(result.phase_timers.sdma_setup_count) + "\n" +
+      "phase_counter compute_submit_count: " + std::to_string(result.phase_timers.compute_submit_count) + "\n" +
+      "phase_counter socket_rpc_count: " + std::to_string(result.phase_timers.socket_rpc_count) + "\n";
+  for (std::size_t i = 0; i < kRpcOperationNames.size(); ++i) {
+    output += "rpc_count_" + std::string(kRpcOperationNames[i]) + ": " +
+              std::to_string(result.phase_timers.rpc_operations[i].count) + "\n";
+    output += "rpc_usec_" + std::string(kRpcOperationNames[i]) + ": " +
+              std::to_string(result.phase_timers.rpc_operations[i].usec) + "\n";
+  }
+  output += "failure_stage: " + log_value(result.failure_stage) + "\n" +
+            "failure_text: " + log_value(result.failure_text) + "\n" +
+            "exit_status: " + std::to_string(result.exit_status) + "\n";
+  return output;
 }
 
 std::string native_prefill_json(const native_r9700::NativePrefillResult& result) {
-  return "{\"producer_kind\":\"" + json_escape(result.producer_kind) +
-         "\",\"native_prefill_acceptance\":\"" + json_escape(result.native_prefill_acceptance) +
-         "\",\"runtime_substrate\":\"" + json_escape(native_r9700::kRuntimeSubstrate) +
-         "\",\"prefill_npz_path\":\"" + json_escape(result.prefill_npz_path) +
-         "\",\"hardware_log_path\":\"" + json_escape(result.hardware_log_path) +
-         "\",\"native_prefill_full_layer_loop_status\":\"" +
-         json_escape(result.native_prefill_full_layer_loop_status) +
-         "\",\"native_prefill_blocker_source\":\"" +
-         json_escape(result.native_prefill_blocker_source) +
-         "\",\"kernel_count\":" + std::to_string(result.kernel_count) +
-         ",\"transfer_bytes\":" + std::to_string(result.transfer_bytes) +
-         ",\"n_prefix\":" + std::to_string(result.n_prefix) +
-         ",\"wall_usec\":" + std::to_string(result.wall_usec) +
-         ",\"tokens_per_sec\":" + std::to_string(tokens_per_sec(result)) +
-         ",\"model_load_usec\":" + std::to_string(result.phase_timers.model_load_usec) +
-         ",\"staging_copy_usec\":" + std::to_string(result.phase_timers.staging_copy_usec) +
-         ",\"sdma_setup_usec\":" + std::to_string(result.phase_timers.sdma_setup_usec) +
-         ",\"sdma_submit_inclusive_usec\":" + std::to_string(result.phase_timers.sdma_submit_inclusive_usec) +
-         ",\"sdma_fence_wait_usec\":" + std::to_string(result.phase_timers.sdma_fence_wait_usec) +
-         ",\"sdma_submit_exclusive_usec\":" + std::to_string(result.phase_timers.sdma_submit_exclusive_usec) +
-         ",\"model_bind_inclusive_usec\":" + std::to_string(result.phase_timers.model_bind_inclusive_usec) +
-         ",\"dispatch_build_inclusive_usec\":" + std::to_string(result.phase_timers.dispatch_build_inclusive_usec) +
-         ",\"device_prepare_inclusive_usec\":" + std::to_string(result.phase_timers.device_prepare_inclusive_usec) +
-         ",\"embedding_upload_inclusive_usec\":" + std::to_string(result.phase_timers.embedding_upload_inclusive_usec) +
-         ",\"weight_upload_inclusive_usec\":" + std::to_string(result.phase_timers.weight_upload_inclusive_usec) +
-         ",\"compute_loop_inclusive_usec\":" + std::to_string(result.phase_timers.compute_loop_inclusive_usec) +
-         ",\"kv_readback_inclusive_usec\":" + std::to_string(result.phase_timers.kv_readback_inclusive_usec) +
-         ",\"session_close_inclusive_usec\":" + std::to_string(result.phase_timers.session_close_inclusive_usec) +
-         ",\"npz_serialization_inclusive_usec\":" + std::to_string(result.phase_timers.npz_serialization_inclusive_usec) +
-         ",\"measured_exclusive_total_usec\":" + std::to_string(result.phase_timers.measured_exclusive_total_usec) +
-         ",\"unattributed_usec\":" + std::to_string(result.phase_timers.unattributed_usec) +
-         ",\"pm4_build_usec\":" + std::to_string(result.phase_timers.pm4_build_usec) +
-         ",\"hdp_flush_usec\":" + std::to_string(result.phase_timers.hdp_flush_usec) +
-         ",\"doorbell_usec\":" + std::to_string(result.phase_timers.doorbell_usec) +
-         ",\"timeline_wait_usec\":" + std::to_string(result.phase_timers.timeline_wait_usec) +
-         ",\"sdma_setup_count\":" + std::to_string(result.phase_timers.sdma_setup_count) +
-         ",\"compute_submit_count\":" + std::to_string(result.phase_timers.compute_submit_count) +
-         ",\"socket_rpc_count\":" + std::to_string(result.phase_timers.socket_rpc_count) +
-         ",\"failure_stage\":\"" + json_escape(result.failure_stage) +
-         "\",\"failure_text\":\"" + json_escape(result.failure_text) +
-         "\",\"exit_status\":" + std::to_string(result.exit_status) + "}\n";
+  std::string output =
+      "{\"producer_kind\":\"" + json_escape(result.producer_kind) +
+      "\",\"native_prefill_acceptance\":\"" + json_escape(result.native_prefill_acceptance) +
+      "\",\"runtime_substrate\":\"" + json_escape(native_r9700::kRuntimeSubstrate) +
+      "\",\"prefill_npz_path\":\"" + json_escape(result.prefill_npz_path) +
+      "\",\"hardware_log_path\":\"" + json_escape(result.hardware_log_path) +
+      "\",\"native_prefill_full_layer_loop_status\":\"" +
+      json_escape(result.native_prefill_full_layer_loop_status) +
+      "\",\"native_prefill_blocker_source\":\"" +
+      json_escape(result.native_prefill_blocker_source) +
+      "\",\"kernel_count\":" + std::to_string(result.kernel_count) +
+      ",\"transfer_bytes\":" + std::to_string(result.transfer_bytes) +
+      ",\"n_prefix\":" + std::to_string(result.n_prefix) +
+      ",\"wall_usec\":" + std::to_string(result.wall_usec) +
+      ",\"tokens_per_sec\":" + std::to_string(tokens_per_sec(result)) +
+      ",\"model_load_usec\":" + std::to_string(result.phase_timers.model_load_usec) +
+      ",\"staging_copy_usec\":" + std::to_string(result.phase_timers.staging_copy_usec) +
+      ",\"sdma_setup_usec\":" + std::to_string(result.phase_timers.sdma_setup_usec) +
+      ",\"sdma_submit_inclusive_usec\":" + std::to_string(result.phase_timers.sdma_submit_inclusive_usec) +
+      ",\"sdma_fence_wait_usec\":" + std::to_string(result.phase_timers.sdma_fence_wait_usec) +
+      ",\"sdma_submit_exclusive_usec\":" + std::to_string(result.phase_timers.sdma_submit_exclusive_usec) +
+      ",\"model_bind_inclusive_usec\":" + std::to_string(result.phase_timers.model_bind_inclusive_usec) +
+      ",\"dispatch_build_inclusive_usec\":" + std::to_string(result.phase_timers.dispatch_build_inclusive_usec) +
+      ",\"device_prepare_inclusive_usec\":" + std::to_string(result.phase_timers.device_prepare_inclusive_usec) +
+      ",\"embedding_upload_inclusive_usec\":" + std::to_string(result.phase_timers.embedding_upload_inclusive_usec) +
+      ",\"weight_upload_inclusive_usec\":" + std::to_string(result.phase_timers.weight_upload_inclusive_usec) +
+      ",\"compute_loop_inclusive_usec\":" + std::to_string(result.phase_timers.compute_loop_inclusive_usec) +
+      ",\"kv_readback_inclusive_usec\":" + std::to_string(result.phase_timers.kv_readback_inclusive_usec) +
+      ",\"session_close_inclusive_usec\":" + std::to_string(result.phase_timers.session_close_inclusive_usec) +
+      ",\"npz_serialization_inclusive_usec\":" + std::to_string(result.phase_timers.npz_serialization_inclusive_usec) +
+      ",\"measured_exclusive_total_usec\":" + std::to_string(result.phase_timers.measured_exclusive_total_usec) +
+      ",\"unattributed_usec\":" + std::to_string(result.phase_timers.unattributed_usec) +
+      ",\"pm4_build_usec\":" + std::to_string(result.phase_timers.pm4_build_usec) +
+      ",\"hdp_flush_usec\":" + std::to_string(result.phase_timers.hdp_flush_usec) +
+      ",\"doorbell_usec\":" + std::to_string(result.phase_timers.doorbell_usec) +
+      ",\"timeline_wait_usec\":" + std::to_string(result.phase_timers.timeline_wait_usec) +
+      ",\"sdma_setup_count\":" + std::to_string(result.phase_timers.sdma_setup_count) +
+      ",\"compute_submit_count\":" + std::to_string(result.phase_timers.compute_submit_count) +
+      ",\"socket_rpc_count\":" + std::to_string(result.phase_timers.socket_rpc_count);
+  for (std::size_t i = 0; i < kRpcOperationNames.size(); ++i) {
+    output += ",\"rpc_count_" + std::string(kRpcOperationNames[i]) + "\":" +
+              std::to_string(result.phase_timers.rpc_operations[i].count);
+    output += ",\"rpc_usec_" + std::string(kRpcOperationNames[i]) + "\":" +
+              std::to_string(result.phase_timers.rpc_operations[i].usec);
+  }
+  output += ",\"failure_stage\":\"" + json_escape(result.failure_stage) +
+            "\",\"failure_text\":\"" + json_escape(result.failure_text) +
+            "\",\"exit_status\":" + std::to_string(result.exit_status) + "}\n";
+  return output;
 }
 
 bool write_native_prefill_log(const std::string& path,

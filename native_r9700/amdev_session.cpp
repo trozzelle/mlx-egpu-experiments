@@ -2723,9 +2723,17 @@ bool ResidentHsaSession::readback(const std::vector<std::string>& names,
 
 bool ResidentHsaSession::close(std::string* error_text) {
   Impl& state = *impl_;
-  if (state.client != nullptr) {
-    state.phase_timers.socket_rpc_count = state.client->rpc_count;
-  }
+  const auto snapshot_rpc_operations = [&state]() {
+    state.phase_timers.socket_rpc_count = 0;
+    if (state.client == nullptr) return;
+    for (std::size_t i = 0; i < state.phase_timers.rpc_operations.size(); ++i) {
+      RpcOperationTiming& timing = state.phase_timers.rpc_operations[i];
+      timing.count = state.client->rpc_counters.counts[i];
+      timing.usec = state.client->rpc_counters.usecs[i];
+      state.phase_timers.socket_rpc_count += timing.count;
+    }
+  };
+  snapshot_rpc_operations();
   if (state.resident == nullptr) {
     state.final_timers = state.phase_timers;
     state.reset_after_close();
@@ -2751,13 +2759,16 @@ bool ResidentHsaSession::close(std::string* error_text) {
   std::string detail;
   if (state.compute_queue_retirement != nullptr &&
       !state.compute_queue_retirement->retire(&detail)) {
+    snapshot_rpc_operations();
     if (error_text != nullptr) *error_text = "terminal queue-0 retirement failed: " + detail;
     return false;
   }
   if (!state.release_resident(&detail)) {
     if (error_text != nullptr) *error_text = "resident VRAM cleanup did not complete: " + detail;
+    snapshot_rpc_operations();
     return false;
   }
+  snapshot_rpc_operations();
   state.final_timers = state.phase_timers;
   state.reset_after_close();
   return true;
