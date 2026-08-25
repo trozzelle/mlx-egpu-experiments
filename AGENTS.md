@@ -2,29 +2,33 @@
 
 ## Project Overview
 
-This repo builds a prefill-offload path for AMD Radeon AI PRO R9700 eGPU + mlx-lm/oMLX decode on Apple Silicon. The durable boundary is the mlx-lm-compatible prompt-cache artifact: a producer emits KV state, a consumer imports that cache, then decodes from the final prompt token.
+This repo now develops two co-equal products for the AMD Radeon AI PRO R9700 eGPU on Apple Silicon: a persistent **R9700 Prefill Service** for mlx-lm/oMLX consumers and a **Portable Inference Device Platform** built around TinyGPU ownership, an inference-shaped HAL, and admitted Kernel Packs. The durable compatibility artifact remains the mlx-lm prompt cache; the broader logical boundary is the Canonical KV Description plus Engine Adapters.
 
-Current priority: shortest working vertical slice to a user-usable native R9700 prefill worker. Do not default to exhaustive primitive proofs, full proof ladders, or proof-complete hardware claims unless a specific production blocker requires them. Record honest limitations; never relabel CPU/NumPy evidence as native R9700 acceptance.
+Baseline B0 is complete: native C0 kernel/transfer/resident-VRAM proof, 16-layer Llama 3.2 1B C1R token parity through prompt-128, and C2R imported-cache serving through the actual hardware producer with no fallback. Do not reopen those gates or relabel CPU/NumPy evidence as native acceptance.
 
-Qwen3.8-27B is a product goal, but it is a separate target-expansion slice from the Llama C1/C2 acceptance path because the local Qwen target uses a different MLX-VLM/quantized/hybrid-cache ABI.
+Current parallel-ready work is F1 persistent warm worker, F2 gfx1201 WMMA foundation, P1 TinyGPU device-owner hardening, P3 Kernel Packs, and Q1 Qwen contract/oracle research. Prefer the shortest evidence-producing slice; do not build exhaustive proof ladders or speculative platform abstractions without a phase gate.
+
+Qwen3.8-27B remains a separate target-expansion contract because it uses MLX-VLM Qwen3.5-family quantization and hybrid recurrent/full-attention cache state. Q1 may proceed in parallel, but native Qwen performance promotion waits for the selected shared matrix/attention prerequisites.
 
 ## Architecture & Data Flow
 
-- Canonical vocabulary lives in `CONTEXT.md`: distinguish in-memory **KV cache** from serialized **prompt cache**; the **prefill producer** owns KV truth; the **prefill consumer** must not recompute the prefilled prefix.
-- Path A validation: `tinygrad_kv_worker.harness` runs tinygrad prefill on R9700, `tinygrad_kv_worker.exporter` writes `.safetensors`, mlx-lm imports the S-1 prompt cache, then `generate_step` receives only the final prompt token.
-- Path C target: `native_r9700` should run model-forward prefill tensor work on macOS TinyGPU.app / `APLRemotePCIDevice` / `PCIIface` (`pci_id 1002:7551`, `gfx1201`) without tinygrad, then emit the same prompt-cache ABI.
-- CPU-reference flow: `native_r9700.prefill` emits NPZ K/V (`layer{i}_K`, `layer{i}_V`, `n_prefix`, `producer_kind`), `native_r9700.kv_cache` converts it to mlx-lm `.safetensors`, and `native_r9700.serving` validates/imports that cache before mlx-lm decode.
-- Acceptance gate: producer path `P` must match native mlx-lm baseline `R` token-for-token. Semantic similarity is not acceptance.
-- `producer_kind` is load-bearing. `cpu_reference` is oracle/regression evidence only; `r9700_native` must fail closed until it emits a validated hardware-backed cache.
-- Serving fallback is allowed only before cache acceptance. After a prompt cache is accepted, decode failures must not silently recompute or repair the offloaded prefix.
+- Canonical vocabulary lives in `CONTEXT.md`: distinguish in-memory **KV cache** from serialized **prompt cache**; the **Prefill Producer** owns KV truth; the **Prefill Consumer** must not recompute an accepted prefix.
+- Accepted native flow: `native_r9700.prefill` validates the request, `native_r9700.native_worker` invokes the TinyGPU/AMDev C++ runner, the hardware path emits a validated `r9700_native` NPZ/evidence set, `native_r9700.kv_cache` writes the mlx-lm prompt cache, and `native_r9700.serving` imports it for final-token decode.
+- R9700 Prefill Service target: persistent process, resident/prepacked model handles, reusable buffers, warm-request evidence, and Engine Adapters; F1 is not yet complete.
+- Portable Inference Device Platform target: the TinyGPU Device Owner remains the sole macOS hardware authority; the Inference HAL, Kernel Packs, conformance, and service adoption advance through P1–P4 gates.
+- Path A is a historical correctness control: `tinygrad_kv_worker.harness` runs tinygrad prefill on R9700, exports an `S-1` `.safetensors` prompt cache, and passes only the final prompt token to mlx-lm.
+- CPU Reference Producer flow: `native_r9700.prefill` may run the NumPy oracle and emit the same NPZ schema, but `producer_kind=cpu_reference` is never native hardware acceptance.
+- Acceptance gate: producer path `P` must match native mlx-lm baseline `R` token-for-token. Optimized WMMA/attention intermediates may use reviewed bounded tolerances; semantic similarity alone is not acceptance.
+- `producer_kind` is load-bearing. `r9700_native` is accepted only with validated, request-bound hardware evidence; missing, stale, mismatched, or malformed evidence fails closed.
+- Serving fallback is allowed only before cache acceptance. After acceptance, decode failures must not silently recompute or repair the offloaded prefix.
 
 ## Key Directories
 
-- `native_r9700/` — Path C Python/C++ implementation. Includes model config/loading, NumPy oracle primitives, prefill/cache/parity/serving CLIs, and native runtime shell.
-- `tinygrad_kv_worker/` — Phase 0 / Path A harness and exporter for tinygrad-to-mlx-lm prompt-cache validation.
-- `tests/native_r9700/` — staged C1/C2 tests for loader, primitives, attention, prefill, cache emitter, parity, serving, and runtime contracts.
-- `tests/native_r9700/fixtures/` — committed oracle fixture data and schemas used by C1/C2 tests.
-- `tests/` — Phase 0 harness/exporter tests plus native AMDev C++ probe contracts.
+- `native_r9700/` — current service, producer/oracle, cache, parity, benchmark, runtime, model-binding, Kernel Pack foundation, and Qwen contract code.
+- `tinygrad_kv_worker/` — historical Path A harness/exporter retained as a correctness control.
+- `tests/native_r9700/` — regression and contract tests for accepted C1R/C2R behavior plus current runtime, benchmark, kernel, and Qwen work.
+- `tests/native_r9700/fixtures/` — committed Llama/Qwen oracle fixture data and schemas.
+- `tests/` — Path A controls plus native AMDev/runtime contract coverage.
 - `docs/` — current architecture, design, roadmap, implementation plan, references, ADRs, validation results, and active command ledger.
 - `docs/archive/` — completed/superseded task packets, implementation plans, design specs, and diagnostic handoffs; historical evidence only.
 - `.superpowers/swarm/` — swarm ledger/reports. Use `progress.md` for freshest status when it conflicts with older reports.
@@ -65,20 +69,29 @@ $PY -m native_r9700.kv_cache --prefill-npz <prefill.npz> --out <prompt-cache.saf
 $PY -m native_r9700.serving --model <mlx-model-dir> --fixtures-dir tests/native_r9700/fixtures --threshold-tokens 128 --max-new-tokens 4 --artifacts-dir logs/c2-serving --json logs/c2-serving/result.json --log logs/c2-serving/run.log
 ```
 
-C++ runtime build/run shape:
+Current C++ runner build shape (kept in sync with `RUNNER_SOURCES` in `tests/native_r9700/test_block_prefill_runtime_contract.py`):
 
 ```sh
 mkdir -p build/native-r9700-runtime
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
-  native_r9700/runtime_contract.cpp native_r9700/amdev_packets.cpp \
-  native_r9700/amdev_session.cpp native_r9700/device_memory.cpp \
-  native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 \
+  native_r9700/amdev_packets.cpp native_r9700/runtime_contract.cpp \
+  native_r9700/prefill_npz.cpp native_r9700/vram_layout.cpp \
+  native_r9700/vram_allocator.cpp native_r9700/dynamic_page_table.cpp \
+  native_r9700/resident_memory.cpp native_r9700/vram_smoke_asset.cpp \
+  native_r9700/hsa_code_image_asset.cpp native_r9700/model_weight_binder.cpp \
+  native_r9700/amdev_session.cpp native_r9700/kernel_catalog.cpp \
+  native_r9700/device_memory.cpp native_r9700/hardware_lock.cpp \
+  native_r9700/llama_stage_layout.cpp native_r9700/llama_layer_executor.cpp \
+  native_r9700/kernel_assets.cpp native_r9700/runtime.cpp \
+  native_r9700/runner.cpp -I native_r9700 \
   -o build/native-r9700-runtime/native_r9700_runner
 build/native-r9700-runtime/native_r9700_runner --lifecycle-dry-run
 build/native-r9700-runtime/native_r9700_runner --kernel-proof
 build/native-r9700-runtime/native_r9700_runner --transfer-proof --bytes 20480
+build/native-r9700-runtime/native_r9700_runner --vram-smoke
 build/native-r9700-runtime/native_r9700_runner --native-prefill-proof \
-  --model <mlx-model-dir> --token-ids-json '[...]' --out <prefill.npz> --log <prefill.log>
+  --model <mlx-model-dir> --token-ids-json '[...]' \
+  --out <prefill.npz> --log <prefill.log>
 ```
 
 Phase 0 GPU parity control command pattern:
@@ -95,8 +108,8 @@ DEV=AMD JITBEAM=2 HF_HOME=${HOME}/Development/ml/models \
 
 - Prefer small, explicit modules and fail-loud validation over generic abstractions.
 - Keep `native_r9700` tinygrad-free except for explicitly labeled comparison/control commands.
-- Preserve the S-1 prompt-cache contract: cache contains prefix tokens; final prompt token is passed to mlx-lm `generate_step`.
-- Validate shapes/dtypes/geometry at boundaries. Llama 3.2 1B first target: 16 layers, 8 KV heads, head dim 64, fp16 K/V shape `(1, 8, N, 64)`.
+- Preserve the mlx-lm serialized-adapter contract: prompt cache contains the `S-1` prefix and the final prompt token is passed to `generate_step`.
+- Validate shapes/dtypes/geometry at boundaries. Accepted Llama control: 16 layers, 8 KV heads, head dim 64, fp16 K/V shape `(1, 8, N, 64)`; do not apply it to Qwen hybrid state.
 - Use custom error classes with precise messages (`ConfigError`, `PrefillError`, `KVCacheError`, `ParityError`, `NativePrefillError`, `PrimitiveError`).
 - Write cache artifacts atomically: validate in memory, write temp sibling, `os.replace`, and clean temp/output on failure.
 - Redact sensitive CLI inputs in logs (`--prompt`, `--token-ids-json`).
@@ -107,24 +120,25 @@ DEV=AMD JITBEAM=2 HF_HOME=${HOME}/Development/ml/models \
 
 ## Important Files
 
-- `CONTEXT.md` — canonical terms and project language.
-- `docs/ARCHITECTURE.md` — producer/consumer boundary and high-level flows.
-- `docs/DESIGN.md` — KV interchange, producer, validation, runtime-discovery, and serving contracts.
+- `CONTEXT.md` — canonical cache, product, platform, and measurement language.
+- `docs/ARCHITECTURE.md` — two-product boundaries, ownership, layers, and current accepted baseline.
+- `docs/DESIGN.md` — TinyGPU/HAL/Kernel Pack/service/cache/numerical/security contracts.
 - `docs/ROADMAP.md` — current F1–F6, P1–P5, Q1 capability ordering and G0–G3 integration gates.
-- `docs/adr/0004-macos-substrate-selection.md` — accepted macOS TinyGPU/AMDev substrate.
-- `docs/adr/0005-cpu-reference-is-not-native-r9700-producer.md` — critical native-acceptance correction.
-- `docs/pinned-upstream-interfaces.md` — mlx-lm prompt-cache ABI, TinyGPU/tinygrad AMD facts, oMLX notes.
-- `docs/IMPLEMENTATION_PLAN.md` — current two-track high-level implementation plan; archived phase packets are indexed by `docs/archive/README.md`.
-- `docs/tasks/native-r9700-producer/validation-commands.md` — exact command ledger; add discovered commands here, not placeholders.
-- `docs/path-a-validation-results.md` — validation report and reclassified reference/native status.
-- `.superpowers/swarm/progress.md` — freshest swarm status ledger.
-- `native_r9700/config.py` — strict Llama config validation.
-- `native_r9700/loader.py` — MLX safetensors metadata/provenance loader.
-- `native_r9700/prefill.py` — CPU/NumPy full-layer reference producer; `r9700_native` remains fail-closed until implemented.
+- `docs/IMPLEMENTATION_PLAN.md` — current two-track high-level implementation plan.
+- `docs/REFERENCES.md` and `docs/upstream-reference-manifest.yaml` — source-reuse roles and immutable upstream pins.
+- `docs/adr/0006-two-products-independent-tracks.md` — co-equal product and independent-track decision.
+- `docs/adr/0007-tinygpu-owner-portable-hal.md` — TinyGPU ownership and portable HAL decision.
+- `docs/tasks/native-r9700-producer/validation-commands.md` — active F/P/Q command ledger; historical exact commands are linked from it.
+- `docs/archive/README.md` — completed/superseded task packets, plans, specs, and diagnostic history.
+- `docs/path-a-validation-results.md` — Path A validation and native/reference acceptance record.
+- `.superpowers/swarm/progress.md` — freshest current status and ready/blocked work.
+- `native_r9700/prefill.py` — Llama CPU oracle plus producer-kind validation and native-worker CLI orchestration.
+- `native_r9700/native_worker.py` — fail-closed hardware runner invocation and acceptance-evidence validation.
 - `native_r9700/kv_cache.py` — NPZ-to-mlx-lm prompt-cache emitter.
-- `native_r9700/parity.py` — C1 P/R parity harness.
-- `native_r9700/serving.py` — C2 imported-cache serving wrapper.
-- `native_r9700/runtime.h`, `native_r9700/runtime.cpp`, `native_r9700/runner.cpp` — native C++ runtime shell and proof commands.
+- `native_r9700/parity.py` — producer/baseline parity harness.
+- `native_r9700/serving.py` — mlx-lm imported-cache adapter, acceptance, and fallback boundary.
+- `native_r9700/benchmark.py` — evidence-gated native benchmark rows plus CPU-reference baseline and Path A control rows.
+- `native_r9700/runtime.h`, `native_r9700/runtime.cpp`, `native_r9700/runner.cpp` — native C++ runtime, model execution, and proof commands.
 
 ## Runtime/Tooling Preferences
 

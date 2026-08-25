@@ -30,13 +30,35 @@ Native R9700 producer commands must not import or call tinygrad unless explicitl
 ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
 ```
 
+### Current native runner build and no-model smokes
+
+The translation-unit list is maintained by `RUNNER_SOURCES` in `tests/native_r9700/test_block_prefill_runtime_contract.py`:
+
+```sh
+mkdir -p build/native-r9700-runtime
+xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
+  native_r9700/amdev_packets.cpp native_r9700/runtime_contract.cpp \
+  native_r9700/prefill_npz.cpp native_r9700/vram_layout.cpp \
+  native_r9700/vram_allocator.cpp native_r9700/dynamic_page_table.cpp \
+  native_r9700/resident_memory.cpp native_r9700/vram_smoke_asset.cpp \
+  native_r9700/hsa_code_image_asset.cpp native_r9700/model_weight_binder.cpp \
+  native_r9700/amdev_session.cpp native_r9700/kernel_catalog.cpp \
+  native_r9700/device_memory.cpp native_r9700/hardware_lock.cpp \
+  native_r9700/llama_stage_layout.cpp native_r9700/llama_layer_executor.cpp \
+  native_r9700/kernel_assets.cpp native_r9700/runtime.cpp \
+  native_r9700/runner.cpp -I native_r9700 \
+  -o build/native-r9700-runtime/native_r9700_runner
+build/native-r9700-runtime/native_r9700_runner --lifecycle-dry-run
+build/native-r9700-runtime/native_r9700_runner --kernel-proof
+build/native-r9700-runtime/native_r9700_runner --transfer-proof --bytes 20480
+build/native-r9700-runtime/native_r9700_runner --vram-smoke
+```
 
 ### Existing harness syntax check
 
 ```sh
 ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m py_compile tinygrad_kv_worker/harness.py
 ```
-
 
 ### Existing Phase 0 GPU parity command
 

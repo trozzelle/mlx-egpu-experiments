@@ -1,4 +1,4 @@
-# Native R9700 Producer — Current Progress
+# R9700 Products — Current Progress
 
 ## Authority
 
@@ -22,17 +22,20 @@
   completion-timeline reset (`8f2f0ca`), launch geometry + o-proj/gated-MLP width
   (`c8f5770`), missing query RoPE (`36bf94a`), fused gated-MLP PCIe blowup
   (`6036802`), and the 64-key attention span (`c26f801`).
+- B0 remains a scalar/native correctness baseline, not the target performance architecture. No F1 persistent worker, F2 WMMA foundation, production Inference HAL/Kernel Pack integration, or native Qwen acceptance has promoted yet.
 
 ## Current follow-up ledger
 
-| Task | Status | Evidence | Blocker |
+| Phase | Status | Evidence | Next gate |
 |---|---|---|---|
-| LN-2 RMSNorm repair | Done | token-exact `normalized` (`a0ab94d1`) | — |
-| LN-3 Layer-0 recurrence | Done | 2/6/16/64/128 ULP-correct | — |
-| LN-4 All-layer recurrence | Done | 16-layer prefill ULP-correct | — |
-| LN-5 Native C1R/C2R | Done | C1R token-exact (prompt-0/16/64/128); C2R no-fallback | — |
-| F3 candidate: score-kernel RoPE precompute | Open | — | Performance only; reprofile after F2 WMMA foundation. |
-| Q1 Qwen contract/oracle package | Open | Existing `native_r9700/qwen_*` controls | Native promotion remains downstream of the shared matrix/attention foundation. |
+| B0 native Llama producer/serving baseline | Complete | C0 hardware proof; C1R prompt-0/16/64/128 exact; C2R no-fallback | Preserve as regression control. |
+| F1 persistent warm worker | Ready | Accepted producer/serving path; resident memory and worker foundations | Repeated warm requests with no weight reload and first authoritative warm baseline. |
+| F2 gfx1201 WMMA foundation | Ready | Scalar control, code-image admission, pinned WMMA/ISA sources | Lane-map proof plus admitted standalone WMMA GEMM and shared G0 record. |
+| P1 TinyGPU Device Owner hardening | Ready | ADR 0007; accepted TinyGPU/AMDev path; pinned lifecycle/DriverKit sources | Cold lifecycle, safe user-client ABI, reset/fault conformance, and G0 consumption. |
+| P3 first-class Kernel Packs | Ready | Existing HSA asset/catalog validation and upstream manifest | Concrete provenance/numerical/evidence records; migrate G0 WMMA artifact. |
+| Q1 Qwen contract/oracle package | Ready | Existing `native_r9700/qwen_*` controls plus pinned MLX-VLM/model sources | Deterministic hybrid-state ownership, fixtures, and native acceptance contract. |
+| F3 matrix projection graph | Blocked | Requires F1 model-handle/prepacking and F2 WMMA family | Gate/up → down → fused QKV → O promotion in profile order. |
+| P2 Inference HAL | Blocked | Requires P1 ABI freeze; G0 required for promotion | Portable copy/fill/dispatch/barrier/timestamp/fence/fault conformance. |
 
 ## Guardrails
 

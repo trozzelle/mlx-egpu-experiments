@@ -1,6 +1,6 @@
 # CONTEXT
 
-Project language for the R9700 prefill service and portable inference device platform. Glossary only — architecture lives in `docs/ARCHITECTURE.md`, implementation contracts in `docs/DESIGN.md`, sequencing in `docs/ROADMAP.md`, and decisions in `docs/adr/`.
+Project language for the **R9700 Prefill Service** and **Portable Inference Device Platform**. Glossary only — architecture lives in `docs/ARCHITECTURE.md`, implementation contracts in `docs/DESIGN.md`, sequencing in `docs/ROADMAP.md`, and decisions in `docs/adr/`.
 
 ## Cache and inference language
 
@@ -35,6 +35,10 @@ _Avoid_: silently repairing or recomputing an accepted producer prefix.
 **Native R9700 Producer**:
 A tinygrad-free prefill producer whose model-forward work executes on the AMD Radeon AI PRO R9700.
 _Avoid_: applying this term to CPU/NumPy oracle output, a generic ROCm backend, or a decode owner.
+
+**CPU Reference Producer**:
+A CPU/NumPy Prefill Producer retained as an oracle for model math, cache geometry, and interchange behavior.
+_Avoid_: treating “tinygrad-free,” schema-valid output, or CPU parity as Native R9700 acceptance.
 
 **R9700 Prefill Service**:
 The product boundary that manages resident models and serves prefill requests using a Native R9700 producer.
