@@ -839,6 +839,54 @@ def test_native_worker_does_not_parse_required_values_as_block_option(
     result = native_worker.run_native_prefill(
         model_dir, [1, 2], out_path, log_path
     )
-
     assert result["native_prefill_acceptance"] == "pass", result["failure_text"]
     assert out_path.is_file()
+
+
+
+@pytest.mark.parametrize("field_name", ["block_tokens", "block_count"])
+def test_native_worker_rejects_oversized_decimal_key_value_evidence_with_cleanup(
+    tmp_path, monkeypatch, field_name
+):
+    from native_r9700 import native_worker
+
+    out_path = tmp_path / "native-prefill.npz"
+    log_path = tmp_path / "native-prefill.log"
+
+    def fake_run(argv, capture_output, text, check):
+        _write_native_prefill_npz(out_path, n_prefix=2)
+        evidence = {
+            "producer_kind": "r9700_native",
+            "native_prefill_acceptance": "pass",
+            "native_prefill_full_layer_loop_status": "pass",
+            "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+            "hardware_log_path": str(log_path),
+            "prefill_npz_path": str(out_path),
+            "kernel_count": 4,
+            "transfer_bytes": 4096,
+            "block_tokens": 1,
+            "block_count": 2,
+            "failure_stage": "",
+            "exit_status": 0,
+        }
+        evidence[field_name] = "9" * 5000
+        log_path.write_text(
+            "\n".join(f"{key}: {value}" for key, value in evidence.items()) + "\n",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setenv(
+        "NATIVE_R9700_PREFILL_RUNNER", "/tmp/fake-native-prefill-runner"
+    )
+    monkeypatch.delenv("NATIVE_R9700_PREFILL_BLOCK_TOKENS", raising=False)
+    monkeypatch.setattr(native_worker.subprocess, "run", fake_run)
+
+    result = native_worker.run_native_prefill(
+        "synthetic-model", [1, 2], out_path, log_path
+    )
+
+    assert result["native_prefill_acceptance"] == "open"
+    assert result["failure_stage"] == "worker_result_validation"
+    assert f"reported {field_name} must be an exact integer" in result["failure_text"]
+    assert not out_path.exists()

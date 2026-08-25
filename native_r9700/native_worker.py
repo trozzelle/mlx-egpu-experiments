@@ -324,7 +324,10 @@ def _parse_key_value_text(text: str) -> dict[str, object]:
                 and stripped_value.isascii()
                 and stripped_value.isdecimal()
             ):
-                result[key] = int(stripped_value)
+                try:
+                    result[key] = int(stripped_value)
+                except ValueError:
+                    result[key] = stripped_value
             else:
                 result[key] = stripped_value
     return result
