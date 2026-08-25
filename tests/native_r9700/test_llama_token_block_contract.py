@@ -13,6 +13,7 @@ PROBE_SOURCES = (
     NATIVE_INCLUDE_DIR / "kernel_catalog.cpp",
     NATIVE_INCLUDE_DIR / "model_weight_binder.cpp",
     NATIVE_INCLUDE_DIR / "amdev_packets.cpp",
+    NATIVE_INCLUDE_DIR / "hardware_lock.cpp",
     NATIVE_INCLUDE_DIR / "vram_layout.cpp",
     NATIVE_INCLUDE_DIR / "vram_allocator.cpp",
     NATIVE_INCLUDE_DIR / "dynamic_page_table.cpp",
