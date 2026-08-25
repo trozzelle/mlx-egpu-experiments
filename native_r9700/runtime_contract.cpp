@@ -67,6 +67,18 @@ void log_progress(const std::string& text) {
   std::fflush(stderr);
 }
 
+struct ScopedPhaseUsec {
+  long* target;
+  timeval start{};
+
+  explicit ScopedPhaseUsec(long* out) : target(out) { gettimeofday(&start, nullptr); }
+  ~ScopedPhaseUsec() {
+    timeval now{};
+    gettimeofday(&now, nullptr);
+    *target += (now.tv_sec - start.tv_sec) * 1000000L + (now.tv_usec - start.tv_usec);
+  }
+};
+
 enum class TraceBufferKind {
   EmbeddingRow,
   Normalized,
@@ -725,6 +737,8 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
   gettimeofday(&model_load_end, nullptr);
   const long model_load_usec = (model_load_end.tv_sec - model_load_start.tv_sec) * 1000000L +
                                (model_load_end.tv_usec - model_load_start.tv_usec);
+  result->phase_timers.model_load_usec = model_load_usec;
+  result->phase_timers.model_bind_inclusive_usec = model_load_usec;
   if (!weight_table_ok) {
     fail(result, "layer_weight_table", detail, error_text);
     return 1;
@@ -739,18 +753,62 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
   }
 
   LlamaPersistentDispatch persistent_dispatch;
-  if (!build_llama_persistent_dispatch(weight_table,
-                                       static_cast<uint32_t>(request.token_ids.size()),
-                                       &persistent_dispatch, &detail)) {
+  bool persistent_dispatch_ok = false;
+  {
+    ScopedPhaseUsec timer(&result->phase_timers.dispatch_build_inclusive_usec);
+    persistent_dispatch_ok =
+        build_llama_persistent_dispatch(weight_table,
+                                        static_cast<uint32_t>(request.token_ids.size()),
+                                        &persistent_dispatch, &detail);
+  }
+  if (!persistent_dispatch_ok) {
     fail(result, "persistent_dispatch_build", detail, error_text);
     return 1;
   }
   ResidentHsaSession resident;
   ResidentHsaDispatchResult dispatch_result;
+  auto close_resident_and_snapshot = [&](std::string* close_error) {
+    bool close_ok = false;
+    {
+      ScopedPhaseUsec timer(&result->phase_timers.session_close_inclusive_usec);
+      close_ok = resident.close(close_error);
+    }
+    const PhaseTimers outer_phase_timers = result->phase_timers;
+    // phase_timers() returns the close-time snapshot (captured before the reset).
+    result->phase_timers = resident.phase_timers();
+    result->phase_timers.model_load_usec = outer_phase_timers.model_load_usec;
+    result->phase_timers.model_bind_inclusive_usec =
+        outer_phase_timers.model_bind_inclusive_usec;
+    result->phase_timers.dispatch_build_inclusive_usec =
+        outer_phase_timers.dispatch_build_inclusive_usec;
+    result->phase_timers.device_prepare_inclusive_usec =
+        outer_phase_timers.device_prepare_inclusive_usec;
+    result->phase_timers.embedding_upload_inclusive_usec =
+        outer_phase_timers.embedding_upload_inclusive_usec;
+    result->phase_timers.weight_upload_inclusive_usec =
+        outer_phase_timers.weight_upload_inclusive_usec;
+    result->phase_timers.compute_loop_inclusive_usec =
+        outer_phase_timers.compute_loop_inclusive_usec;
+    result->phase_timers.kv_readback_inclusive_usec =
+        outer_phase_timers.kv_readback_inclusive_usec;
+    result->phase_timers.session_close_inclusive_usec =
+        outer_phase_timers.session_close_inclusive_usec;
+    result->phase_timers.npz_serialization_inclusive_usec =
+        outer_phase_timers.npz_serialization_inclusive_usec;
+    return close_ok;
+  };
   log_progress("resident_prepare begin buffers=" +
                std::to_string(persistent_dispatch.request.buffers.size()) +
                " images=" + std::to_string(persistent_dispatch.request.hsa_images.size()));
-  if (!resident.prepare(persistent_dispatch.request, &dispatch_result, &detail)) {
+  bool resident_prepare_ok = false;
+  {
+    ScopedPhaseUsec timer(&result->phase_timers.device_prepare_inclusive_usec);
+    resident_prepare_ok =
+        resident.prepare(persistent_dispatch.request, &dispatch_result, &detail);
+  }
+  if (!resident_prepare_ok) {
+    std::string close_error;
+    close_resident_and_snapshot(&close_error);
     const std::string failure =
         "resident_prepare failed backend_failure_stage=" + dispatch_result.failure_stage + ": " + detail;
     log_progress(failure);
@@ -788,71 +846,100 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
   // stage kernels in causal order. Per-token scratch buffers are fully
   // rewritten by each token's stage sequence before use; K/V caches accumulate
   // per layer across tokens in position order.
-  for (uint32_t token = 0; token < request.token_ids.size(); ++token) {
-    Fp16WeightSpan embedding_row;
-    if (!select_llama_embedding_row(weight_table.embed_tokens, request.token_ids[token],
-                                    &embedding_row, &detail) ||
-        !upload_span("token=" + std::to_string(token) + " embedding_row",
-                     persistent_dispatch.hidden_buffers[token], embedding_row)) {
-      std::string close_error;
-      resident.close(&close_error);
-      log_progress("resident_embedding_upload failed " + detail);
-      fail(result, "resident_embedding_upload", detail, error_text);
-      return 1;
+  bool embedding_upload_ok = true;
+  {
+    ScopedPhaseUsec timer(&result->phase_timers.embedding_upload_inclusive_usec);
+    for (uint32_t token = 0; token < request.token_ids.size(); ++token) {
+      Fp16WeightSpan embedding_row;
+      if (!select_llama_embedding_row(weight_table.embed_tokens, request.token_ids[token],
+                                      &embedding_row, &detail) ||
+          !upload_span("token=" + std::to_string(token) + " embedding_row",
+                       persistent_dispatch.hidden_buffers[token], embedding_row)) {
+        embedding_upload_ok = false;
+        break;
+      }
     }
+  }
+  if (!embedding_upload_ok) {
+    std::string close_error;
+    close_resident_and_snapshot(&close_error);
+    log_progress("resident_embedding_upload failed " + detail);
+    fail(result, "resident_embedding_upload", detail, error_text);
+    return 1;
   }
   for (uint32_t layer = 0; layer < persistent_dispatch.layer_stages.size(); ++layer) {
     const LlamaLayerWeightSpans& spans = persistent_dispatch.layer_weight_metadata.layers[layer];
     const LlamaLayerResidentBufferIndices& buffers = persistent_dispatch.layer_buffers[layer];
     const std::string weight_context = "layer=" + std::to_string(layer);
-    if (!upload_span(weight_context + " input_layernorm", buffers.input_layernorm,
-                     spans.input_layernorm) ||
-        !upload_span(weight_context + " post_attention_layernorm",
-                     buffers.post_attention_layernorm, spans.post_attention_layernorm) ||
-        !upload_span(weight_context + " q_projection", buffers.q_projection, spans.q_proj) ||
-        !upload_span(weight_context + " k_projection", buffers.k_projection, spans.k_proj) ||
-        !upload_span(weight_context + " v_projection", buffers.v_projection, spans.v_proj) ||
-        !upload_span(weight_context + " o_projection", buffers.o_projection, spans.o_proj) ||
-        !upload_span(weight_context + " gate_projection", buffers.gate_projection,
-                     spans.gate_proj) ||
-        !upload_span(weight_context + " up_projection", buffers.up_projection, spans.up_proj) ||
-        !upload_span(weight_context + " down_projection", buffers.down_projection,
-                     spans.down_proj)) {
+    bool weight_upload_ok = false;
+    {
+      ScopedPhaseUsec timer(&result->phase_timers.weight_upload_inclusive_usec);
+      weight_upload_ok =
+          upload_span(weight_context + " input_layernorm", buffers.input_layernorm,
+                      spans.input_layernorm) &&
+          upload_span(weight_context + " post_attention_layernorm",
+                      buffers.post_attention_layernorm, spans.post_attention_layernorm) &&
+          upload_span(weight_context + " q_projection", buffers.q_projection, spans.q_proj) &&
+          upload_span(weight_context + " k_projection", buffers.k_projection, spans.k_proj) &&
+          upload_span(weight_context + " v_projection", buffers.v_projection, spans.v_proj) &&
+          upload_span(weight_context + " o_projection", buffers.o_projection, spans.o_proj) &&
+          upload_span(weight_context + " gate_projection", buffers.gate_projection,
+                      spans.gate_proj) &&
+          upload_span(weight_context + " up_projection", buffers.up_projection, spans.up_proj) &&
+          upload_span(weight_context + " down_projection", buffers.down_projection,
+                      spans.down_proj);
+    }
+    if (!weight_upload_ok) {
       std::string close_error;
-      resident.close(&close_error);
+      close_resident_and_snapshot(&close_error);
       log_progress("resident_weight_upload failed " + detail);
       fail(result, "resident_weight_upload", detail, error_text);
       return 1;
     }
-    for (uint32_t token = 0; token < request.token_ids.size(); ++token) {
-      if (!set_llama_token_stage_scalars(&persistent_dispatch.layer_stages[layer], token,
-                                         &detail) ||
-          !set_llama_token_hidden_buffer(&persistent_dispatch.layer_stages[layer],
-                                         persistent_dispatch.hidden_binding_slots,
-                                         persistent_dispatch.hidden_buffers[token], &detail)) {
-        std::string close_error;
-        resident.close(&close_error);
-        log_progress("resident_token_stage_scalars failed " + detail);
-        fail(result, "resident_token_stage_scalars", detail, error_text);
-        return 1;
+    int compute_failure = 0;
+    uint32_t failed_token = 0;
+    {
+      ScopedPhaseUsec timer(&result->phase_timers.compute_loop_inclusive_usec);
+      for (uint32_t token = 0; token < request.token_ids.size(); ++token) {
+        if (!set_llama_token_stage_scalars(&persistent_dispatch.layer_stages[layer], token,
+                                           &detail) ||
+            !set_llama_token_hidden_buffer(&persistent_dispatch.layer_stages[layer],
+                                           persistent_dispatch.hidden_binding_slots,
+                                           persistent_dispatch.hidden_buffers[token], &detail)) {
+          compute_failure = 1;
+          failed_token = token;
+          break;
+        }
+        log_progress("layer=" + std::to_string(layer) + " token=" + std::to_string(token) +
+                     " dispatch_batch_begin stages=" +
+                     std::to_string(persistent_dispatch.layer_stages[layer].size()));
+        if (!resident.dispatch_batch(persistent_dispatch.layer_stages[layer],
+                                     &dispatch_result, &detail)) {
+          compute_failure = 2;
+          failed_token = token;
+          break;
+        }
+        log_progress("layer=" + std::to_string(layer) + " token=" + std::to_string(token) +
+                     " dispatch_batch_complete count=" +
+                     std::to_string(dispatch_result.pm4_dispatch_count));
       }
-      log_progress("layer=" + std::to_string(layer) + " token=" + std::to_string(token) +
-                   " dispatch_batch_begin stages=" +
-                   std::to_string(persistent_dispatch.layer_stages[layer].size()));
-      if (!resident.dispatch_batch(persistent_dispatch.layer_stages[layer],
-                                   &dispatch_result, &detail)) {
-        std::string close_error;
-        resident.close(&close_error);
-        const std::string failure = "layer=" + std::to_string(layer) +
-            " token=" + std::to_string(token) +
-            " backend_failure_stage=" + dispatch_result.failure_stage + ": " + detail;
-        log_progress("resident_dispatch_batch failed " + failure);
-        fail(result, "resident_dispatch_batch", failure, error_text);
-        return 1;
-      }
-      log_progress("layer=" + std::to_string(layer) + " token=" + std::to_string(token) +
-                   " dispatch_batch_complete count=" +
-                   std::to_string(dispatch_result.pm4_dispatch_count));
+    }
+    if (compute_failure == 1) {
+      std::string close_error;
+      close_resident_and_snapshot(&close_error);
+      log_progress("resident_token_stage_scalars failed " + detail);
+      fail(result, "resident_token_stage_scalars", detail, error_text);
+      return 1;
+    }
+    if (compute_failure == 2) {
+      std::string close_error;
+      close_resident_and_snapshot(&close_error);
+      const std::string failure = "layer=" + std::to_string(layer) +
+          " token=" + std::to_string(failed_token) +
+          " backend_failure_stage=" + dispatch_result.failure_stage + ": " + detail;
+      log_progress("resident_dispatch_batch failed " + failure);
+      fail(result, "resident_dispatch_batch", failure, error_text);
+      return 1;
     }
   }
   std::vector<std::string> kv_names;
@@ -862,9 +949,14 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
     kv_names.push_back("llama.layer" + std::to_string(layer) + ".v_cache");
   }
   log_progress("resident_kv_readback begin buffers=" + std::to_string(kv_names.size()));
-  if (!resident.readback(kv_names, &dispatch_result, &detail)) {
+  bool kv_readback_ok = false;
+  {
+    ScopedPhaseUsec timer(&result->phase_timers.kv_readback_inclusive_usec);
+    kv_readback_ok = resident.readback(kv_names, &dispatch_result, &detail);
+  }
+  if (!kv_readback_ok) {
     std::string close_error;
-    resident.close(&close_error);
+    close_resident_and_snapshot(&close_error);
     const std::string failure =
         "backend_failure_stage=" + dispatch_result.failure_stage + ": " + detail;
     log_progress("resident_kv_readback failed " + failure);
@@ -873,14 +965,13 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
   }
   log_progress("resident_kv_readback complete");
   log_progress("resident_close begin");
-  if (!resident.close(&detail)) {
+  const bool resident_close_ok = close_resident_and_snapshot(&detail);
+  if (!resident_close_ok) {
     log_progress("resident_close failed " + detail);
     fail(result, "resident_close", detail, error_text);
     return 1;
   }
   log_progress("resident_close complete");
-  // phase_timers() returns the close-time snapshot (captured before the reset).
-  result->phase_timers = resident.phase_timers();
   result->n_prefix = static_cast<uint32_t>(request.token_ids.size());
   result->kernel_count = dispatch_result.pm4_dispatch_count;
   result->transfer_bytes = dispatch_result.sdma_upload_bytes + dispatch_result.sdma_download_bytes;
@@ -891,7 +982,12 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
   payload.kv_readback_bytes = std::move(dispatch_result.readback_bytes);
   log_progress("npz_serialize begin buffers=" +
                std::to_string(payload.kv_readback_bytes.size()));
-  if (!write_native_prefill_npz(payload, request.out_npz_path, &detail)) {
+  bool npz_serialization_ok = false;
+  {
+    ScopedPhaseUsec timer(&result->phase_timers.npz_serialization_inclusive_usec);
+    npz_serialization_ok = write_native_prefill_npz(payload, request.out_npz_path, &detail);
+  }
+  if (!npz_serialization_ok) {
     log_progress("npz_serialize failed " + detail);
     fail(result, "prefill_npz_serialization", detail, error_text);
     return 1;

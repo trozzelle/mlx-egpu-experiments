@@ -179,8 +179,20 @@ std::string native_prefill_key_value(const native_r9700::NativePrefillResult& re
          "phase_timer model_load_usec: " + std::to_string(result.phase_timers.model_load_usec) + "\n" +
          "phase_timer staging_copy_usec: " + std::to_string(result.phase_timers.staging_copy_usec) + "\n" +
          "phase_timer sdma_setup_usec: " + std::to_string(result.phase_timers.sdma_setup_usec) + "\n" +
-         "phase_timer sdma_submit_usec: " + std::to_string(result.phase_timers.sdma_submit_usec) + "\n" +
+         "phase_timer sdma_submit_inclusive_usec: " + std::to_string(result.phase_timers.sdma_submit_inclusive_usec) + "\n" +
          "phase_timer sdma_fence_wait_usec: " + std::to_string(result.phase_timers.sdma_fence_wait_usec) + "\n" +
+         "phase_timer sdma_submit_exclusive_usec: " + std::to_string(result.phase_timers.sdma_submit_exclusive_usec) + "\n" +
+         "phase_timer model_bind_inclusive_usec: " + std::to_string(result.phase_timers.model_bind_inclusive_usec) + "\n" +
+         "phase_timer dispatch_build_inclusive_usec: " + std::to_string(result.phase_timers.dispatch_build_inclusive_usec) + "\n" +
+         "phase_timer device_prepare_inclusive_usec: " + std::to_string(result.phase_timers.device_prepare_inclusive_usec) + "\n" +
+         "phase_timer embedding_upload_inclusive_usec: " + std::to_string(result.phase_timers.embedding_upload_inclusive_usec) + "\n" +
+         "phase_timer weight_upload_inclusive_usec: " + std::to_string(result.phase_timers.weight_upload_inclusive_usec) + "\n" +
+         "phase_timer compute_loop_inclusive_usec: " + std::to_string(result.phase_timers.compute_loop_inclusive_usec) + "\n" +
+         "phase_timer kv_readback_inclusive_usec: " + std::to_string(result.phase_timers.kv_readback_inclusive_usec) + "\n" +
+         "phase_timer session_close_inclusive_usec: " + std::to_string(result.phase_timers.session_close_inclusive_usec) + "\n" +
+         "phase_timer npz_serialization_inclusive_usec: " + std::to_string(result.phase_timers.npz_serialization_inclusive_usec) + "\n" +
+         "phase_timer measured_exclusive_total_usec: " + std::to_string(result.phase_timers.measured_exclusive_total_usec) + "\n" +
+         "phase_timer unattributed_usec: " + std::to_string(result.phase_timers.unattributed_usec) + "\n" +
          "phase_timer pm4_build_usec: " + std::to_string(result.phase_timers.pm4_build_usec) + "\n" +
          "phase_timer hdp_flush_usec: " + std::to_string(result.phase_timers.hdp_flush_usec) + "\n" +
          "phase_timer doorbell_usec: " + std::to_string(result.phase_timers.doorbell_usec) + "\n" +
@@ -211,8 +223,20 @@ std::string native_prefill_json(const native_r9700::NativePrefillResult& result)
          ",\"model_load_usec\":" + std::to_string(result.phase_timers.model_load_usec) +
          ",\"staging_copy_usec\":" + std::to_string(result.phase_timers.staging_copy_usec) +
          ",\"sdma_setup_usec\":" + std::to_string(result.phase_timers.sdma_setup_usec) +
-         ",\"sdma_submit_usec\":" + std::to_string(result.phase_timers.sdma_submit_usec) +
+         ",\"sdma_submit_inclusive_usec\":" + std::to_string(result.phase_timers.sdma_submit_inclusive_usec) +
          ",\"sdma_fence_wait_usec\":" + std::to_string(result.phase_timers.sdma_fence_wait_usec) +
+         ",\"sdma_submit_exclusive_usec\":" + std::to_string(result.phase_timers.sdma_submit_exclusive_usec) +
+         ",\"model_bind_inclusive_usec\":" + std::to_string(result.phase_timers.model_bind_inclusive_usec) +
+         ",\"dispatch_build_inclusive_usec\":" + std::to_string(result.phase_timers.dispatch_build_inclusive_usec) +
+         ",\"device_prepare_inclusive_usec\":" + std::to_string(result.phase_timers.device_prepare_inclusive_usec) +
+         ",\"embedding_upload_inclusive_usec\":" + std::to_string(result.phase_timers.embedding_upload_inclusive_usec) +
+         ",\"weight_upload_inclusive_usec\":" + std::to_string(result.phase_timers.weight_upload_inclusive_usec) +
+         ",\"compute_loop_inclusive_usec\":" + std::to_string(result.phase_timers.compute_loop_inclusive_usec) +
+         ",\"kv_readback_inclusive_usec\":" + std::to_string(result.phase_timers.kv_readback_inclusive_usec) +
+         ",\"session_close_inclusive_usec\":" + std::to_string(result.phase_timers.session_close_inclusive_usec) +
+         ",\"npz_serialization_inclusive_usec\":" + std::to_string(result.phase_timers.npz_serialization_inclusive_usec) +
+         ",\"measured_exclusive_total_usec\":" + std::to_string(result.phase_timers.measured_exclusive_total_usec) +
+         ",\"unattributed_usec\":" + std::to_string(result.phase_timers.unattributed_usec) +
          ",\"pm4_build_usec\":" + std::to_string(result.phase_timers.pm4_build_usec) +
          ",\"hdp_flush_usec\":" + std::to_string(result.phase_timers.hdp_flush_usec) +
          ",\"doorbell_usec\":" + std::to_string(result.phase_timers.doorbell_usec) +
@@ -618,6 +642,7 @@ int main(int argc, char** argv) {
     result.wall_usec = static_cast<uint64_t>(
         (wall_end.tv_sec - wall_start.tv_sec) * 1000000L +
         (wall_end.tv_usec - wall_start.tv_usec));
+    native_r9700::finalize_phase_accounting(result.wall_usec, &result.phase_timers);
     if (!parsed_tokens && result.failure_stage == "native_prefill_request") {
       result.failure_text = parse_error;
       status = result.exit_status = 1;

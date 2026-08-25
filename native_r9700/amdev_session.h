@@ -17,8 +17,20 @@ struct PhaseTimers {
   long model_load_usec = 0;
   long staging_copy_usec = 0;
   long sdma_setup_usec = 0;
-  long sdma_submit_usec = 0;
+  long sdma_submit_inclusive_usec = 0;
   long sdma_fence_wait_usec = 0;
+  long sdma_submit_exclusive_usec = 0;
+  long model_bind_inclusive_usec = 0;
+  long dispatch_build_inclusive_usec = 0;
+  long device_prepare_inclusive_usec = 0;
+  long embedding_upload_inclusive_usec = 0;
+  long weight_upload_inclusive_usec = 0;
+  long compute_loop_inclusive_usec = 0;
+  long kv_readback_inclusive_usec = 0;
+  long session_close_inclusive_usec = 0;
+  long npz_serialization_inclusive_usec = 0;
+  uint64_t measured_exclusive_total_usec = 0;
+  uint64_t unattributed_usec = 0;
   long pm4_build_usec = 0;
   long hdp_flush_usec = 0;
   long doorbell_usec = 0;
@@ -27,6 +39,8 @@ struct PhaseTimers {
   uint64_t compute_submit_count = 0;
   uint64_t socket_rpc_count = 0;
 };
+
+void finalize_phase_accounting(uint64_t wall_usec, PhaseTimers* timers);
 
 
 // A bounded C0-compatible launch: one input page, one output page, one code

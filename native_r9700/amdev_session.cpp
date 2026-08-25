@@ -1940,6 +1940,24 @@ bool run_resident_kernel_dispatch(const ResidentKernelDispatch& request,
 
 
 
+void finalize_phase_accounting(uint64_t wall_usec, PhaseTimers* timers) {
+  if (timers == nullptr) return;
+  timers->sdma_submit_exclusive_usec =
+      std::max(0L, timers->sdma_submit_inclusive_usec - timers->sdma_fence_wait_usec);
+  const uint64_t top_level =
+      static_cast<uint64_t>(std::max(0L, timers->model_bind_inclusive_usec)) +
+      static_cast<uint64_t>(std::max(0L, timers->dispatch_build_inclusive_usec)) +
+      static_cast<uint64_t>(std::max(0L, timers->device_prepare_inclusive_usec)) +
+      static_cast<uint64_t>(std::max(0L, timers->embedding_upload_inclusive_usec)) +
+      static_cast<uint64_t>(std::max(0L, timers->weight_upload_inclusive_usec)) +
+      static_cast<uint64_t>(std::max(0L, timers->compute_loop_inclusive_usec)) +
+      static_cast<uint64_t>(std::max(0L, timers->kv_readback_inclusive_usec)) +
+      static_cast<uint64_t>(std::max(0L, timers->session_close_inclusive_usec)) +
+      static_cast<uint64_t>(std::max(0L, timers->npz_serialization_inclusive_usec));
+  timers->measured_exclusive_total_usec = std::min(wall_usec, top_level);
+  timers->unattributed_usec = wall_usec - timers->measured_exclusive_total_usec;
+}
+
 struct ScopedUsec {
   long* target;
   timeval start{};
@@ -2389,7 +2407,7 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
       }
       std::atomic_thread_fence(std::memory_order_seq_cst);
       {
-        ScopedUsec timer(&state.phase_timers.sdma_submit_usec);
+        ScopedUsec timer(&state.phase_timers.sdma_submit_inclusive_usec);
         if (!state.submit_sdma_chunk_persistent(state.staging.gpu_va,
                                                state.buffers[index].gpu_va + offset, chunk,
                                                &detail)) {
@@ -2641,7 +2659,7 @@ bool ResidentHsaSession::upload_named(const std::string& buffer_name, const uint
     }
     std::atomic_thread_fence(std::memory_order_seq_cst);
     {
-      ScopedUsec timer(&state.phase_timers.sdma_submit_usec);
+      ScopedUsec timer(&state.phase_timers.sdma_submit_inclusive_usec);
       if (!state.submit_sdma_chunk_persistent(state.staging.gpu_va,
                                               state.buffers[buffer_index].gpu_va + offset, chunk,
                                               &detail)) {
@@ -2687,7 +2705,7 @@ bool ResidentHsaSession::readback(const std::vector<std::string>& names,
     while (offset < byte_count) {
       const uint32_t chunk = static_cast<uint32_t>(std::min<uint64_t>(kPageSize, byte_count - offset));
       {
-        ScopedUsec timer(&state.phase_timers.sdma_submit_usec);
+        ScopedUsec timer(&state.phase_timers.sdma_submit_inclusive_usec);
         if (!state.submit_sdma_chunk_persistent(state.buffers[buffer_index].gpu_va + offset,
                                                state.readback.gpu_va, chunk, &detail)) {
           return fail(detail);
@@ -2715,7 +2733,8 @@ bool ResidentHsaSession::close(std::string* error_text) {
   std::printf("phase_timer model_load_usec: %ld\n", state.phase_timers.model_load_usec);
   std::printf("phase_timer staging_copy_usec: %ld\n", state.phase_timers.staging_copy_usec);
   std::printf("phase_timer sdma_setup_usec: %ld\n", state.phase_timers.sdma_setup_usec);
-  std::printf("phase_timer sdma_submit_usec: %ld\n", state.phase_timers.sdma_submit_usec);
+  std::printf("phase_timer sdma_submit_inclusive_usec: %ld\n",
+              state.phase_timers.sdma_submit_inclusive_usec);
   std::printf("phase_timer sdma_fence_wait_usec: %ld\n", state.phase_timers.sdma_fence_wait_usec);
   std::printf("phase_timer pm4_build_usec: %ld\n", state.phase_timers.pm4_build_usec);
   std::printf("phase_timer hdp_flush_usec: %ld\n", state.phase_timers.hdp_flush_usec);

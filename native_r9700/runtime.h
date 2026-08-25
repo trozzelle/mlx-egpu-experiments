@@ -6260,8 +6260,8 @@ struct NativePrefillResult {
   std::string native_prefill_blocker_source;
   std::string failure_stage;
   std::string failure_text;
-  // Per-phase launch/transport timing (usec) + submission counters from the
-  // resident session; populated before the NPZ is serialized.
+  // Exclusive leaf timing from the resident session plus inclusive top-level
+  // host phases; the runner finalizes wall-time attribution before rendering.
   PhaseTimers phase_timers;
   // End-to-end native prefill wall time measured by the runner (usec).
   uint64_t wall_usec = 0;
