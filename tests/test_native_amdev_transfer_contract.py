@@ -645,6 +645,26 @@ def test_gc_hub_source_contract_disables_agp_and_configures_every_invalidate_ran
     )
 
 
+def test_probe_gc_tlb_flush_uses_req_ack_without_mmhub_semaphore():
+    source = PROBE_SOURCE.read_text()
+    gc_start = source.index("bool flush_gc_tlb_vmid0(")
+    gc_end = source.index("\n\n\nbool setup_fixed_vm_mapping", gc_start)
+    gc_flush = source[gc_start:gc_end]
+    mm_start = source.index("bool flush_mmhubs_tlb(")
+    mm_flush = source[mm_start:gc_start]
+
+    gc_req = "regs_gfx1201::kGcInvalidateEng17Req"
+    gc_ack = "regs_gfx1201::kGcInvalidateEng17Ack"
+    mm_sem = "regs_gfx1201::kMmInvalidateEng17Sem"
+    mm_req = "regs_gfx1201::kMmInvalidateEng17Req"
+    mm_ack = "regs_gfx1201::kMmInvalidateEng17Ack"
+
+    assert "flush_hdp(client, *log, error_text)" in gc_flush
+    assert "kGcInvalidateEng17Sem" not in gc_flush
+    assert gc_flush.index(gc_req) < gc_flush.index(gc_ack)
+    assert mm_flush.index(mm_sem) < mm_flush.index(mm_req) < mm_flush.index(mm_ack) < mm_flush.rindex(mm_sem)
+
+
 def test_mec_rs64_pipe_activation_self_test_reports_steady_state_encoding(tmp_path):
     exe = compile_probe(tmp_path)
 

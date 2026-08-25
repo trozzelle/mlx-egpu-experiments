@@ -5775,11 +5775,6 @@ bool flush_gc_tlb_vmid0(const RemoteClient& client, DiscoveryLog* log,
     log->vm.gc_tlb_flush_status = "fail";
     return false;
   }
-  if (!poll_register_mask(client, *log, log->ip.gc, regs_gfx1201::kGcInvalidateEng17Sem, 0x1U,
-                          0x1U, regs_gfx1201::kGcInvalidateEng17Sem.name, error_text)) {
-    log->vm.gc_tlb_flush_status = "fail";
-    return false;
-  }
   if (!write_register_dword(client, *log, log->ip.gc, regs_gfx1201::kGcInvalidateEng17Req,
                             encode_invalidate_req_vmid0(), error_text)) {
     *error_text = std::string("write ") + regs_gfx1201::kGcInvalidateEng17Req.name +
@@ -5790,13 +5785,6 @@ bool flush_gc_tlb_vmid0(const RemoteClient& client, DiscoveryLog* log,
   if (!poll_register_mask(client, *log, log->ip.gc, regs_gfx1201::kGcInvalidateEng17Ack,
                           am_vm::kInvalidateMaskVmid0, am_vm::kInvalidateMaskVmid0,
                           regs_gfx1201::kGcInvalidateEng17Ack.name, error_text)) {
-    log->vm.gc_tlb_flush_status = "fail";
-    return false;
-  }
-  if (!write_register_dword(client, *log, log->ip.gc, regs_gfx1201::kGcInvalidateEng17Sem, 0,
-                            error_text)) {
-    *error_text = std::string("clear ") + regs_gfx1201::kGcInvalidateEng17Sem.name +
-                  " failed: " + *error_text;
     log->vm.gc_tlb_flush_status = "fail";
     return false;
   }
