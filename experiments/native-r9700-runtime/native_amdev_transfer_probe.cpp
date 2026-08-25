@@ -437,8 +437,13 @@ constexpr uint32_t kEventTypeCsPartialFlush = 7U;
 constexpr uint32_t kEventIndexPartialFlush = 4U;
 constexpr uint32_t kEventTypeCacheFlushAndInvTs = 20U;
 constexpr uint32_t kReleaseMemEventIndexEndOfPipe = 5U;
+// tinygrad/runtime/autogen/am/pm4_soc15.py:31-32 generated gfx12 selectors;
+// tinygrad/runtime/ops_amd.py:372-376 uses these for its GPU timestamp.
+constexpr uint32_t kReleaseMemDataSelNone = 0U;
 constexpr uint32_t kReleaseMemDataSelSend32BitLow = 1U;
+constexpr uint32_t kReleaseMemDataSelSendGpuClockCounter = 3U;
 constexpr uint32_t kReleaseMemIntSelNone = 0U;
+constexpr uint32_t kReleaseMemIntSelSendInterruptAfterWriteConfirm = 2U;
 constexpr uint32_t kAcquireMemGcrCntlGlmWbShift = 4U;
 constexpr uint32_t kAcquireMemGcrCntlGlmInvShift = 5U;
 constexpr uint32_t kAcquireMemGcrCntlGlkWbShift = 6U;

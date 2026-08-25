@@ -29,8 +29,13 @@ constexpr uint32_t kEventTypeCsPartialFlush = 7U;
 constexpr uint32_t kEventIndexPartialFlush = 4U;
 constexpr uint32_t kEventTypeCacheFlushAndInvTs = 20U;
 constexpr uint32_t kReleaseMemEventIndexEndOfPipe = 5U;
+constexpr uint32_t kReleaseMemDataSelNone = 0U;
 constexpr uint32_t kReleaseMemDataSelSend32BitLow = 1U;
+// tinygrad/runtime/autogen/am/pm4_soc15.py:32 generated gfx12 selector.
+constexpr uint32_t kReleaseMemDataSelSendGpuClockCounter = 3U;
 constexpr uint32_t kReleaseMemIntSelNone = 0U;
+// tinygrad/runtime/autogen/am/pm4_soc15.py:31; used by ops_amd.py:374.
+constexpr uint32_t kReleaseMemIntSelSendInterruptAfterWriteConfirm = 2U;
 constexpr uint32_t kAcquireMemGcrCntlGliInvShift = 0U;   // instruction-cache invalidate
 constexpr uint32_t kAcquireMemGcrCntlGlmWbShift = 4U;
 constexpr uint32_t kAcquireMemGcrCntlGlmInvShift = 5U;
@@ -111,21 +116,76 @@ uint32_t encode_event_write_cs_partial_flush() {
   return kEventTypeCsPartialFlush | (kEventIndexPartialFlush << 8);
 }
 
+uint32_t encode_release_mem_event_without_cache_flush() {
+  return kEventTypeCacheFlushAndInvTs | (kReleaseMemEventIndexEndOfPipe << 8);
+}
+
 uint32_t encode_release_mem_event() {
-  return kEventTypeCacheFlushAndInvTs | (kReleaseMemEventIndexEndOfPipe << 8) |
-         kReleaseMemGcrGlmWb | kReleaseMemGcrGlmInv | kReleaseMemGcrGlvInv |
-         kReleaseMemGcrGl1Inv | kReleaseMemGcrGl2Inv | kReleaseMemGcrGl2Wb |
-         kReleaseMemGcrSeq;
+  return encode_release_mem_event_without_cache_flush() | kReleaseMemGcrGlmWb |
+         kReleaseMemGcrGlmInv | kReleaseMemGcrGlvInv | kReleaseMemGcrGl1Inv |
+         kReleaseMemGcrGl2Inv | kReleaseMemGcrGl2Wb | kReleaseMemGcrSeq;
+}
+
+uint32_t encode_release_mem_data_control(uint32_t data_sel, uint32_t int_sel) {
+  return data_sel << 29 | int_sel << 24;
 }
 
 uint32_t encode_release_mem_data_sel() {
-  return kReleaseMemDataSelSend32BitLow << 29 | kReleaseMemIntSelNone << 24;
+  return encode_release_mem_data_control(kReleaseMemDataSelSend32BitLow,
+                                         kReleaseMemIntSelNone);
+}
+
+uint32_t encode_release_mem_data_sel_none() {
+  return encode_release_mem_data_control(kReleaseMemDataSelNone, kReleaseMemIntSelNone);
+}
+
+uint32_t encode_release_mem_gpu_clock_data_sel() {
+  return encode_release_mem_data_control(kReleaseMemDataSelSendGpuClockCounter,
+                                         kReleaseMemIntSelNone);
+}
+
+uint32_t encode_release_mem_ordering_data_sel() {
+  return encode_release_mem_data_control(
+      kReleaseMemDataSelNone, kReleaseMemIntSelSendInterruptAfterWriteConfirm);
 }
 
 void append_pm4_packet3(std::vector<uint32_t>* words, uint32_t opcode,
                         std::initializer_list<uint32_t> payload) {
   words->push_back(pm4_packet3(opcode, static_cast<uint32_t>(payload.size() - 1U)));
   words->insert(words->end(), payload.begin(), payload.end());
+}
+
+void append_pm4_acquire_mem(std::vector<uint32_t>* words) {
+  append_pm4_packet3(words, kPacket3AcquireMem,
+                     {0U, 0xffffffffU, 0xffffffffU, 0U, 0U, 0U,
+                      encode_acquire_mem_gcr_cntl_for_dispatch()});
+}
+
+void append_pm4_dispatch_body(std::vector<uint32_t>* words,
+                              const Pm4DispatchConfig& config) {
+  append_pm4_acquire_mem(words);
+  const uint64_t code_addr = config.code_va >> 8;
+  append_pm4_packet3(words, kPacket3SetShReg,
+                     {kComputePgmLoSetShOffset, lo32_impl(code_addr), hi32_impl(code_addr)});
+  append_pm4_packet3(words, kPacket3SetShReg,
+                     {kComputePgmRsrc1SetShOffset, config.rsrc1, config.rsrc2});
+  append_pm4_packet3(words, kPacket3SetShReg,
+                     {kComputePgmRsrc3SetShOffset, config.rsrc3});
+  append_pm4_packet3(words, kPacket3SetShReg,
+                     {kComputeTmpringSizeSetShOffset, 0U});
+  append_pm4_packet3(words, kPacket3SetShReg,
+                     {kComputeRestartXSetShOffset, 0U, 0U, 0U});
+  append_pm4_packet3(words, kPacket3SetShReg,
+                     {kComputeUserData0SetShOffset, lo32_impl(config.kernargs_va),
+                      hi32_impl(config.kernargs_va)});
+  append_pm4_packet3(words, kPacket3SetShReg,
+                     {kComputeResourceLimitsSetShOffset, 0U});
+  append_pm4_packet3(words, kPacket3SetShReg,
+                     {kComputeStartXSetShOffset, 0U, 0U, 0U, config.workgroup_x,
+                      config.workgroup_y, config.workgroup_z, 0U, 0U});
+  append_pm4_packet3(words, kPacket3DispatchDirect,
+                     {config.global_x, config.global_y, config.global_z,
+                      encode_dispatch_initiator(config.wave32)});
 }
 
 }  // namespace
@@ -145,40 +205,55 @@ std::vector<uint32_t> build_sdma_copy_words(uint64_t src_va, uint64_t dst_va,
 }
 
 std::vector<uint32_t> build_pm4_dispatch_words(const Pm4DispatchConfig& config) {
-  // C0 build_compute_dispatch_words (probe L623-660), parameterized only at
-  // the documented program-resource and launch-geometry fields.
+  return build_pm4_dispatch_words(config, Pm4StageTail{});
+}
+
+std::vector<uint32_t> build_pm4_dispatch_words(const Pm4DispatchConfig& config,
+                                               const Pm4StageTail& tail) {
   std::vector<uint32_t> words;
   words.reserve(kPm4DispatchDwordCount);
-  append_pm4_packet3(&words, kPacket3AcquireMem,
-                     {0U, 0xffffffffU, 0xffffffffU, 0U, 0U, 0U,
-                      encode_acquire_mem_gcr_cntl_for_dispatch()});
-  const uint64_t code_addr = config.code_va >> 8;
-  append_pm4_packet3(&words, kPacket3SetShReg,
-                     {kComputePgmLoSetShOffset, lo32_impl(code_addr), hi32_impl(code_addr)});
-  append_pm4_packet3(&words, kPacket3SetShReg,
-                     {kComputePgmRsrc1SetShOffset, config.rsrc1, config.rsrc2});
-  append_pm4_packet3(&words, kPacket3SetShReg,
-                     {kComputePgmRsrc3SetShOffset, config.rsrc3});
-  append_pm4_packet3(&words, kPacket3SetShReg,
-                     {kComputeTmpringSizeSetShOffset, 0U});
-  append_pm4_packet3(&words, kPacket3SetShReg,
-                     {kComputeRestartXSetShOffset, 0U, 0U, 0U});
-  append_pm4_packet3(&words, kPacket3SetShReg,
-                     {kComputeUserData0SetShOffset, lo32_impl(config.kernargs_va),
-                      hi32_impl(config.kernargs_va)});
-  append_pm4_packet3(&words, kPacket3SetShReg,
-                     {kComputeResourceLimitsSetShOffset, 0U});
-  append_pm4_packet3(&words, kPacket3SetShReg,
-                     {kComputeStartXSetShOffset, 0U, 0U, 0U, config.workgroup_x,
-                      config.workgroup_y, config.workgroup_z, 0U, 0U});
-  append_pm4_packet3(&words, kPacket3DispatchDirect,
-                     {config.global_x, config.global_y, config.global_z,
-                      encode_dispatch_initiator(config.wave32)});
-  append_pm4_packet3(&words, kPacket3EventWrite, {encode_event_write_cs_partial_flush()});
+  append_pm4_dispatch_body(&words, config);
+  if (tail.emit_cs_partial_flush) {
+    append_pm4_packet3(&words, kPacket3EventWrite,
+                       {encode_event_write_cs_partial_flush()});
+  }
+  if (tail.emit_cache_release) {
+    append_pm4_packet3(&words, kPacket3ReleaseMem,
+                       {encode_release_mem_event(),
+                        tail.write_timeline ? encode_release_mem_data_sel()
+                                            : encode_release_mem_data_sel_none(),
+                        tail.write_timeline ? lo32_impl(config.timeline_va) : 0U,
+                        tail.write_timeline ? hi32_impl(config.timeline_va) : 0U,
+                        tail.write_timeline ? config.timeline_value : 0U,
+                        0U, 0U});
+  }
+  return words;
+}
+
+std::vector<uint32_t> build_pm4_gpu_timestamp_words(uint64_t timestamp_va) {
+  std::vector<uint32_t> words;
+  words.reserve(24U);
+  append_pm4_packet3(&words, kPacket3ReleaseMem,
+                     {encode_release_mem_event_without_cache_flush(),
+                      encode_release_mem_ordering_data_sel(),
+                      0U, 0U, 0U, 0U, 0U});
+  append_pm4_packet3(&words, kPacket3ReleaseMem,
+                     {encode_release_mem_event_without_cache_flush(),
+                      encode_release_mem_gpu_clock_data_sel(),
+                      lo32_impl(timestamp_va), hi32_impl(timestamp_va),
+                      0U, 0U, 0U});
+  append_pm4_acquire_mem(&words);
+  return words;
+}
+
+std::vector<uint32_t> build_pm4_timeline_signal_words(uint64_t timeline_va,
+                                                      uint32_t timeline_value) {
+  std::vector<uint32_t> words;
+  words.reserve(8U);
   append_pm4_packet3(&words, kPacket3ReleaseMem,
                      {encode_release_mem_event(), encode_release_mem_data_sel(),
-                      lo32_impl(config.timeline_va), hi32_impl(config.timeline_va),
-                      config.timeline_value, 0U, 0U});
+                      lo32_impl(timeline_va), hi32_impl(timeline_va),
+                      timeline_value, 0U, 0U});
   return words;
 }
 

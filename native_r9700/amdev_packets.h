@@ -31,9 +31,23 @@ struct Pm4DispatchConfig {
   uint32_t timeline_value = 1;  // monotonic RELEASE_MEM write payload (was fixed kReleaseMemTimelineValue)
 };
 
+struct Pm4StageTail {
+  bool emit_cs_partial_flush = true;
+  bool emit_cache_release = true;
+  bool write_timeline = true;
+};
+
 // C0A25 compute dispatch stream: 12 packets and 59 dwords total. This is the
 // reusable form consumed by AMDevSession's physical resident-dispatch path.
 std::vector<uint32_t> build_pm4_dispatch_words(const Pm4DispatchConfig& config);
+std::vector<uint32_t> build_pm4_dispatch_words(const Pm4DispatchConfig& config,
+                                                const Pm4StageTail& tail);
+
+// Pure queue-stage completion encoders. The timestamp stream orders prior GPU
+// work, writes the GPU clock to timestamp_va, then makes that write visible.
+std::vector<uint32_t> build_pm4_gpu_timestamp_words(uint64_t timestamp_va);
+std::vector<uint32_t> build_pm4_timeline_signal_words(uint64_t timeline_va,
+                                                       uint32_t timeline_value);
 
 // Frozen C0 add-one packet stream retained as the proof-packet contract.
 std::vector<uint32_t> build_pm4_dispatch_words(uint64_t code_va, uint64_t kernargs_va,
