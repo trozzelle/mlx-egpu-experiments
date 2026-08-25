@@ -1,8 +1,7 @@
 # Using an AMD eGPU as a prefill device for MLX-LM / oMLX — Research Reference
 
 Date: 2026-08-16
-Status: Research reference. Path A Phase 0 is implemented and validated; Path C roadmap is defined
-in §8/§9.
+Status: Historical research reference. It records the Path A/early Path C investigation; current product boundaries and source roles live in `ARCHITECTURE.md`, `DESIGN.md`, `ROADMAP.md`, and `REFERENCES.md`.
 
 ---
 

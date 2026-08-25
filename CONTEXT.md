@@ -1,71 +1,100 @@
 # CONTEXT
 
-Project language for the eGPU-assisted MLX-LM / oMLX inference work. Glossary only — no
-implementation detail, spec, or decisions. Architecture lives in `docs/ARCHITECTURE.md`,
-implementation contracts in `docs/DESIGN.md`, sequencing in `docs/ROADMAP.md`, decisions in
-`docs/adr/`.
+Project language for the R9700 prefill service and portable inference device platform. Glossary only — architecture lives in `docs/ARCHITECTURE.md`, implementation contracts in `docs/DESIGN.md`, sequencing in `docs/ROADMAP.md`, and decisions in `docs/adr/`.
 
----
+## Cache and inference language
 
 **KV tensor**:
-A single per-layer attention key or value tensor for one sequence. Standard inference vocabulary.
-_Avoid_: referring to a whole sequence's cache as a single "KV tensor" (that is a KV cache).
+A single per-layer attention key or value tensor for one sequence.
+_Avoid_: referring to a whole sequence's cache as one KV tensor; that is a KV cache.
 
 **KV cache**:
-The collection of all per-layer KV tensors for one sequence/request. The complete attention state
-a decoder needs to continue generation. Standard inference vocabulary (SGLang, vLLM, llama.cpp).
-_Avoid_: "KV cache" and "prompt cache" are **not** synonyms in this project (see Prompt cache).
+The collection of all per-layer KV tensors for one sequence or request: the attention state a decoder needs to continue generation.
+_Avoid_: using KV cache and prompt cache as synonyms; a KV cache is in memory.
 
 **Prompt cache**:
-A *portable, serialized image* of a KV cache that crosses the device boundary from a prefill
-producer to a consumer. Distinct from a KV cache: a prompt cache is the interchange artifact
-(e.g. mlx-lm's `save_prompt_cache` / `load_prompt_cache` `.safetensors`), not the in-memory state.
-_Avoid_: treating "prompt cache" and "KV cache" as the same thing; the former is serialized, the
-latter is in-memory.
+A portable serialized image of a KV cache that crosses a producer/consumer boundary or is retained as a review artifact.
+_Avoid_: using prompt cache for live in-memory KV state.
 
-**Prefill producer**:
-The component that runs the prompt forward pass and emits a prompt cache. Producer owns the KV
-truth for the prefilled portion; the consumer treats the imported prompt cache as fixed
-compatibility state. Not a single implementation — it is tinygrad in Path A and a native R9700
-producer in Path C.
-_Avoid_: "prefill daemon" (a Path A Phase-1 *implementation term* — see `docs/DESIGN.md`, not
-architecture language).
-
-**Prefill consumer** (the decode host):
-The component that decodes from an imported prompt cache — mlx-lm and oMLX on Apple Silicon Metal.
-Consumers never recompute the prefilled portion.
+**Canonical KV description**:
+The engine-neutral description of KV geometry, dtype, layout, position semantics, model identity, and optional quantization needed to interpret a KV cache.
+_Avoid_: “universal KV binary ABI”; engines still require adapters and may use different physical cache representations.
 
 **KV interchange format**:
-The durable contract for the prompt cache: layout, dtype, per-layer schema, and position/RoPE
-semantics. This is the product boundary for Path A and the first Path C native-producer stage.
-Later native-consumer-backend work may evolve or retire it, but only after an explicit gate.
-_Avoid_: "KV ABI" — implementation-flavored and implies a fixed binary ABI; the format is a
-versioned interchange schema.
+The versioned prompt-cache schema used for durable producer/consumer interchange and compatibility evidence.
+_Avoid_: “KV ABI,” which implies one fixed in-memory or binary representation.
 
-**Path C**:
-The tinygrad-free track. It starts with a native R9700 prefill producer behind the KV interchange
-format, after a short dual-track runtime spike, and only later may become a native mlx-lm/oMLX
-consumer backend.
-_Avoid_: treating Path C as "rewrite mlx-lm first", "fork DwarfStar", or "full inference engine" as
-the initial boundary.
+**Prefill producer**:
+The component that runs the prompt forward pass and owns authoritative KV state for the prefilled prefix until handoff.
+_Avoid_: treating producer as a synonym for service, daemon, transport, or consumer.
+
+**Prefill consumer** (decode host):
+The component that accepts producer KV through an engine adapter and continues decode without recomputing the accepted prefix.
+_Avoid_: silently repairing or recomputing an accepted producer prefix.
 
 **Native R9700 producer**:
-A Path C prefill producer that runs model-forward kernels on the AMD Radeon AI PRO R9700 without
-tinygrad and emits a prompt cache through the KV interchange format.
-_Avoid_: generic ROCm backend, DwarfStar fork, full server, or decode owner.
+A tinygrad-free prefill producer whose model-forward work executes on the AMD Radeon AI PRO R9700.
+_Avoid_: applying this term to CPU/NumPy oracle output, a generic ROCm backend, or a decode owner.
+
+**R9700 Prefill Service**:
+The product boundary that manages resident models and serves prefill requests using a Native R9700 producer.
+_Avoid_: “prefill daemon” as the product name; daemon is one process-lifetime implementation choice.
+
+**Engine adapter**:
+A boundary component that maps canonical KV and service results into one consumer engine's cache and lifecycle semantics.
+_Avoid_: assuming raw K/V tensor shape alone makes caches interchangeable across engines.
+
+## Device platform language
+
+**Portable Inference Device Platform**:
+The product boundary that provides the device, execution, kernel, conformance, and evidence contracts needed by local inference workloads.
+_Avoid_: “generic eGPU platform,” “full ROCm port,” or “universal accelerator framework.”
+
+**TinyGPU Device Owner**:
+The sole macOS DriverKit authority for R9700 attachment, lifecycle, protected device resources, submission, and fault control.
+_Avoid_: exposing unrestricted PCI/MMIO ownership to inference clients or treating TinyGPU and the HAL as the same layer.
+
+**Inference HAL**:
+The deliberately small portable execution contract between inference software and vendor/device backends.
+_Avoid_: “IREE adoption,” “ROCr port,” or “device plugin”; upstream runtimes guide its shape but are not the product.
+
+**Kernel pack**:
+An admitted set of target-specific executable images plus entry-point, resource, shape, numerical, provenance, and conformance metadata.
+_Avoid_: “kernel blob” for an admitted production asset or “monolithic kernel library” for independent shape families.
+
+**Correctness control**:
+A retained scalar or reference implementation used to diagnose and bound an optimized implementation.
+_Avoid_: calling CPU/NumPy or scalar evidence native-performance acceptance.
+
+## Measurement language
+
+**Cold process benchmark**:
+End-to-end startup measurement including device initialization, model loading, model upload, kernel loading, prefill, and cache handoff.
+_Avoid_: presenting it as worker compute throughput.
+
+**Warm prefill benchmark**:
+The primary product measurement for one request when the process, device, model, and kernels are already resident.
+_Avoid_: including model load or one-time preparation without labeling it.
+
+**GPU compute benchmark**:
+The kernel-optimization measurement from the first transformer GPU operation to the last, excluding service and cache-transfer overhead.
+_Avoid_: presenting it as user-visible request latency.
+
+## Historical and deferred language
+
+**Path C**:
+The historical tinygrad-free program that established the native runtime, Native R9700 producer, and imported-cache serving path through C0–C2.
+_Avoid_: using Path C as the umbrella name for the new prefill-service and device-platform roadmaps.
 
 **Native consumer backend**:
-A later-stage integration where mlx-lm or oMLX schedules R9700 work directly instead of receiving a
-serialized prompt cache from a producer.
-_Avoid_: treating this as the first Path C acceptance gate.
+A deferred integration where an inference engine schedules R9700 work directly instead of consuming service-produced cache state.
+_Avoid_: treating a native MLX backend as the next required product gate.
 
 **DwarfStar reference**:
-Antirez' `ds4` / DwarfStar codebase used as prior art for narrow native inference engines and
-Metal/ROCm kernel structure.
+Antirez' `ds4` / DwarfStar codebase used as prior art for narrow native inference engines and kernel structure.
 _Avoid_: `fs4`; treating DwarfStar as a dependency, target architecture, or general GGUF runner.
 
----
-
 **Deprecated terms**:
-- "Radeon R9700" — superseded by the correct model: AMD Radeon AI PRO R9700 (RDNA4 / gfx12-class,
-  32 GB workstation GPU, ASUS TURBO variant).
+- “Radeon R9700” — use AMD Radeon AI PRO R9700 (`gfx1201`, RDNA4, 32 GB).
+- “Prefill daemon” as architecture — use R9700 Prefill Service; daemon is implementation vocabulary.
+- “Device plugin” for the platform boundary — use Inference HAL or engine adapter, whichever is meant.

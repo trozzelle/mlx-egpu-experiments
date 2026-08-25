@@ -1,0 +1,349 @@
+schema_version: 1
+captured_at: 2026-08-25
+authority:
+  guide: docs/REFERENCES.md
+  interface_pins: docs/pinned-upstream-interfaces.md
+  policy: >-
+    These revisions authorize reference use only. Copying, translating, vendoring,
+    or compiling an artifact requires file-level license review, recorded local
+    modifications, source and image hashes, applicable ASIC/IP scope, and linked
+    local conformance evidence.
+
+sources:
+  - id: mac-amdgpu
+    priority: P0
+    reuse: port-adapt
+    upstream: https://github.com/lemonade-sdk/mac-amdgpu
+    revision: 3bdeed2de940504ad6bd1bac718d5de2f65ddb83
+    paths:
+      - dext/MacAMDGPU.cpp
+      - dext/MacAMDGPU.iig
+      - dext/MacAMDGPUUserClient.iig
+      - dext/amdgpu/amdgpu_init.cpp
+      - dext/amdgpu/gmc_v12_0.cpp
+      - dext/amdgpu/psp_v14_0.cpp
+      - dext/amdgpu/smu_v14_0.cpp
+      - dext/amdgpu/mes_v12_1.cpp
+      - dext/amdgpu/gfx_v12_0.cpp
+      - dext/amdgpu/sdma_v7_0.cpp
+    license: MIT
+    license_review: required_before_copy
+    vendored: false
+    phases: [P1]
+    required_evidence:
+      - cold-init stage and register-trace differential
+      - BO/VM and SDMA conformance
+      - TinyGPU remains sole device owner
+    prohibited_wholesale: second production DriverKit substrate
+
+  - id: tinygrad-amdev
+    priority: P0
+    reuse: port-adapt-and-differential-oracle
+    upstream: https://github.com/tinygrad/tinygrad
+    revision: d851aca9ae1faf4210cc0da4508bead7da57d7ee
+    paths:
+      - tinygrad/runtime/support/am/amdev.py
+      - tinygrad/runtime/support/am/ip.py
+      - tinygrad/runtime/ops_amd.py
+    license: MIT
+    license_review: required_before_copy
+    vendored: false
+    phases: [P1]
+    required_evidence:
+      - initialization-stage register snapshots
+      - reset and recovery differential
+      - no tinygrad runtime dependency in product path
+    prohibited_wholesale: tinygrad runtime dependency
+
+  - id: linux-amdgpu-gfx12
+    priority: P0
+    reuse: normative-and-port-adapt
+    upstream: https://github.com/torvalds/linux
+    revision: 73ae59e975966d24e32926247ddb45a537ebe184
+    paths:
+      - drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c
+      - drivers/gpu/drm/amd/amdgpu/gmc_v12_0.c
+      - drivers/gpu/drm/amd/amdgpu/sdma_v7_0.c
+      - drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c
+    license: GPL-2.0-only tree; verify each copied definition or sequence
+    license_review: required_before_translation_or_copy
+    vendored: false
+    phases: [P1]
+    required_evidence:
+      - source-cited register and bitfield mapping
+      - VM/PTE/TLB conformance
+      - queue and reset conformance
+    prohibited_wholesale: DRM, TTM, GEM, scheduler, or Linux object model
+
+  - id: llvm-amdgpu-usage
+    priority: P0
+    reuse: normative
+    upstream: https://github.com/llvm/llvm-project
+    revision: 8dba93818258d95c46fa2c17e902a8256e4d91b5
+    paths:
+      - llvm/docs/AMDGPUUsage.rst
+    license: Apache-2.0 WITH LLVM-exception
+    license_review: reference-only
+    vendored: false
+    phases: [F2, P3]
+    required_evidence:
+      - code-object and descriptor admission
+      - kernarg alignment validation
+      - wave and segment metadata validation
+    prohibited_wholesale: LLVM toolchain as runtime dependency
+
+  - id: amd-isa-spec-manager
+    priority: P0
+    reuse: tool-and-normative
+    upstream: https://github.com/GPUOpen-Tools/isa_spec_manager
+    revision: 452645535ac05f466b06a13e5eafeb5a86d3ad11
+    paths:
+      - include/amdisa
+      - source/examples/basic_decoder.cpp
+      - source/examples/multi_arch_decoder.cpp
+      - documentation/spec_documentation.md
+    license: MIT
+    license_review: required_before_vendoring_tool_code
+    vendored: false
+    phases: [F2, P3]
+    required_evidence:
+      - RDNA4 XML revision recorded with each analysis
+      - admitted-image disassembly
+      - WMMA and unsupported-instruction checks
+    prohibited_wholesale: none; tool integration remains optional
+
+  - id: radeon-gpu-analyzer
+    priority: P0
+    reuse: tool
+    upstream: https://github.com/GPUOpen-Tools/radeon_gpu_analyzer
+    revision: 39688b004af6993f7146dd8e26b52994ec020fe6
+    paths:
+      - source
+      - README.md
+    license: MIT
+    license_review: required_before_vendoring_tool_code
+    vendored: false
+    phases: [F2, P3]
+    required_evidence:
+      - offline ISA and resource report linked to Kernel Pack
+    prohibited_wholesale: runtime dependency
+
+  - id: amd-matrix-instruction-calculator
+    priority: P0
+    reuse: tool
+    upstream: https://github.com/ROCm/amd_matrix_instruction_calculator
+    revision: 2ef91896bcdc4d26624f952e5c905c787cd9bc9e
+    paths:
+      - matrix_calculator.py
+      - README.md
+    license: MIT
+    license_review: required_before_vendoring_tool_code
+    vendored: false
+    phases: [F2]
+    required_evidence:
+      - gfx1201 register-layout report
+      - independent local lane-map hardware proof
+    prohibited_wholesale: treating generated layout as hardware acceptance without execution
+
+  - id: rocm-libraries-rocwmma-hipblaslt
+    priority: P0
+    reuse: normative-pattern-and-port-adapt
+    upstream: https://github.com/ROCm/rocm-libraries
+    revision: f7f2aee8e764e612f49f2dc030b7e1639fb30d34
+    paths:
+      - projects/rocwmma/samples/simple_hgemm.cpp
+      - projects/rocwmma/samples/perf_hgemm.cpp
+      - projects/rocwmma/library/include/rocwmma
+      - projects/hipblaslt
+    license: component-specific; no repository-wide assertion
+    license_review: required_for_each_file_or_generated_asset
+    vendored: false
+    phases: [F2, F3, F6]
+    required_evidence:
+      - gfx1201 target and wave32 review
+      - local descriptor and fragment-layout proof
+      - standalone numerical and performance records
+    prohibited_wholesale: hipBLASLt or rocBLAS host runtime
+
+  - id: aiter-gfx1201
+    priority: P0
+    reuse: port-adapt-and-pattern
+    upstream: https://github.com/ROCm/aiter
+    revision: 35c652ed3bd34e5d5828954e1545babc9255a69a
+    paths:
+      - aiter/ops/flydsl/kernels/flash_attn_func_gfx1201.py
+      - aiter/ops/triton/configs/gfx1201
+      - aiter/ops/triton/attention
+    license: Apache-2.0 for pinned flash source; repository metadata reports MIT
+    license_review: required_for_each_additional_path
+    vendored: false
+    phases: [F3, F4, F6]
+    required_evidence:
+      - gfx1201 path-specific source review
+      - local generated-image provenance
+      - attention or GEMM numerical contract
+      - local hardware benchmark
+    prohibited_wholesale: AITER runtime or non-gfx1201 CK/assembly assumptions
+
+  - id: flash-attention
+    priority: P0
+    reuse: normative-and-pattern
+    upstream: https://github.com/Dao-AILab/flash-attention
+    revision: 0251105a2fb19d2957484b7f023cd8c115286ced
+    paths:
+      - flash_attn
+      - tests
+      - README.md
+    license: BSD-3-Clause
+    license_review: required_before_copy
+    vendored: false
+    phases: [F4]
+    required_evidence:
+      - online-softmax and causal/GQA reference comparison
+      - arbitrary-length and tail coverage
+      - numerical error report
+    prohibited_wholesale: CUDA/ROCm runtime dependency
+
+  - id: iree-hal-drivers
+    priority: P0
+    reuse: pattern
+    upstream: https://github.com/iree-org/iree
+    revision: d153db0dc98cc25eda92fcb08792bdcfb78cfe8a
+    paths:
+      - runtime/src/iree/hal/drivers/hip
+      - runtime/src/iree/hal/drivers/cuda
+      - runtime/src/iree/hal
+    license: Apache-2.0
+    license_review: required_before_copy
+    vendored: false
+    phases: [P2, P4]
+    required_evidence:
+      - interface-to-design mapping
+      - absence of unused compiler/runtime abstractions
+      - HAL lifecycle and error conformance
+    prohibited_wholesale: IREE compiler and runtime adoption
+
+  - id: pjrt-c-api
+    priority: P1
+    reuse: pattern
+    upstream: https://github.com/openxla/xla
+    revision: 0b37d01b248cf5c1d86cc0df047af44b4db951f7
+    paths:
+      - xla/pjrt/c/pjrt_c_api.h
+    license: Apache-2.0
+    license_review: required_before_copy
+    vendored: false
+    phases: [P1, P2]
+    required_evidence:
+      - ABI version and struct-size compatibility tests
+      - opaque-handle lifetime review
+    prohibited_wholesale: XLA or PJRT runtime adoption
+
+  - id: mlx-cuda-backend
+    priority: P1
+    reuse: pattern-and-watch
+    upstream: https://github.com/ml-explore/mlx
+    revision: 1f8e74e3f12f31365464a6867c6579f0e9b29d85
+    paths:
+      - mlx/backend/cuda
+      - mlx/backend/gpu
+    license: MIT
+    license_review: required_before_copy
+    vendored: false
+    phases: [P5]
+    required_evidence:
+      - measured adapter limitation
+      - native-backend ADR before implementation
+    prohibited_wholesale: immediate backend/am implementation
+
+  - id: mlx-lm-cache
+    priority: P0
+    reuse: normative
+    upstream: https://github.com/ml-explore/mlx-lm
+    revision: e2f2fb2aef987f86878d17638446183cffe21fe4
+    paths:
+      - mlx_lm/models/cache.py
+      - mlx_lm/generate.py
+      - mlx_lm/cache_prompt.py
+      - tests
+    license: MIT
+    license_review: reference-only
+    vendored: false
+    phases: [F1, F5, F6, Q1]
+    required_evidence:
+      - prompt-cache round trip
+      - S-1 final-token injection
+      - cache-class and metadata compatibility
+    prohibited_wholesale: shape-only cache compatibility
+
+  - id: omlx
+    priority: P0
+    reuse: adapter-source-and-pattern
+    upstream: https://github.com/jundot/omlx
+    revision: 90ecf1c26dbed875e6ced82c4faa6e9250037f2d
+    paths:
+      - omlx/scheduler.py
+      - omlx/cluster/worker.py
+      - docs/distributed-cluster.md
+    license: Apache-2.0
+    license_review: required_before_copy
+    vendored: false
+    phases: [F1, F5, Q1]
+    required_evidence:
+      - mlx-lm cache seam review
+      - local worker lifecycle comparison
+      - no distributed-scope import
+    prohibited_wholesale: cluster, transport, or app-shell adoption
+
+  - id: vllm-kv-connector
+    priority: P1
+    reuse: pattern
+    upstream: https://github.com/vllm-project/vllm
+    revision: 80771bbbddf9e5153eea3aca8055049ee5aaaed1
+    paths:
+      - vllm/distributed/kv_transfer/kv_connector/v1/base.py
+      - docs/features/disagg_prefill.md
+    license: Apache-2.0
+    license_review: required_before_copy
+    vendored: false
+    phases: [F1, F5]
+    required_evidence:
+      - local lifecycle and failure-state mapping
+      - measured benefit for any adopted transfer abstraction
+    prohibited_wholesale: vLLM distributed runtime
+
+  - id: llama-cpp-ggml-backend
+    priority: P1
+    reuse: pattern
+    upstream: https://github.com/ggml-org/llama.cpp
+    revision: eab8ee41f889ef7823af517e8098fb8a9b3cf601
+    paths:
+      - ggml/include/ggml-backend.h
+      - ggml/src/ggml-backend.cpp
+      - ggml/src/ggml-backend-reg.cpp
+    license: MIT
+    license_review: required_before_copy
+    vendored: false
+    phases: [P5]
+    required_evidence:
+      - supported-op and graph-partition design review
+      - service/adapter baseline comparison
+    prohibited_wholesale: engine rewrite
+
+  - id: dwarfstar-ds4
+    priority: P2
+    reuse: pattern
+    upstream: https://github.com/antirez/ds4
+    revision: c1d4597a80e300b803dc642519718f2c999589da
+    paths:
+      - ds4.c
+      - kernels
+      - tests
+    license: MIT
+    license_review: required_before_copy
+    vendored: false
+    phases: [F6, P5]
+    required_evidence:
+      - narrow idea-to-local-contract mapping
+      - target and model mismatch review
+    prohibited_wholesale: model scope, session format, server, agent stack, or product architecture

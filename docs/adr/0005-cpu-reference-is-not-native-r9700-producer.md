@@ -35,4 +35,8 @@ Conflating "tinygrad-free" with "R9700/eGPU compute" hid the missing model-kerne
 - C2 cannot pass unless large prompts use the R9700/eGPU producer route and still satisfy fallback/security semantics.
 - C3 direct consumer backend work remains downstream of real C2 evidence, not CPU-reference evidence.
 
+## Resolution evidence
+
+By 2026-08-25 the reopened gates were satisfied: native 16-layer Llama prefill produced hardware-backed `r9700_native` artifacts, C1R was token-exact through prompt-128, and C2R accepted the actual R9700 producer route with no fallback. The CPU/NumPy classification and hardware-evidence requirement remain in force.
+
 **Links:** `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/ROADMAP.md`, `docs/tasks/native-r9700-producer/phase-c1-native-producer-parity.md`, `docs/tasks/native-r9700-producer/phase-c2-serving-integration.md`.

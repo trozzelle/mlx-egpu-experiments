@@ -1,146 +1,240 @@
 # Architecture
 
+This document defines durable product and system boundaries. Implementation contracts live in `DESIGN.md`. Capability sequencing lives in `ROADMAP.md`. Project language lives in `../CONTEXT.md`. Upstream reuse guidance lives in `REFERENCES.md`.
+
 ## Purpose
 
-Define durable product and system boundaries for using the AMD Radeon AI PRO R9700 eGPU as a
-prefill device, and eventually native accelerator, for MLX-LM / oMLX inference on Apple Silicon
-macOS. This document names what must stay true as the implementation changes. Implementation
-contracts live in `docs/DESIGN.md`; capability sequencing lives in `docs/ROADMAP.md`; project
-language lives in `CONTEXT.md`.
+Turn the accepted native R9700 prefill proof into two durable products:
+
+1. a fast, persistent **R9700 Prefill Service** for cache-aware inference engines; and
+2. a reusable **Portable Inference Device Platform** for local inference workloads on non-Metal devices.
+
+The products are co-equal. They share hardware, kernel, conformance, and evidence foundations but advance on independent tracks. Neither product may claim the other's capability without passing an explicit integration gate.
 
 ## Documentation contract
 
-This document defines durable product and system boundaries. Implementation contracts live in
-DESIGN.md. Capability sequencing lives in ROADMAP.md. Project language lives in CONTEXT.md. Key
-decisions are recorded in `docs/adr/`.
+- `CONTEXT.md` defines canonical terms only.
+- This document states ownership, boundaries, invariants, and target structure.
+- `DESIGN.md` specifies implementation-facing interfaces and validation contracts.
+- `ROADMAP.md` sequences capability outcomes and promotion gates.
+- `IMPLEMENTATION_PLAN.md` describes high-level execution workstreams; task packets remain separate.
+- `REFERENCES.md` and `upstream-reference-manifest.yaml` classify and pin upstream guidance.
+- `docs/adr/` records hard-to-reverse decisions and rejected alternatives.
 
 ## Product/system boundary
 
-The current durable boundary is the **KV interchange format** (ADR 0001): the versioned schema for
-a serialized prompt cache crossing from a prefill **producer** to a prefill **consumer**. Producers
-and consumers are interchangeable behind this format. The producer is tinygrad in Path A and a
-native R9700 producer in the first Path C stage; the consumer is mlx-lm / oMLX on Apple Silicon
-Metal.
+### R9700 Prefill Service
 
-Path C uses a **hybrid staged boundary** (ADR 0003):
+Owns:
 
-1. **First Path C boundary:** a tinygrad-free native R9700 prefill producer that emits the same
-   consumer-loadable prompt cache and passes the Phase-0-style token-exact parity gate.
-2. **Later boundary:** a native mlx-lm/oMLX consumer backend may schedule R9700 kernels directly
-   after native-producer correctness and runtime viability are proven.
+- resident model identity, preparation, and lifetime;
+- prefill request scheduling and model-forward execution;
+- authoritative KV state until handoff;
+- canonical KV metadata and prompt-cache artifacts;
+- per-request evidence, timing, and fail-closed results.
 
-DwarfStar (`antirez/ds4`) is a source-level reference for narrow native inference engines and
-Metal/ROCm kernel organization. It is not a dependency, not a target architecture, and not a
-general GGUF runner.
+Does not own:
+
+- Apple Metal decode, sampling, or application request policy;
+- arbitrary remote/distributed KV transport;
+- a universal cross-engine physical KV representation;
+- a complete inference engine or general GGUF runner.
+
+### Portable Inference Device Platform
+
+Owns:
+
+- TinyGPU device ownership and protected hardware lifecycle;
+- a small Inference HAL for buffers, executable dispatch, queues, synchronization, timestamps, and faults;
+- Kernel Pack admission, provenance, numerical contracts, and conformance;
+- device capability manifests and target-specific backends;
+- reusable execution evidence for inference workloads.
+
+Does not own:
+
+- the full ROCr/HIP/CUDA/IREE surface;
+- Linux DRM, TTM, KFD, or a Vulkan implementation;
+- framework model graphs, tokenization, sampling, or serving policy;
+- multi-node scheduling;
+- NVIDIA-on-macOS as an implied extension of AMD support.
+
+### Shared boundary
+
+The prefill service consumes platform execution contracts; the platform never acquires model or engine semantics. Engine adapters consume canonical KV and translate it into consumer-specific cache state. Prompt-cache files remain the durable compatibility and review artifact even after a direct local transport is introduced.
 
 ## Current baseline
 
-- AMD Radeon AI PRO R9700 (32 GB, RDNA4/gfx12-class) attached via Thunderbolt 5, driven today by
-  the TinyGPU driver extension through tinygrad.
-- Phase 0 proved the core theory: official Meta Llama 3.2 1B fp16 weights on tinygrad/R9700
-  produce a KV cache that mlx-lm/Metal can consume with `P == R` token-for-token across the gate
-  prompts. The report is `docs/path-a-validation-results.md`.
-- The Phase 0 harness discovered and fixed two load-bearing contract details: Llama-3 RoPE scaling
-  must come from the MLX sidecar, and mlx-lm `generate_step` requires an `S-1` imported prefix plus
-  the final prompt token as the supplied suffix.
-- No persistent R9700/eGPU model-forward producer daemon or native consumer backend exists yet. The
-  current `native_r9700.prefill` path is CPU/NumPy reference and ABI-oracle work; the current
-  `native_r9700.serving` path is an imported-cache wrapper around that reference producer.
+Confirmed repository evidence as of 2026-08-25:
+
+- Path A proved the producer/consumer theory: tinygrad/R9700 prompt caches decode token-for-token with mlx-lm through the `S-1` prompt-cache contract.
+- Native C0 proved kernel launch, host↔device transfer, and resident-VRAM operation on the AMD Radeon AI PRO R9700 (`1002:7551`, `gfx1201`) through TinyGPU.app / `APLRemotePCIDevice` / `PCIIface`.
+- Native C1R now executes all 16 Llama 3.2 1B layers on the R9700 and is token-exact at prompt lengths 0, 16, 64, and 128 against the mlx-lm baseline.
+- Native C2R routes prompt lengths 16 and 128 through the actual R9700 producer, accepts the imported cache, performs no fallback, and decodes token-exactly.
+- The scalar/native graph, prompt-cache emitter, fail-closed serving wrapper, hardware evidence binding, kernel-asset admission, resident allocations, and profiling are working foundations.
+- The diagnosis tied to commit `5407e4d` reports a B4 prompt-128 median of 18.012 seconds, or 7.11 prefix tokens/s. This is a directional redesign baseline, not a fresh promotion measurement; the persistent-worker phase must remeasure cold, warm, and GPU-compute scopes.
+
+The baseline retires native correctness risk for the first Llama target. It does not establish a persistent worker, production device-owner ABI, portable HAL, matrix-shaped prefill, tiled attention, long-context capacity, Qwen acceptance, or general device support.
 
 ## Target architecture
 
-The architecture keeps prefill disaggregation as the first correctness boundary, then permits a
-native backend only after the native producer has passed its own gate.
+```mermaid
+flowchart TB
+    subgraph Engines[Cache-aware inference engines]
+      MLX[mlx-lm]
+      OMLX[oMLX]
+      GGML[ggml / llama.cpp — later]
+    end
 
-```text
-Stage A / C1:
+    subgraph Service[R9700 Prefill Service]
+      ADAPTERS[Engine adapters]
+      MODEL[Resident model service]
+      GRAPH[Model graph and KV ownership]
+    end
 
-prefill producer  ──KV interchange format──▶  prefill consumer
-(AMD eGPU)                                    (Apple Silicon Metal)
- tinygrad Path A / native Path C              mlx-lm / oMLX
- owns KV truth (ADR 0002)                     treats prompt cache as compatibility state
+    subgraph Platform[Portable Inference Device Platform]
+      PACKS[Kernel Packs and conformance]
+      HAL[Inference HAL]
+      AMD[AMD / TinyGPU backend]
+    end
 
-Later C-native-backend horizon:
+    DEXT[TinyGPU Device Owner]
+    GPU[AMD Radeon AI PRO R9700]
 
-mlx-lm / oMLX scheduler ──native backend seam──▶ R9700 kernels/runtime
+    Engines --> ADAPTERS
+    ADAPTERS --> MODEL
+    MODEL --> GRAPH
+    GRAPH --> PACKS
+    PACKS --> HAL
+    HAL --> AMD
+    AMD --> DEXT
+    DEXT --> GPU
 ```
 
-The producer runs the prompt forward pass on the eGPU and emits a prompt cache over the KV
-interchange format. For mlx-lm `generate_step`, the imported cache covers the `S-1` prefix and the
-consumer replays the final prompt token before decoding; it does not recompute the offloaded
-prefix. A later native backend may retire the serialized handoff on its fast path, but that is a new
-boundary decision, not the first Path C milestone.
+### TinyGPU Device Owner
 
-Current implementation correction (ADR 0005): a CPU-only, tinygrad-free producer is not a Path C
-Native R9700 producer. It is a reference/oracle until model-forward prefill compute runs on the
-R9700/eGPU and emits the accepted prompt-cache artifact.
+TinyGPU remains the sole macOS DriverKit authority. It owns attachment, power/cold lifecycle, firmware-facing lifecycle, BAR and protected device resources, buffer/VA authority, queue creation, validated submission, fences, interrupts/faults, reset, and per-client isolation.
+
+Inference clients do not receive unrestricted PCI/MMIO access. Raw register operations remain diagnostic-only. `mac-amdgpu`, tinygrad AMDev, and Linux amdgpu are reference sources for sequences and invariants; they do not create a second production device owner.
+
+### Inference HAL
+
+The HAL is portable in interface and narrow in scope. It exposes only the execution concepts required by local inference: device capabilities, buffers, executables, command buffers, queues, fences, copies, barriers, dispatch, timestamps, waits, and fault queries.
+
+The current product implements one backend: AMD R9700 through TinyGPU. A future backend must fit the interface or trigger an explicit design change; portability is not license to add speculative abstractions.
+
+### Kernel Packs and model graph
+
+Target-specific code images enter through Kernel Packs with executable metadata, resource requirements, shape/dtype constraints, weight-packing version, numerical policy, provenance, license status, conformance, and benchmark evidence.
+
+The production prefill graph becomes matrix-shaped:
+
+1. input RMSNorm;
+2. fused QKV WMMA projection;
+3. RoPE and K/V write;
+4. causal tiled attention with online softmax;
+5. O WMMA projection and residual;
+6. post-attention RMSNorm;
+7. fused gate/up WMMA projection;
+8. SiLU, down WMMA projection, and residual.
+
+Launch fusion follows measured evidence. Replacing GEMV-shaped projections and materialized attention is more important than minimizing launch count.
+
+### Persistent model service
+
+A model handle owns resident/prepacked weights, Kernel Pack selection, scratch plans, reusable request buffers, KV allocation policy, graph variants, block-size tuning, quantization metadata, and model identity. Model load is a lifecycle operation, not part of every prefill request.
+
+### Engine adapters
+
+Adapters translate canonical KV and service evidence into each engine's cache classes, offsets, position semantics, and lifecycle. mlx-lm is the first normative adapter. oMLX reuses the mlx-lm cache seam where compatible. ggml/llama.cpp and a direct native MLX backend are later integrations, not assumptions in the service or HAL.
 
 ## Ownership table
 
-| Concern | Owner |
-|---|---|
-| KV interchange format for Path A and first Path C producer | System contract documented in DESIGN.md |
-| Prefill KV truth per request | Prefill producer (ADR 0002) |
-| Decode correctness from imported cache | Consumer after the producer passes the parity gate |
-| Prompt-cache compatibility state after import | Consumer (mlx-lm / oMLX) |
-| Tinygrad exporter/harness | Path A implementation |
-| Native R9700 kernels/runtime | Path C producer implementation |
-| Runtime substrate choice (macOS eGPU vs Linux ROCm/HIP) | Path C runtime-discovery gate, not architecture vocabulary |
-| DwarfStar source usage | Reference corpus only; no ownership transfer |
-| Native mlx-lm/oMLX backend | Deferred later-stage integration |
+| Concern | Owner | Boundary |
+|---|---|---|
+| PCI attachment, power, protected resources, reset | TinyGPU Device Owner | DriverKit/user-client contract |
+| BO/VA, queues, validated submit, fences, faults | TinyGPU Device Owner | No unrestricted MMIO for inference clients |
+| Portable execution objects and commands | Inference HAL | No model or engine semantics |
+| AMD PM4/SDMA/MQD/HQD implementation | AMD/TinyGPU HAL backend | Never exposed as portable API |
+| Code images, descriptors, provenance, numerics | Kernel Pack system | Admission precedes production use |
+| Model weights, prepacking, scratch, graph variants | R9700 Prefill Service model handle | Resident across warm requests |
+| Authoritative prefill KV | Prefill producer | Producer owns truth until handoff |
+| Canonical KV description | R9700 Prefill Service | Engine-neutral logical contract |
+| Consumer cache objects and decode state | Engine adapter and prefill consumer | Consumer-specific compatibility state |
+| Decode and sampling | mlx-lm/oMLX/other engine | Outside both products |
+| CPU/NumPy and scalar controls | Validation system | Oracle/control evidence only |
+| Upstream reuse classification and provenance | `REFERENCES.md` and manifest | No unreviewed copying |
 
 ## Core flows
 
-1. **Path A validated flow:** tinygrad prefill on R9700 → export prompt cache → mlx-lm imports the
-   `S-1` prefix → mlx-lm decodes on Metal and matches the native baseline.
-2. **Path C native-producer flow:** native runtime/kernels prefill on R9700 → emit the KV
-   interchange format → consumer decode flow remains unchanged → Phase-0-style gate proves parity.
-3. **Path C runtime-discovery flow:** minimal model/kernel work is exercised on both the local macOS
-   eGPU path and a Linux ROCm/HIP reference path; the first native producer proceeds only on a
-   substrate with observed kernel launch, memory movement, and correctness instrumentation.
-4. **Later native-backend flow:** mlx-lm/oMLX schedules R9700 kernels directly through a native
-   backend seam; the prompt-cache format remains a fallback/review artifact unless a later ADR
-   supersedes it.
+### Warm prefill request
+
+1. Client selects a loaded model handle and submits token IDs plus a cache specification.
+2. Service validates model identity, request geometry, context capacity, and adapter compatibility.
+3. Service reuses resident/prepacked weights and request buffers.
+4. Model graph submits Kernel Pack commands through the current runtime or the HAL after its integration gate.
+5. Producer materializes authoritative KV and evidence.
+6. Engine adapter emits a prompt cache or direct local handoff preserving canonical KV semantics.
+7. Consumer accepts the cache and decodes from the final prompt token.
+
+### Platform command execution
+
+1. Caller queries device capabilities and loads an admitted executable.
+2. HAL allocates/imports buffers and records copy, fill, dispatch, barrier, and timestamp commands.
+3. AMD backend translates portable commands into validated TinyGPU operations.
+4. TinyGPU owns queue submission and reports fence, timing, or fault state.
+5. Conformance binds output and evidence to the executable and device identity.
+
+### Optimization promotion
+
+1. New kernel is admitted with source/image provenance and a manifest-specific numerical contract.
+2. Kernel passes standalone comparison against scalar/NumPy/MLX controls.
+3. Model graph passes final decoded-token equality and repeated stability.
+4. Cold, warm, and GPU-compute benchmark scopes are recorded.
+5. Production selection changes only after the targeted bottleneck improves without service or platform regression.
+
+### Direct local cache transport
+
+A later adapter may avoid NPZ or safetensors rewriting on the hot path by using shared or pinned local memory. The canonical KV description and acceptance state remain unchanged; prompt-cache serialization remains available for compatibility, replay, debugging, and review.
 
 ## State and artifact ownership
 
-- The producer owns the authoritative KV cache for the prefilled portion (ADR 0002).
-- The consumer owns the in-memory prompt cache as compatibility state during decode.
-- Serialized prompt-cache artifacts are versioned by the KV interchange format; consumers may apply
-  their own post-import optimizations only after import.
-- Runtime logs and parity reports are review artifacts. Model files and local logs stay uncommitted.
-- DwarfStar KV/session formats are not adopted as this project's format; they are examples of a
-  narrow engine's state ownership and validation practice.
+- The service owns model handles, packed resident weights, request buffers, graph variants, and live producer KV.
+- The consumer owns imported cache objects only after acceptance.
+- A decode failure after cache acceptance must not trigger silent prefix recomputation.
+- Prompt-cache files are immutable handoff/review artifacts for one model identity, prompt prefix, format version, and producer evidence set.
+- Kernel Packs bind source revision, image digest, descriptor/resources, target, numerical policy, and conformance results.
+- Firmware and translated hardware sequences retain upstream provenance and licensing records.
+- Cold, warm, and GPU-compute benchmark results are distinct artifacts and must not be compared as one metric.
 
 ## Constraints and compatibility
 
-- Producer and consumer load the **same model weights** for parity gates. The Phase 0 passing
-  baseline used official Meta Llama 3.2 1B fp16 on both sides.
-- The prompt cache must satisfy consumer decoder numerics. RoPE/position semantics are part of the
-  format contract.
-- Tinygrad AMD device memory is process-local with no tensor IPC. Path A crosses the boundary as
-  serialized bytes.
-- Path C cannot assume DwarfStar's ROCm path directly maps to the local eGPU: upstream DwarfStar's
-  ROCm target is Linux Strix Halo (`gfx1151`), while this project targets an AMD Radeon AI PRO R9700
-  eGPU on macOS first. That mismatch is why ROADMAP.md starts Path C with a dual-track runtime
-  spike.
-- Hackintosh RDNA4 graphics-stack prior art is not a Path A constraint. It may inform native Path C
-  device/runtime work only where it explains compute-visible register/ISA behavior.
-- mac-amdgpu (`${HOME}/Development/ml/tools/mac-amdgpu`, `lemonade-sdk/mac-amdgpu`,
-  v0.1.48) is a **behavioral/init reference, not a substrate switch.** ADR 0004 keeps
-  TinyGPU/AMDev as the C1 substrate. mac-amdgpu's SIP-disabled + paid-entitlement setup is its own
-  dev/signing arrangement, not a requirement here; and it has not yet reached GFX compute-kernel
-  execution (its compute path stops at KIQ NOP/fence + SDMA copy), so it is behind the C0A25
-  `--kernel-proof` gate. Its durable value is init/GART/PTE/PSP/SMU sequence reference. See
-  `docs/pinned-upstream-interfaces.md` §6–§7 and the PCIe BAR diagnostic PDF.
+- Hardware-first scope: AMD Radeon AI PRO R9700, `gfx1201`, 32 GB, Apple Silicon macOS over Thunderbolt.
+- TinyGPU is the sole production device owner (ADR 0007).
+- First optimized model control: Llama 3.2 1B fp16. Qwen3.8-27B research may proceed in parallel but has separate quantized, MLX-VLM, and hybrid-cache contracts.
+- The `S-1` prompt-cache invariant and final-token injection remain load-bearing for the mlx-lm serialized adapter.
+- Final decoded tokens remain exact against the native consumer baseline. Optimized intermediate K/V and logits use explicit bounded numerical contracts, not byte identity.
+- Consumer fallback is allowed only before cache acceptance.
+- Local files, stdio, Unix sockets, or reviewed shared-memory transport precede any network exposure.
+- No source or firmware is imported without exact revision, path, license status, local modifications, applicable ASIC/IP scope, and conformance linkage.
+- Other AMD devices use capability manifests and target-specific Kernel Packs, not scattered PCI-ID conditionals.
+- Linux NVIDIA should use existing CUDA ecosystems. macOS NVIDIA is a separate research backend and is not on the current roadmap.
 
 ## Architecture decisions
 
 - [ADR 0001 — KV interchange format is the durable boundary](adr/0001-kv-interchange-format-boundary.md)
-- [ADR 0002 — Producer owns KV truth; consumer treats prompt cache as compatibility state](adr/0002-producer-owns-kv-truth.md)
+- [ADR 0002 — Producer owns KV truth](adr/0002-producer-owns-kv-truth.md)
 - [ADR 0003 — Path C uses a hybrid staged boundary](adr/0003-hybrid-staged-path-c.md)
+- [ADR 0004 — macOS eGPU runtime selected as C1 substrate](adr/0004-macos-substrate-selection.md)
+- [ADR 0005 — CPU reference is not Native R9700 acceptance](adr/0005-cpu-reference-is-not-native-r9700-producer.md)
+- [ADR 0006 — Prefill service and device platform are co-equal products](adr/0006-two-products-independent-tracks.md)
+- [ADR 0007 — TinyGPU remains device owner behind a portable inference HAL](adr/0007-tinygpu-owner-portable-hal.md)
 
 ## Open questions
 
-- None blocking architecture acceptance. Path C runtime substrate selection is intentionally a
-  Roadmap Phase C0 evidence gate, not an architecture assumption.
+None block architecture acceptance. Roadmap gates must resolve the following before the affected capability promotes:
+
+- the first stable TinyGPU user-client ABI version and entitlement/distribution path;
+- manifest-specific numerical tolerances for each WMMA or tiled-attention family;
+- service protocol encoding and direct local cache-transport mechanism;
+- the point at which Qwen moves from parallel oracle/ABI research to native performance acceptance;
+- whether measured evidence ever justifies a native MLX backend.

@@ -1,10 +1,8 @@
-# Pinned Upstream Interfaces — Path A (Phases 0–2)
+# Pinned Upstream Interfaces
 
-Reference capture of the external interfaces Path A builds on. These are upstream, version-churny
-surfaces; pin the exact contracts here so the exporter / daemon don't silently break. Re-verify
-against upstream before each phase if the pinned commit changes.
+Version-sensitive capture of exact external cache, engine, TinyGPU, DriverKit-reference, and kernel/runtime interfaces used by this repository. `REFERENCES.md` owns reuse classification; `upstream-reference-manifest.yaml` owns immutable repository pins. Re-verify the affected capture whenever its pin changes.
 
-Capured: 2026-08-16 (tinygrad, mlx-lm `main`; oMLX `main`).
+Initial capture: 2026-08-16 (tinygrad, mlx-lm, oMLX); extended through 2026-08-25 for native R9700 work. Section-local dates and revisions remain authoritative for older captures.
 
 ---
 
