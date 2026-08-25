@@ -31,31 +31,39 @@ Build a tinygrad-free prefill producer on the AMD Radeon AI PRO R9700 that emits
 
 ## Current status
 
-- C0 substrate/runtime proof is established on macOS TinyGPU.app /
-  `APLRemotePCIDevice` / `PCIIface`, `1002:7551`, `gfx1201`.
-- Llama 3.2 1B C1R is token-exact at prompt 0/16/64/128. C2R prompt 16/128
-  imports and decodes the accepted native prompt cache without fallback.
-- The accepted launch/transport baseline uses persistent SDMA and a ten-stage
-  direct-ring batch. Prompt-128 improved from 104.6 seconds to approximately
-  43.7 seconds at `512a58a`, with 20,480 kernels and 2,048 compute submissions.
-- Compute-side software on `opt/compute-side-token-blocks` now includes exclusive
-  host timing, per-operation RPC accounting, optional T0–T10 GPU-clock capture
-  in the proven compute-control page, diagnostic terminal/overlap barrier
-  policies, and token blocks `1,2,4,8,16,32` with zero-padded exact-fill
-  embedding uploads. Production defaults remain block size 1,
-  `PerStageTimeline`, and `Full`; no unmeasured policy has been promoted.
-- Hardware-free final changed-boundary verification is 232/232 passing and the
-  full native runner builds without warnings. Whole-branch correctness/security
-  review is clean for reachable software. The current broader native suite reports
-  670 passed / 64 documented baseline failures, primarily test compile closures
-  missing `hardware_lock.cpp`.
-- Current hard blocker: three fresh kernel-proof attempts on 2026-08-25 reached
-  TinyGPU but `CFG_READ` returned `Driver not available`; macOS
-  `system_profiler SPPCIDataType` lists only the Thunderbolt Ethernet controller,
-  not the R9700. No server restart or process kill was attempted. Until R9700
-  access is restored, the GPU timestamp
-  profile, terminal/overlap A/B, block-size ladder, C1R/C2R/stability recertification,
-  and profile-gated query-RoPE optimization remain unverified.
+- The selected substrate remains macOS TinyGPU.app / `APLRemotePCIDevice` /
+  `PCIIface`, `1002:7551`, `gfx1201`. A corrected GC TLB probe now uses the
+  source-grounded GC `HDP → REQ → ACK` sequence; the MMHUB-only semaphore is
+  no longer applied to GC.
+- **Cold-native limitation:** after a true enclosure/server cold start, native
+  GC invalidate REQ still receives no ACK until one explicit tinygrad AMD
+  initialization runs. After that control initialization, native kernel proof
+  and VRAM smoke pass. All performance/acceptance results below are therefore
+  honest **warm-state native evidence**, not proof-complete tinygrad-free cold
+  bring-up.
+- Llama 3.2 1B C1R is token-exact at prompt 0/16/64/128. Native C2R prompt
+  16/128 imports and decodes the accepted prompt cache without fallback.
+- Launch/transport optimization reduced prompt-128 from 104.6 seconds to
+  approximately 44.1 seconds with direct-ring ten-stage batching.
+- Compute-side optimization evaluated token blocks `1,2,4,8,16,32`; every size
+  passes the full C1R matrix and native C2R 16/128. Three-run prompt-128 medians:
+  B1 44.137 s, B2 27.594 s, B4 20.319 s, B8 29.736 s, B16 33.165 s, B32
+  34.084 s.
+- Production defaults are now **block size 4**, **terminal timeline**, and
+  **Full barriers**. B4 emits 5,120 kernels in 512 submissions across 32 blocks,
+  reaches 6.30 prefix tokens/s, and is 53.96% faster than B1 / 80.58% faster
+  than the original 104.6-second path. Ten consecutive prompt-128 B4 runs pass
+  at 20.230–20.415 seconds without a TinyGPU restart.
+- K/V projection overlap remains diagnostic-only: its 0.64% gain is below the
+  3% promotion threshold. The selected B4 GPU profile ranks gate/up projection
+  first (51.66%), attention score second (21.87%), MLP down third (12.01%), and
+  RMSNorm fourth (10.47%). Query-RoPE tuning was correctly skipped because
+  attention score did not rank first.
+- Final changed-boundary verification is 258/258 passing and the full
+  21-translation-unit runner builds without warnings. Whole-branch
+  correctness/security and promotion reviews are clean. The pre-existing
+  broader-suite test closures missing `hardware_lock.cpp` remain outside this
+  optimization slice.
 - Qwen3.8-27B remains a separate target-expansion slice; CPU/NumPy evidence is
   not native acceptance.
 
