@@ -318,3 +318,53 @@ through the resident path at one workgroup — A pointer-only constant store, B 
 (4) clean-state baseline (dequeue/reset HQD, verify `CP_HQD_ACTIVE==0`, clear + verify GCVM/RS64
 fault registers, resident sentinel). Pause: MEC firmware `0xc67`, one-op microkernels, LLVM
 division-lowering, cache invalidation, RSRC3 overrides.
+
+---
+
+## 12. Qwen3.8 MLX-VLM and model contract (captured 2026-08-25)
+
+**MLX-VLM source:** `Blaizzy/mlx-vlm` at
+[`2b31570bdee86e2cdeea049761885aeed524a98c`](https://github.com/Blaizzy/mlx-vlm/tree/2b31570bdee86e2cdeea049761885aeed524a98c).
+
+Pinned files:
+
+- `mlx_vlm/models/qwen3_5/config.py`
+- `mlx_vlm/models/qwen3_5/language.py`
+- `mlx_vlm/models/qwen3_5/qwen3_5.py`
+- `mlx_vlm/models/cache.py`
+- `mlx_vlm/tests/test_speculative.py`
+
+**Model artifact:** `mlx-community/Qwen3.8-27B-4bit` at Hugging Face revision
+[`3e6447f082e89cc7f0bc6e5441afd38dfce760ff`](https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/tree/3e6447f082e89cc7f0bc6e5441afd38dfce760ff), license tag `apache-2.0`.
+The pinned `config.json` declares `Qwen3_5ForConditionalGeneration`, `model_type=qwen3_5`, and
+four-bit quantization.
+
+Load-bearing correction: Qwen3.8 uses the Qwen3.5-family hybrid graph. Linear-attention layers own
+recurrent array state; periodic full-attention layers own KV cache state. A Qwen adapter must preserve
+both state families and their update/position rules. Llama's homogeneous `(K,V)` cache list, geometry,
+trimming behavior, and acceptance thresholds are not portable assumptions.
+
+Q1 remains oracle/contract work. Local model shards must be bound to the pinned model revision and
+record exact local digests before any `r9700_native` execution claim.
+
+---
+
+## 13. P1 DriverKit and firmware records (captured 2026-08-25)
+
+**Apple living documentation, accessed 2026-08-25:**
+
+- [`IOPCIDevice`](https://developer.apple.com/documentation/pcidriverkit/iopcidevice) — PCI
+  configuration, BARs, interrupts, power/link lifecycle, and reset.
+- [Communicating between a DriverKit extension and a client
+  app](https://developer.apple.com/documentation/driverkit/communicating-between-a-driverkit-extension-and-a-client-app)
+  — checked scalar/structured calls, `IOUserClient` dispatch, bounded outputs, async completion,
+  per-client state, and entitlement guidance.
+
+Every P1 ABI/security review must record its Apple documentation access date and DriverKit SDK
+version because these pages are not immutable source revisions.
+
+**Firmware source:** official linux-firmware at
+[`0305399a878366cd1ab2898786e376fe5372544d`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/firmware/linux-firmware/+/0305399a878366cd1ab2898786e376fe5372544d).
+`WHENCE` and the exact R9700 firmware paths are pinned in `upstream-reference-manifest.yaml`.
+Before redistribution or device use, record each file's SHA-256, WHENCE/license entry, ASIC/IP
+applicability, and unchanged/modified status.

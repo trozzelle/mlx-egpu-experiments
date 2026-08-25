@@ -13,6 +13,7 @@ This roadmap sequences capabilities for `ARCHITECTURE.md` and `DESIGN.md`. It is
 - Matrix-shaped FP16 prefill precedes quantized native performance promotion.
 - Qwen contract/oracle research may proceed in parallel without borrowing Llama acceptance.
 - Upstream code is guidance until `REFERENCES.md` and `upstream-reference-manifest.yaml` authorize its role and provenance.
+- Each Engine Adapter preserves the Canonical KV Description while owning consumer-specific cache and lifecycle semantics.
 
 ## Current baseline
 
@@ -104,6 +105,7 @@ The 2026-08-25 diagnosis reports 18.012 seconds / 7.11 prefix tok/s for prompt-1
 - Kernel output is finite and within its reviewed manifest tolerance across full tiles and tails.
 - Disassembly contains the intended gfx1201 WMMA operation and no unsupported instruction.
 - Performance demonstrates matrix utilization beyond the retained scalar control for the admitted shape.
+- F2 publishes one shared gfx1201 WMMA conformance record that binds lane mapping, target/code image, descriptors, shape/tail coverage, numerics, ISA analysis, and hardware performance for Gate G0.
 
 ### Validation and review expectation
 
@@ -260,6 +262,7 @@ The 2026-08-25 diagnosis reports 18.012 seconds / 7.11 prefix tok/s for prompt-1
 - ADR 0007.
 - Accepted native AMDev compute/SDMA/VM path.
 - `REFERENCES.md` lifecycle, DriverKit, queue, and firmware sources.
+- P1 may begin in parallel with F2; P1 promotion requires the shared F2 WMMA conformance record through Gate G0.
 
 ### Promotion gate
 
@@ -292,6 +295,7 @@ The 2026-08-25 diagnosis reports 18.012 seconds / 7.11 prefix tok/s for prompt-1
 - P1 stable device-owner operations.
 - `DESIGN.md` HAL semantics.
 - IREE and PJRT as Pattern references only.
+- P2 may begin after P1 ABI freeze; P2 promotion requires Gate G0 rather than a duplicate HAL-specific WMMA proof.
 
 ### Promotion gate
 
@@ -323,6 +327,7 @@ The 2026-08-25 diagnosis reports 18.012 seconds / 7.11 prefix tok/s for prompt-1
 - Existing `hsa_code_image_asset`, kernel asset/catalog, and manifest validation foundations.
 - `upstream-reference-manifest.yaml` source pins.
 - P2 executable semantics are preferred but not required to begin manifest tooling.
+- P3 manifest tooling may begin in parallel with F2; P3 promotion requires Gate G0 and migration of that exact WMMA conformance record.
 
 ### Promotion gate
 
@@ -377,7 +382,6 @@ The 2026-08-25 diagnosis reports 18.012 seconds / 7.11 prefix tok/s for prompt-1
 - Capability manifests and Kernel Packs for evidence-selected additional AMD targets.
 - ggml/llama.cpp backend experiment through its existing backend/scheduler seam.
 - Native MLX AMD backend decision based on measured service/adapter limitations.
-- Separate research decision for any NVIDIA backend.
 
 ### Dependencies
 
@@ -433,6 +437,10 @@ The 2026-08-25 diagnosis reports 18.012 seconds / 7.11 prefix tok/s for prompt-1
 
 # Cross-track integration gates
 
+## Gate G0: Shared gfx1201 WMMA conformance
+
+F2 produces one reusable hardware conformance record for the admitted WMMA foundation. P1, P2, and P3 may start independently, but none may promote by inventing a separate WMMA proof: each must consume the same target/image, descriptor, lane-map, numerical, ISA, and hardware evidence or explicitly supersede it through a reviewed F2 record.
+
 ## Gate G1: HAL adoption
 
 F1 service may adopt P2/P3 only when behavior, warm performance, diagnostics, and cleanup are non-regressing. Platform availability does not force adoption.
@@ -458,7 +466,7 @@ For Llama 3.2 1B prompt-128 warm prefill, 100, 500, 1,000, and 2,000 tok/s are d
 - mac-amdgpu, Linux amdgpu, ROCr, IREE, hipBLASLt, Mooncake, or DwarfStar as wholesale dependencies/product architecture.
 - Generic multi-vendor runtime breadth without a second inference outcome.
 - Multi-node/distributed prefill.
-- macOS NVIDIA as implied by CUDA source portability.
+- Any NVIDIA backend program is deferred outside this roadmap and requires a separate product/architecture decision; CUDA source portability does not imply macOS device support.
 
 ## Handoff to task docs
 

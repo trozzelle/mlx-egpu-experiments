@@ -9,6 +9,27 @@ authority:
     modifications, source and image hashes, applicable ASIC/IP scope, and linked
     local conformance evidence.
 
+documents:
+  - id: apple-pcidriverkit-iopcidevice
+    priority: P0
+    reuse: normative
+    url: https://developer.apple.com/documentation/pcidriverkit/iopcidevice
+    accessed_at: 2026-08-25
+    phases: [P1]
+    required_evidence:
+      - access date and DriverKit SDK version recorded in ABI review
+      - PCI configuration, BAR, interrupt, power, and reset semantics reviewed
+  - id: apple-driverkit-user-client-sample
+    priority: P0
+    reuse: normative-and-pattern
+    url: https://developer.apple.com/documentation/driverkit/communicating-between-a-driverkit-extension-and-a-client-app
+    accessed_at: 2026-08-25
+    phases: [P1]
+    required_evidence:
+      - checked scalar and structured input mapping
+      - bounded output, async completion, per-client state, and entitlement review
+
+
 sources:
   - id: mac-amdgpu
     priority: P0
@@ -45,6 +66,10 @@ sources:
       - tinygrad/runtime/support/am/amdev.py
       - tinygrad/runtime/support/am/ip.py
       - tinygrad/runtime/ops_amd.py
+      - extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp
+      - extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.iig
+      - extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp
+      - extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverUserClient.iig
     license: MIT
     license_review: required_before_copy
     vendored: false
@@ -347,3 +372,70 @@ sources:
       - narrow idea-to-local-contract mapping
       - target and model mismatch review
     prohibited_wholesale: model scope, session format, server, agent stack, or product architecture
+
+  - id: linux-firmware-r9700
+    priority: P0
+    reuse: normative-firmware-and-provenance
+    upstream: https://kernel.googlesource.com/pub/scm/linux/kernel/git/firmware/linux-firmware
+    revision: 0305399a878366cd1ab2898786e376fe5372544d
+    paths:
+      - WHENCE
+      - amdgpu/psp_14_0_3_sos.bin
+      - amdgpu/smu_14_0_3.bin
+      - amdgpu/sdma_7_0_1.bin
+      - amdgpu/gc_12_0_1_rlc.bin
+      - amdgpu/gc_12_0_1_imu.bin
+      - amdgpu/gc_12_0_1_pfp.bin
+      - amdgpu/gc_12_0_1_me.bin
+      - amdgpu/gc_12_0_1_mec.bin
+      - amdgpu/gc_12_0_1_uni_mes.bin
+    license: file-specific; canonical terms recorded in WHENCE
+    license_review: required_for_each_firmware_file
+    vendored: false
+    phases: [P1]
+    required_evidence:
+      - exact file SHA-256 and WHENCE entry
+      - ASIC and IP-version applicability
+      - unchanged or locally modified status
+    prohibited_wholesale: firmware from opaque packages or mirrors
+
+  - id: mlx-vlm-qwen3-5
+    priority: P0
+    reuse: normative-model-and-cache-source
+    upstream: https://github.com/Blaizzy/mlx-vlm
+    revision: 2b31570bdee86e2cdeea049761885aeed524a98c
+    paths:
+      - mlx_vlm/models/qwen3_5/config.py
+      - mlx_vlm/models/qwen3_5/language.py
+      - mlx_vlm/models/qwen3_5/qwen3_5.py
+      - mlx_vlm/models/cache.py
+      - mlx_vlm/tests/test_speculative.py
+    license: MIT
+    license_review: reference-only
+    vendored: false
+    phases: [Q1, F6]
+    required_evidence:
+      - Qwen3.8 to qwen3_5 architecture mapping
+      - ArraysCache and full-attention KV component ownership
+      - quantization and recurrence semantics
+    prohibited_wholesale: Llama cache assumptions or MLX-VLM server scope
+
+  - id: qwen3-8-27b-4bit-model
+    priority: P0
+    reuse: normative-model-artifact
+    upstream: https://huggingface.co/mlx-community/Qwen3.8-27B-4bit
+    revision: 3e6447f082e89cc7f0bc6e5441afd38dfce760ff
+    paths:
+      - config.json
+      - model.safetensors.index.json
+      - tokenizer.json
+      - tokenizer_config.json
+    license: Apache-2.0
+    license_review: model-card-and-upstream-license-review-required
+    vendored: false
+    phases: [Q1, F6]
+    required_evidence:
+      - model and base-model fingerprints
+      - qwen3_5 architecture and four-bit quantization config
+      - exact local shard digests before native execution
+    prohibited_wholesale: floating model revision or unbound local weight directory

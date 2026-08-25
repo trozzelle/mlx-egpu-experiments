@@ -48,20 +48,20 @@ Local code is the first reference for already-proven behavior.
 
 ## Phase/source matrix
 
-| Roadmap phase | Required P0 sources | Useful P1/P2 sources |
+| Roadmap phase | Primary phase sources | Supporting sources |
 |---|---|---|
 | F1 persistent worker | local resident/worker/serving code; mlx-lm cache; oMLX worker pattern | vLLM connector; Mooncake lifecycle only |
 | F2 WMMA foundation | LLVM AMDGPU ABI; AMD ISA decoder; matrix calculator; rocWMMA samples; local asset admission | hipBLASLt; RGA; rocprofiler trace |
 | F3 matrix projections | rocWMMA; hipBLASLt design; AITER gfx1201 GEMM/config corpus | Triton and FlyDSL authoring patterns |
 | F4 tiled attention | AITER `flash_attn_func_gfx1201.py`; official FlashAttention algorithm/tests | AOTriton/Triton tuning patterns; rocprofiler |
 | F5 fusion/direct handoff | local service/adapters; mlx-lm cache; oMLX; vLLM connector | Mooncake metadata/lifecycle only |
-| F6 quantized/Qwen | AITER gfx1201 quantized configs; rocWMMA; MLX/MLX-VLM pins in `pinned-upstream-interfaces.md` | hipBLASLt epilogues/tuning; DwarfStar staging ideas |
-| P1 TinyGPU owner | local AMDev; mac-amdgpu; tinygrad AMDev; Linux amdgpu; Apple DriverKit; linux-firmware | m1n1 diagnostic pattern |
-| P2 Inference HAL | local runtime; IREE HIP/CUDA HAL; PJRT C API | RADV winsys/command streams; ROCr semantics |
+| F6 quantized/Qwen | AITER gfx1201 quantized configs; rocWMMA; pinned mlx-lm, MLX-VLM, and Qwen model sources | hipBLASLt epilogues/tuning; DwarfStar staging ideas |
+| P1 TinyGPU owner | local AMDev; mac-amdgpu; tinygrad/TinyGPU; Linux amdgpu; dated Apple DriverKit records; pinned linux-firmware | m1n1 diagnostic pattern |
+| P2 Inference HAL | local runtime; IREE HIP/CUDA HAL | PJRT ABI discipline; RADV winsys/command streams; ROCr semantics |
 | P3 Kernel Packs | local asset admission; LLVM ABI; ISA decoder; RGA; manifest pins | rocprofiler decoder; AQLprofile |
 | P4 service/platform integration | local service/runtime; IREE boundary; Kernel Pack records | ggml backend conformance patterns |
-| P5 expansion/backends | ggml backend; MLX CUDA backend; capability manifests | Linux CUDA for NVIDIA; NVIDIA open modules as Watch only |
-| Q1 Qwen contract | local Qwen code; pinned MLX/MLX-VLM model/cache sources | AITER quantized operators and configs |
+| P5 expansion/backends | ggml backend; MLX CUDA backend scope blueprint; capability manifests | additional AMD target references selected by evidence |
+| Q1 Qwen contract | local Qwen code; pinned mlx-lm, MLX-VLM, and Qwen model/cache sources | AITER quantized operators and configs |
 
 ## Device ownership, cold initialization, memory, and queues
 
@@ -75,9 +75,9 @@ Closest cold-initialization reference: same PCI ID, gfx1201, Apple Silicon, Thun
 
 Use for PSP/SOS/TMR firmware lifecycle, SMU mailbox, IMU, RLC, CP/MES/GFX/SDMA initialization, GART/VM, DriverKit attachment, and checked user-client mechanics. TinyGPU remains device owner per ADR 0007; do not import mac-amdgpu as a second substrate or copy its development entitlements as product requirements.
 
-### P0 — [`tinygrad/tinygrad` AMDev](https://github.com/tinygrad/tinygrad/tree/d851aca9ae1faf4210cc0da4508bead7da57d7ee/tinygrad/runtime/support/am) — Port/Adapt and differential oracle
+### P0 — [`tinygrad/tinygrad` TinyGPU and AMDev](https://github.com/tinygrad/tinygrad/tree/d851aca9ae1faf4210cc0da4508bead7da57d7ee) — Port/Adapt and differential oracle
 
-`amdev.py` and `ip.py` compactly model full/partial boot, reset, IP discovery, PSP/SMU/GMC/IH/GFX/SDMA, firmware, VMID/page tables, queues, and recovery. Capture stage/register snapshots and compare translated TinyGPU behavior. Do not retain a tinygrad runtime dependency in either product.
+`extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/` is the current device-owner source: `TinyGPUDriver.cpp`, `TinyGPUDriver.iig`, `TinyGPUDriverUserClient.cpp`, and `TinyGPUDriverUserClient.iig`. `tinygrad/runtime/support/am/amdev.py` and `ip.py` compactly model full/partial boot, reset, IP discovery, PSP/SMU/GMC/IH/GFX/SDMA, firmware, VMID/page tables, queues, and recovery. Harden the DEXT/user-client boundary and compare translated lifecycle stages against AMDev snapshots; do not retain a tinygrad Python runtime dependency in either product.
 
 ### P0 — [Linux amdgpu gfx12/gmc12/sdma7/VM](https://github.com/torvalds/linux/tree/73ae59e975966d24e32926247ddb45a537ebe184/drivers/gpu/drm/amd/amdgpu) — Normative and Port/Adapt
 
@@ -85,11 +85,11 @@ Primary source for GFX12 bitfields and lifecycle invariants: `gfx_v12_0.c`, `gmc
 
 ### P0 — Apple [`IOPCIDevice`](https://developer.apple.com/documentation/pcidriverkit/iopcidevice) and DriverKit user-client guidance — Normative
 
-Use for PCI configuration, BAR access, interrupts, power/link lifecycle, reset, Memory Space/Bus Master behavior, entitlements, per-client state, bounded inputs/outputs, and external-method security. These are living documents; record the access date in any ABI/security review.
+Use for PCI configuration, BAR access, interrupts, power/link lifecycle, reset, Memory Space/Bus Master behavior, entitlements, per-client state, bounded inputs/outputs, and external-method security. These are living documents; the manifest records access on 2026-08-25, and each ABI/security review must record its own access date and DriverKit SDK version.
 
-### P0 — linux-firmware `WHENCE` — Normative
+### P0 — [linux-firmware at `0305399a878366cd1ab2898786e376fe5372544d`](https://kernel.googlesource.com/pub/scm/linux/kernel/git/firmware/linux-firmware/+/0305399a878366cd1ab2898786e376fe5372544d) and `WHENCE` — Normative
 
-Use the canonical firmware repository and preserve upstream revision, file SHA-256, WHENCE/license entry, ASIC/IP applicability, and unchanged/modified status. Firmware copied from opaque packages or mirrors is not admissible.
+Use the manifest-pinned firmware paths and canonical `WHENCE` record. Preserve exact file SHA-256, WHENCE/license entry, ASIC/IP applicability, and unchanged/modified status. Firmware copied from opaque packages or mirrors is not admissible.
 
 ### P1/P2 — Linux user queues/MES/debugging and Asahi `m1n1` — Normative/Pattern
 
@@ -156,6 +156,10 @@ Use major/minor versions, `struct_size`, opaque handles, extension chains, async
 ROCr guides agents, memory pools, AQL, signals, executable loading, and async errors, but assumes Linux KFD. RADV guides command recording versus submission and winsys separation, but does not justify a Vulkan port.
 
 ## Service, cache, and engine integration
+
+### P0 — [MLX-VLM Qwen3.5 implementation](https://github.com/Blaizzy/mlx-vlm/tree/2b31570bdee86e2cdeea049761885aeed524a98c/mlx_vlm/models/qwen3_5) and [Qwen3.8-27B-4bit model](https://huggingface.co/mlx-community/Qwen3.8-27B-4bit/tree/3e6447f082e89cc7f0bc6e5441afd38dfce760ff) — Normative
+
+Qwen3.8 maps to the `qwen3_5` architecture and mixes recurrent `ArraysCache` state with periodic full-attention KV state. Use the pinned config, language model, cache implementation, tests, and model `config.json`/index for Q1 model identity, quantization, state ownership, recurrence, and adapter contracts. Do not infer Qwen behavior from Llama's homogeneous KV list. Exact revisions, paths, and licenses are recorded in the manifest and `pinned-upstream-interfaces.md`.
 
 ### P0 — [mlx-lm cache implementation](https://github.com/ml-explore/mlx-lm/tree/e2f2fb2aef987f86878d17638446183cffe21fe4/mlx_lm) — Normative
 
