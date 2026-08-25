@@ -5,6 +5,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 NATIVE_INCLUDE_DIR = REPO_ROOT / "native_r9700"
+AMDEV_SESSION_SOURCE = REPO_ROOT / "native_r9700" / "amdev_session.cpp"
 
 CLOSURE_SOURCES = (
     REPO_ROOT / "native_r9700/kernel_catalog.cpp",
@@ -84,3 +85,18 @@ def test_prefill_phase_accounting_probe(tmp_path: Path) -> None:
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert completed.stdout == "status: pass\n"
+
+
+def test_close_preserves_pre_resident_timer_snapshot() -> None:
+    source = AMDEV_SESSION_SOURCE.read_text(encoding="utf-8")
+    close_start = source.index("bool ResidentHsaSession::close(")
+    close_end = source.index("const PhaseTimers& ResidentHsaSession::phase_timers()", close_start)
+    close_source = source[close_start:close_end]
+    null_branch_start = close_source.index("if (state.resident == nullptr)")
+    null_branch_end = close_source.index("  }\n", null_branch_start)
+    null_branch = close_source[null_branch_start:null_branch_end]
+
+    assert close_source.index("state.phase_timers.socket_rpc_count") < null_branch_start
+    assert null_branch.index("state.final_timers = state.phase_timers") < null_branch.index(
+        "state.reset_after_close()"
+    )

@@ -2723,12 +2723,13 @@ bool ResidentHsaSession::readback(const std::vector<std::string>& names,
 
 bool ResidentHsaSession::close(std::string* error_text) {
   Impl& state = *impl_;
-  if (state.resident == nullptr) {
-    state.reset_after_close();
-    return true;
-  }
   if (state.client != nullptr) {
     state.phase_timers.socket_rpc_count = state.client->rpc_count;
+  }
+  if (state.resident == nullptr) {
+    state.final_timers = state.phase_timers;
+    state.reset_after_close();
+    return true;
   }
   std::printf("phase_timer model_load_usec: %ld\n", state.phase_timers.model_load_usec);
   std::printf("phase_timer staging_copy_usec: %ld\n", state.phase_timers.staging_copy_usec);
