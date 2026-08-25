@@ -49,16 +49,21 @@ Build a tinygrad-free prefill producer on the AMD Radeon AI PRO R9700 that emits
   passes the full C1R matrix and native C2R 16/128. Three-run prompt-128 medians:
   B1 44.137 s, B2 27.594 s, B4 20.319 s, B8 29.736 s, B16 33.165 s, B32
   34.084 s.
-- Production defaults are now **block size 4**, **terminal timeline**, and
-  **Full barriers**. B4 emits 5,120 kernels in 512 submissions across 32 blocks,
-  reaches 6.30 prefix tokens/s, and is 53.96% faster than B1 / 80.58% faster
-  than the original 104.6-second path. Ten consecutive prompt-128 B4 runs pass
-  at 20.230–20.415 seconds without a TinyGPU restart.
+- Production defaults are **block size 4**, **terminal timeline**, and **Full
+  barriers**. Before kernel tuning, B4 emitted 5,120 kernels in 512 submissions
+  across 32 blocks and had a 20.319-second median.
+- The profile-gated gate/up LDS tile shares one exact-order RMS normalization
+  and a 2,048-element fp16 normalized tile per workgroup. Its stage mean fell
+  from 1,106,816 to 562,572 GPU ticks (49.2%); prompt-128 median is now
+  **18.012 seconds / 7.11 prefix tokens/s**, 11.35% faster than pre-LDS B4 and
+  82.78% faster than the original 104.6-second path. C1R 0/16/64/128 and native
+  C2R 16/128 remain token-exact. Ten consecutive post-LDS prompt-128 runs pass
+  at 17.951–18.084 seconds without restart.
 - K/V projection overlap remains diagnostic-only: its 0.64% gain is below the
-  3% promotion threshold. The selected B4 GPU profile ranks gate/up projection
-  first (51.66%), attention score second (21.87%), MLP down third (12.01%), and
-  RMSNorm fourth (10.47%). Query-RoPE tuning was correctly skipped because
-  attention score did not rank first.
+  3% threshold. The post-LDS B4 profile ranks gate/up first (35.23%), attention
+  score second (29.34%), MLP down third (16.09%), and RMSNorm fourth (14.05%).
+  Query-RoPE tuning was correctly skipped because attention score did not rank
+  first.
 - Final changed-boundary verification is 258/258 passing and the full
   21-translation-unit runner builds without warnings. Whole-branch
   correctness/security and promotion reviews are clean. The pre-existing
