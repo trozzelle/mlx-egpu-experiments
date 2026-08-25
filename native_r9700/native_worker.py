@@ -18,6 +18,10 @@ _DEFAULT_RUNNER_ENV = "NATIVE_R9700_PREFILL_RUNNER"
 _BLOCK_TOKENS_ENV = "NATIVE_R9700_PREFILL_BLOCK_TOKENS"
 _ALLOWED_BLOCK_TOKENS = frozenset({"1", "2", "4", "8", "16", "32"})
 _EXPECTED_RUNTIME_SUBSTRATE = "TinyGPU.app/APLRemotePCIDevice/PCIIface"
+_SELECTED_COMPLETION_POLICY = "per-stage"
+_SELECTED_BARRIER_POLICY = "full"
+_CANONICAL_COMPLETION_POLICIES = frozenset({"per-stage", "terminal"})
+_CANONICAL_BARRIER_POLICIES = frozenset({"full", "overlap-kv"})
 _NUM_LAYERS = 16
 _BATCH = 1
 _N_KV_HEADS = 8
@@ -38,6 +42,8 @@ _REQUIRED_FIELDS = (
     "native_prefill_full_layer_loop_status",
     "runtime_substrate",
     "hardware_log_path",
+    "compute_completion_policy",
+    "compute_barrier_policy",
     "prefill_npz_path",
     "kernel_count",
     "transfer_bytes",
@@ -180,6 +186,8 @@ def run_native_prefill(
                 len(token_ids),
                 model_dir,
                 expected_block_tokens,
+                _SELECTED_COMPLETION_POLICY,
+                _SELECTED_BARRIER_POLICY,
             )
         except (EvidenceValidationError, UnicodeError, OSError) as exc:
             result = _open_result(
@@ -385,6 +393,30 @@ def _read_admitted_log_text(
         ) from exc
 
 
+def _same_evidence_value(left: object, right: object) -> bool:
+    return type(left) is type(right) and left == right
+
+
+def _store_unambiguous_field(
+    result: dict[str, object],
+    key: str,
+    value: object,
+    representation: str,
+) -> None:
+    if key in result and not _same_evidence_value(result[key], value):
+        raise EvidenceValidationError(
+            f"conflicting duplicate {representation} evidence for {key}"
+        )
+    result[key] = value
+
+
+def _strict_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        _store_unambiguous_field(result, key, value, "JSON")
+    return result
+
+
 def _merge_evidence_source(
     result: dict[str, object],
     source: Mapping[str, object],
@@ -408,7 +440,7 @@ def _merge_evidence_source(
             "invalid runner evidence source: " + "; ".join(problems)
         )
     for key, value in source.items():
-        if key in result and result[key] != value:
+        if key in result and not _same_evidence_value(result[key], value):
             if key in {"failure_stage", "failure_text"}:
                 detail = f"successful result {key} must be empty"
             else:
@@ -447,7 +479,7 @@ def _parse_json_text(text: str) -> dict[str, object]:
     result: dict[str, object] = {}
     for candidate in candidates:
         try:
-            parsed = json.loads(candidate)
+            parsed = json.loads(candidate, object_pairs_hook=_strict_json_object)
         except (json.JSONDecodeError, ValueError, RecursionError) as exc:
             raise EvidenceValidationError(
                 f"corrupt JSON-looking runner evidence: {exc}"
@@ -456,7 +488,8 @@ def _parse_json_text(text: str) -> dict[str, object]:
             raise EvidenceValidationError(
                 "JSON-looking runner evidence must be an object"
             )
-        result.update(parsed)
+        for key, value in parsed.items():
+            _store_unambiguous_field(result, key, value, "JSON record")
     return result
 
 
@@ -486,11 +519,12 @@ def _parse_key_value_text(text: str) -> dict[str, object]:
         key = key.strip()
         if key in _PARSED_FIELDS:
             stripped_value = value.strip()
-            result[key] = (
+            parsed_value = (
                 _parse_bounded_decimal(key, stripped_value)
                 if key in _INTEGER_ABI_RANGES
                 else stripped_value
             )
+            _store_unambiguous_field(result, key, parsed_value, "key/value")
     return result
 
 
@@ -521,6 +555,18 @@ def _evidence_field_problems(parsed: Mapping[str, object]) -> list[str]:
             problems.append(
                 f"{key} exceeds {_MAX_STRING_EVIDENCE_BYTES} bytes"
             )
+    completion_policy = parsed.get("compute_completion_policy")
+    if (
+        type(completion_policy) is str
+        and completion_policy not in _CANONICAL_COMPLETION_POLICIES
+    ):
+        problems.append("compute_completion_policy is not canonical")
+    barrier_policy = parsed.get("compute_barrier_policy")
+    if (
+        type(barrier_policy) is str
+        and barrier_policy not in _CANONICAL_BARRIER_POLICIES
+    ):
+        problems.append("compute_barrier_policy is not canonical")
     return problems
 
 
@@ -532,6 +578,8 @@ def _normalize_result(
     expected_n_prefix: int,
     expected_model: str,
     expected_block_tokens: int,
+    expected_completion_policy: str,
+    expected_barrier_policy: str,
 ) -> dict[str, object]:
     field_problems = _evidence_field_problems(parsed)
     claimed_success = (
@@ -546,6 +594,12 @@ def _normalize_result(
         ),
         "runtime_substrate": _string_field(parsed, "runtime_substrate", ""),
         "hardware_log_path": _string_field(parsed, "hardware_log_path", ""),
+        "compute_completion_policy": _string_field(
+            parsed, "compute_completion_policy", ""
+        ),
+        "compute_barrier_policy": _string_field(
+            parsed, "compute_barrier_policy", ""
+        ),
         "prefill_npz_path": _string_field(parsed, "prefill_npz_path", ""),
         "kernel_count": _int_field(parsed, "kernel_count", 0),
         "transfer_bytes": _int_field(parsed, "transfer_bytes", 0),
@@ -569,6 +623,8 @@ def _normalize_result(
         expected_n_prefix,
         expected_model,
         expected_block_tokens,
+        expected_completion_policy,
+        expected_barrier_policy,
     )
     if problems:
         result["native_prefill_acceptance"] = _OPEN_ACCEPTANCE
@@ -593,6 +649,8 @@ def _acceptance_problems(
     expected_n_prefix: int,
     expected_model: str,
     expected_block_tokens: int = 1,
+    expected_completion_policy: str = _SELECTED_COMPLETION_POLICY,
+    expected_barrier_policy: str = _SELECTED_BARRIER_POLICY,
 ) -> list[str]:
     problems: list[str] = []
     metadata_accepts = True
@@ -607,6 +665,16 @@ def _acceptance_problems(
         metadata_accepts = False
     if result["runtime_substrate"] != _EXPECTED_RUNTIME_SUBSTRATE:
         problems.append("missing runtime_substrate hardware evidence")
+        metadata_accepts = False
+    if result["compute_completion_policy"] != expected_completion_policy:
+        problems.append(
+            "compute_completion_policy does not match selected request policy"
+        )
+        metadata_accepts = False
+    if result["compute_barrier_policy"] != expected_barrier_policy:
+        problems.append(
+            "compute_barrier_policy does not match selected request policy"
+        )
         metadata_accepts = False
     hardware_log_path = str(result["hardware_log_path"])
     if not hardware_log_path:
@@ -690,6 +758,8 @@ def _open_result(
         "native_prefill_full_layer_loop_status": "blocked",
         "runtime_substrate": "",
         "hardware_log_path": str(log_path),
+        "compute_completion_policy": _SELECTED_COMPLETION_POLICY,
+        "compute_barrier_policy": _SELECTED_BARRIER_POLICY,
         "prefill_npz_path": "",
         "kernel_count": 0,
         "transfer_bytes": 0,

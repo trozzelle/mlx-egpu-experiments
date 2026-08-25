@@ -81,6 +81,8 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
                     "native_prefill_acceptance: pass",
                     "native_prefill_full_layer_loop_status: pass",
                     "runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                    "compute_completion_policy: per-stage",
+                    "compute_barrier_policy: full",
                     f"hardware_log_path: {log_path}",
                     f"prefill_npz_path: {out_path}",
                     "kernel_count: 4",
@@ -103,6 +105,8 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
                     "native_prefill_acceptance": "pass",
                     "native_prefill_full_layer_loop_status": "pass",
                     "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                    "compute_completion_policy": "per-stage",
+                    "compute_barrier_policy": "full",
                     "hardware_log_path": str(log_path),
                     "prefill_npz_path": str(out_path),
                     "kernel_count": 4,
@@ -144,6 +148,8 @@ def test_native_worker_rejects_pass_without_full_layer_loop_evidence(tmp_path):
             "producer_kind": "r9700_native",
             "native_prefill_acceptance": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+            "compute_completion_policy": "per-stage",
+            "compute_barrier_policy": "full",
             "hardware_log_path": str(log_path),
             "prefill_npz_path": str(out_path),
             "kernel_count": 1,
@@ -177,6 +183,8 @@ def test_native_worker_rejects_nonzero_exit_and_removes_partial_output(
                     "producer_kind: r9700_native",
                     "native_prefill_acceptance: pass",
                     "runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                    "compute_completion_policy: per-stage",
+                    "compute_barrier_policy: full",
                     f"hardware_log_path: {log_path}",
                     f"prefill_npz_path: {out_path}",
                     "kernel_count: 4",
@@ -198,6 +206,8 @@ def test_native_worker_rejects_nonzero_exit_and_removes_partial_output(
                     "producer_kind": "r9700_native",
                     "native_prefill_acceptance": "pass",
                     "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                    "compute_completion_policy": "per-stage",
+                    "compute_barrier_policy": "full",
                     "hardware_log_path": str(log_path),
                     "prefill_npz_path": str(out_path),
                     "kernel_count": 4,
@@ -239,6 +249,8 @@ def test_native_worker_accepts_runner_key_value_log_when_json_is_absent(
                     "native_prefill_acceptance: pass",
                     "native_prefill_full_layer_loop_status: pass",
                     "runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                    "compute_completion_policy: per-stage",
+                    "compute_barrier_policy: full",
                     f"hardware_log_path: {log_path}",
                     f"prefill_npz_path: {out_path}",
                     "kernel_count: 3",
@@ -282,6 +294,8 @@ def test_native_worker_rejects_pass_with_malformed_npz_and_removes_output(
                     "native_prefill_acceptance: pass",
                     "native_prefill_full_layer_loop_status: pass",
                     "runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                    "compute_completion_policy: per-stage",
+                    "compute_barrier_policy: full",
                     f"hardware_log_path: {log_path}",
                     f"prefill_npz_path: {out_path}",
                     "kernel_count: 2",
@@ -304,6 +318,8 @@ def test_native_worker_rejects_pass_with_malformed_npz_and_removes_output(
                     "native_prefill_acceptance": "pass",
                     "native_prefill_full_layer_loop_status": "pass",
                     "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                    "compute_completion_policy": "per-stage",
+                    "compute_barrier_policy": "full",
                     "hardware_log_path": str(log_path),
                     "prefill_npz_path": str(out_path),
                     "kernel_count": 2,
@@ -346,6 +362,8 @@ def test_native_worker_rejects_cpu_reference_masquerade_and_removes_unaccepted_n
                     "producer_kind": "cpu_reference",
                     "native_prefill_acceptance": "pass",
                     "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                    "compute_completion_policy": "per-stage",
+                    "compute_barrier_policy": "full",
                     "hardware_log_path": str(log_path),
                     "prefill_npz_path": str(out_path),
                     "kernel_count": 2,
@@ -412,6 +430,8 @@ def test_native_worker_preserves_output_cleanup_failure_for_nonempty_output_dire
                     "producer_kind: r9700_native",
                     "native_prefill_acceptance: open",
                     "runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                    "compute_completion_policy: per-stage",
+                    "compute_barrier_policy: full",
                     f"hardware_log_path: {log_path}",
                     f"prefill_npz_path: {out_path}",
                     "kernel_count: 0",
@@ -549,6 +569,8 @@ def test_native_worker_rejects_incomplete_full_result_and_removes_output(
             "native_prefill_acceptance": "pass",
             "native_prefill_full_layer_loop_status": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+            "compute_completion_policy": "per-stage",
+            "compute_barrier_policy": "full",
             "hardware_log_path": str(log_path),
             "prefill_npz_path": str(out_path),
             "kernel_count": 4,
@@ -591,6 +613,8 @@ def test_native_worker_rejects_pass_without_explicit_hardware_log_evidence(
             "producer_kind": "r9700_native",
             "native_prefill_acceptance": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+            "compute_completion_policy": "per-stage",
+            "compute_barrier_policy": "full",
             "prefill_npz_path": str(out_path),
             "kernel_count": 4,
             "transfer_bytes": 4096,
@@ -704,6 +728,8 @@ def _run_worker_with_block_metadata(
             "native_prefill_acceptance": "pass",
             "native_prefill_full_layer_loop_status": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+            "compute_completion_policy": "per-stage",
+            "compute_barrier_policy": "full",
             "hardware_log_path": str(log_path),
             "prefill_npz_path": str(out_path),
             "kernel_count": 4,
@@ -843,6 +869,8 @@ def test_native_worker_does_not_parse_required_values_as_block_option(
             "native_prefill_acceptance": "pass",
             "native_prefill_full_layer_loop_status": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+            "compute_completion_policy": "per-stage",
+            "compute_barrier_policy": "full",
             "hardware_log_path": str(log_path),
             "prefill_npz_path": str(out_path),
             "kernel_count": 4,
@@ -887,6 +915,8 @@ def test_native_worker_rejects_oversized_decimal_key_value_evidence_with_cleanup
             "native_prefill_acceptance": "pass",
             "native_prefill_full_layer_loop_status": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+            "compute_completion_policy": "per-stage",
+            "compute_barrier_policy": "full",
             "hardware_log_path": str(log_path),
             "prefill_npz_path": str(out_path),
             "kernel_count": 4,
@@ -926,6 +956,8 @@ def _strict_success_evidence(out_path: Path, log_path: Path) -> dict[str, object
         "native_prefill_full_layer_loop_status": "pass",
         "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
         "hardware_log_path": str(log_path),
+        "compute_completion_policy": "per-stage",
+        "compute_barrier_policy": "full",
         "prefill_npz_path": str(out_path),
         "kernel_count": 4,
         "transfer_bytes": 4096,
@@ -1277,3 +1309,143 @@ def test_native_worker_contains_overflowing_npz_integer_metadata(
     assert result["failure_stage"] == "prefill_npz_schema_validation"
     assert "num_layers must be an int scalar" in result["failure_text"]
     assert not out_path.exists()
+
+
+def _json_with_duplicate_field(
+    evidence: dict[str, object], key: str, first: object, second: object
+) -> str:
+    fields = [
+        f"{json.dumps(field)}:{json.dumps(value)}"
+        for field, value in evidence.items()
+        if field != key
+    ]
+    fields[:0] = [
+        f"{json.dumps(key)}:{json.dumps(first)}",
+        f"{json.dumps(key)}:{json.dumps(second)}",
+    ]
+    return "{" + ",".join(fields) + "}"
+
+
+def _key_value_with_duplicate_field(
+    evidence: dict[str, object], key: str, first: object, second: object
+) -> bytes:
+    lines = [
+        f"{field}: {value}"
+        for field, value in evidence.items()
+        if field != key
+    ]
+    lines[:0] = [f"{key}: {first}", f"{key}: {second}"]
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def test_native_worker_preserves_effective_policies_on_strict_pass(
+    tmp_path, monkeypatch
+):
+    result, out_path, _ = _run_worker_with_evidence(tmp_path, monkeypatch)
+    assert result["native_prefill_acceptance"] == "pass"
+    assert result["compute_completion_policy"] == "per-stage"
+    assert result["compute_barrier_policy"] == "full"
+    assert out_path.is_file()
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"compute_completion_policy": "terminal"},
+        {"compute_barrier_policy": "overlap-kv"},
+        {"compute_completion_policy": True},
+        {"compute_barrier_policy": "Full"},
+    ],
+    ids=("completion-mismatch", "barrier-mismatch", "untyped", "noncanonical"),
+)
+def test_native_worker_rejects_policy_mismatch_and_rewrites_policy_log(
+    tmp_path, monkeypatch, override
+):
+    result, out_path, log_path = _run_worker_with_evidence(
+        tmp_path, monkeypatch, evidence_override=override
+    )
+    assert result["native_prefill_acceptance"] == "open"
+    assert result["failure_stage"] == "worker_result_validation"
+    assert not out_path.exists()
+    rewritten = log_path.read_text(encoding="utf-8")
+    assert (
+        f"compute_completion_policy: {result['compute_completion_policy']}\n"
+        in rewritten
+    )
+    assert f"compute_barrier_policy: {result['compute_barrier_policy']}\n" in rewritten
+
+
+@pytest.mark.parametrize("key", ["compute_completion_policy", "compute_barrier_policy"])
+def test_native_worker_rejects_missing_policy_evidence(
+    tmp_path, monkeypatch, key
+):
+    out_path = tmp_path / "strict-output.npz"
+    log_path = tmp_path / "strict-output.log"
+    evidence = _strict_success_evidence(out_path, log_path)
+    evidence.pop(key)
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, stdout=json.dumps(evidence)
+    )
+    assert result["native_prefill_acceptance"] == "open"
+    assert key in result["failure_text"]
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize("representation", ["json", "key-value"])
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [(True, 4), (4, True)],
+    ids=("invalid-then-valid", "valid-then-invalid"),
+)
+def test_native_worker_rejects_conflicting_duplicate_integer_evidence(
+    tmp_path, monkeypatch, representation, first, second
+):
+    out_path = tmp_path / "strict-output.npz"
+    log_path = tmp_path / "strict-output.log"
+    evidence = _strict_success_evidence(out_path, log_path)
+    if representation == "json":
+        kwargs = {
+            "stdout": _json_with_duplicate_field(
+                evidence, "kernel_count", first, second
+            )
+        }
+    else:
+        kwargs = {
+            "stdout": "",
+            "log_bytes": _key_value_with_duplicate_field(
+                evidence, "kernel_count", first, second
+            ),
+        }
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, **kwargs
+    )
+    assert result["failure_stage"] == "worker_result_validation"
+    assert "duplicate" in result["failure_text"]
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize("representation", ["json", "key-value"])
+def test_native_worker_accepts_identical_duplicate_integer_evidence(
+    tmp_path, monkeypatch, representation
+):
+    out_path = tmp_path / "strict-output.npz"
+    log_path = tmp_path / "strict-output.log"
+    evidence = _strict_success_evidence(out_path, log_path)
+    if representation == "json":
+        kwargs = {
+            "stdout": _json_with_duplicate_field(
+                evidence, "kernel_count", 4, 4
+            )
+        }
+    else:
+        kwargs = {
+            "stdout": "",
+            "log_bytes": _key_value_with_duplicate_field(
+                evidence, "kernel_count", 4, 4
+            ),
+        }
+    result, out_path, _ = _run_worker_with_evidence(
+        tmp_path, monkeypatch, **kwargs
+    )
+    assert result["native_prefill_acceptance"] == "pass", result["failure_text"]
+    assert out_path.is_file()
