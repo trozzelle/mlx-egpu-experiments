@@ -49,9 +49,11 @@ Build a tinygrad-free prefill producer on the AMD Radeon AI PRO R9700 that emits
   review is clean for reachable software. The current broader native suite reports
   670 passed / 64 documented baseline failures, primarily test compile closures
   missing `hardware_lock.cpp`.
-- Current hard blocker: two fresh kernel-proof attempts on 2026-08-25 reached
-  TinyGPU but `CFG_READ` returned `Driver not available`. No server restart or
-  process kill was attempted. Until R9700 access is restored, the GPU timestamp
+- Current hard blocker: three fresh kernel-proof attempts on 2026-08-25 reached
+  TinyGPU but `CFG_READ` returned `Driver not available`; macOS
+  `system_profiler SPPCIDataType` lists only the Thunderbolt Ethernet controller,
+  not the R9700. No server restart or process kill was attempted. Until R9700
+  access is restored, the GPU timestamp
   profile, terminal/overlap A/B, block-size ladder, C1R/C2R/stability recertification,
   and profile-gated query-RoPE optimization remain unverified.
 - Qwen3.8-27B remains a separate target-expansion slice; CPU/NumPy evidence is
