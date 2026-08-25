@@ -8,8 +8,8 @@
 - `.superpowers/swarm/reports/c0a-compute-task-3-gc-preflight.md`
 
 ## Source refs
-- Task set 3 row: `docs/tasks/gx1202-compute-dispatch/phase-2-gc-hub-tlb-preflight.md` lines 100-136.
-- Plan Task 3 Steps 6-8: `docs/superpowers/plans/2026-08-17-gfx1201-compute-dispatch.md` lines 459-484.
+- Task set 3 row: `docs/archive/tasks/gx1202-compute-dispatch/phase-2-gc-hub-tlb-preflight.md` lines 100-136.
+- Plan Task 3 Steps 6-8: `docs/archive/superpowers/plans/2026-08-17-gfx1201-compute-dispatch.md` lines 459-484.
 - Hardware command sources: `docs/tasks/native-r9700-producer/validation-commands.md` lines 134-142 (`--transfer-proof`) and 144-152 (`--kernel-proof`).
 - Prior Task set 2 helper context preserved from this report's earlier revision: GC register constants, `validate_direct_pm4_topology`, `program_gc_hub_vmid0`, `flush_gc_tlb_vmid0`, and `--self-test gc-hub-sequence`.
 

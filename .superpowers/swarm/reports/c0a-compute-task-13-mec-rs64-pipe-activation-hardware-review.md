@@ -3,7 +3,7 @@
 **Date:** 2026-08-17 (session-local)
 **Reviewer:** MecRs64PipeActivationHwReview
 **Artifact under review:** `.superpowers/swarm/reports/c0a-compute-task-13-mec-rs64-pipe-activation.md`
-**Subjects:** `logs/c0l-native-amdev-mec-rs64-pipe-activation.log` (this run), `logs/c0k-native-amdev-sysmem-ring-backing.log` (baseline), `docs/superpowers/plans/2026-08-17-mec-rs64-pipe-activation.md` Task 2 Step 2
+**Subjects:** `logs/c0l-native-amdev-mec-rs64-pipe-activation.log` (this run), `logs/c0k-native-amdev-sysmem-ring-backing.log` (baseline), `docs/archive/superpowers/plans/2026-08-17-mec-rs64-pipe-activation.md` Task 2 Step 2
 
 ---
 

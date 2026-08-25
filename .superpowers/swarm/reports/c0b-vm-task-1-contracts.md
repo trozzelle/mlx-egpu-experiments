@@ -8,10 +8,10 @@ Needs review
 - `.superpowers/swarm/reports/c0b-vm-task-1-contracts.md`
 
 ## Source grounding
-- `docs/tasks/native-r9700-gfx12-vm-pte-tlb/phase-1-contracts-and-source-grounding.md` lines 43-88: Task set 1 target, required pytest names, help assertions, validation command, and expected RED result.
-- `docs/tasks/native-r9700-gfx12-vm-pte-tlb/phase-1-contracts-and-source-grounding.md` lines 10-15: source code anchors for `amdev.py`, `memory.py`, `am.py`, `soc_12.py`, and `ip.py`.
-- `docs/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md` lines 66-114: exact expected output tuples copied into the pytest contract.
-- `docs/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md` lines 117-123: source-grounded gfx12 PTE flag formulas for sysmem and VRAM leaves.
+- `docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/phase-1-contracts-and-source-grounding.md` lines 43-88: Task set 1 target, required pytest names, help assertions, validation command, and expected RED result.
+- `docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/phase-1-contracts-and-source-grounding.md` lines 10-15: source code anchors for `amdev.py`, `memory.py`, `am.py`, `soc_12.py`, and `ip.py`.
+- `docs/archive/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md` lines 66-114: exact expected output tuples copied into the pytest contract.
+- `docs/archive/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md` lines 117-123: source-grounded gfx12 PTE flag formulas for sysmem and VRAM leaves.
 
 ## Supervisor command to run
 `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v`

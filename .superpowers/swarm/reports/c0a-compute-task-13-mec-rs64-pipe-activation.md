@@ -1,6 +1,6 @@
 # C0A Compute Task 13 — MEC RS64 Pipe-Activation Replay: Hardware Result (CHANGED-SIGNATURE / launch-eliminated)
 
-**Plan:** `docs/superpowers/plans/2026-08-17-mec-rs64-pipe-activation.md`
+**Plan:** `docs/archive/superpowers/plans/2026-08-17-mec-rs64-pipe-activation.md`
 **Checkpoint at start:** `d603f7b` (C0A21 sysmem ring backing, reviewed blocker)
 **Implementation commit:** `c263e11` (C0A22 T1, reviewed; reviewer accepted 0 Critical/Important, 1 Minor informational)
 **Hardware log:** `logs/c0l-native-amdev-mec-rs64-pipe-activation.log`

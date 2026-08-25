@@ -5,7 +5,7 @@ source_reports_read:
 - `.superpowers/swarm/reports/c0a-compute-task-8-gdc-s2a-coverage.md`
 - `.superpowers/swarm/reports/c0a-compute-task-8-gdc-s2a-readback.md`
 - Prior CP MEC range report `.superpowers/swarm/reports/c0a-compute-task-7-mec-doorbell-range.md`
-- Plan/task doc `docs/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`
+- Plan/task doc `docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`
 
 bar2_index_value_status: matches
 mec_range_status: matches

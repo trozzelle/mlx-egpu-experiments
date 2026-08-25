@@ -10,7 +10,7 @@ Accepted. Phase 2 can be accepted before Phase 3.
 - `.superpowers/swarm/reports/c0b-vm-task-3-hardware-mapping.md`
 - `.superpowers/swarm/progress.md`
 - `logs/c0b-native-amdev-sdma-transfer.log`
-- Contract and source refs: `docs/tasks/native-r9700-gfx12-vm-pte-tlb/phase-2-fixed-vm-mapping.md`, `docs/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md`, and focused tinygrad/generated files cited below.
+- Contract and source refs: `docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/phase-2-fixed-vm-mapping.md`, `docs/archive/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md`, and focused tinygrad/generated files cited below.
 
 ## Critical findings
 

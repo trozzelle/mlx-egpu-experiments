@@ -2,7 +2,7 @@
 
 ## Source and resume state
 - Source docs read:
-  - `docs/tasks/tinygrad-kv-worker/phase-0-parity.md` (the task doc being executed).
+  - `docs/archive/tasks/tinygrad-kv-worker/phase-0-parity.md` (the task doc being executed).
   - `docs/DESIGN.md` §Exporter contract, §KV interchange format, §Error states.
   - `docs/pinned-upstream-interfaces.md` §1 (tinygrad `cache_kv`) and §2 (mlx-lm `save_prompt_cache`/`load_prompt_cache`/`KVCache`).
 - Ledger path: `.superpowers/swarm/progress.md`.

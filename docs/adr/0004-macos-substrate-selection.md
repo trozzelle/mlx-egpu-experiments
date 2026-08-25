@@ -17,4 +17,4 @@ The local macOS eGPU runtime — TinyGPU.app / `APLRemotePCIDevice` / `PCIIface`
 - C1 parity work proceeds on macOS native; Linux ROCm/HIP is tracked as reference and can be promoted later if a parity or portability need outweighs the proven native path.
 - Kernarg layout and kernel-store conventions locked by C0A21/C0A24/C0A25 (store/addressing) are treated as stable inputs to C1 task set 2.
 
-**Links:** `CONTEXT.md` (Path C, Native R9700 producer), `docs/tasks/native-r9700-producer/README.md` (C0 → macOS substrate SELECTED for C1), `phase-c0a-macos-egpu-runtime-focus.md`, swarm report `c0a-compute-task-16-load-path-fix.md`.
+**Links:** `CONTEXT.md` (Path C, Native R9700 producer), `docs/archive/tasks/native-r9700-producer/README.md` (C0 → macOS substrate SELECTED for C1), `phase-c0a-macos-egpu-runtime-focus.md`, swarm report `c0a-compute-task-16-load-path-fix.md`.

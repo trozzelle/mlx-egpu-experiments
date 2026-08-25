@@ -1,7 +1,7 @@
 # Task 2 Review — Remap compute ring PTE to sysmem pages
 
 **Reviewer:** Task2Reviewer
-**Plan:** docs/superpowers/plans/2026-08-17-sysmem-ring-backing-isolation.md, Task 2
+**Plan:** docs/archive/superpowers/plans/2026-08-17-sysmem-ring-backing-isolation.md, Task 2
 **Worktree:** ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer (branch `feature/native-r9700-producer`)
 **Base:** 30d573b (Task 1) + working-tree diff (Task 2)
 **Read-only review.** No build/test/git/hardware executed.

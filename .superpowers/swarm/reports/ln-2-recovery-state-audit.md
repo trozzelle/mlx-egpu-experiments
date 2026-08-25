@@ -12,7 +12,7 @@ This is an **AMDev IP-discovery validation failure**, not an RMSNorm numerical r
 
 The documented initialization sequence is:
 
-1. `APLRemotePCIDevice` connects to TinyGPU.app's Unix-socket RPC service and presents the device as `pcibus='usb4'` (`docs/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md:31-47`).
+1. `APLRemotePCIDevice` connects to TinyGPU.app's Unix-socket RPC service and presents the device as `pcibus='usb4'` (`docs/archive/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md:31-47`).
 2. AMDev maps BAR0 (VRAM), BAR2 (doorbells), and BAR5 (MMIO), establishes its AMD boot policy, and then performs software/memory initialization (`macos-tinygpu-abi-notes.md:51-58`).
 3. During discovery, AMDev reads VRAM size from register `0xde3`, verifies that BAR0 is sufficient, reads the IP-discovery table from VRAM or through MMIO-backed `_read_vram`, and validates that table's discovery signatures (`macos-tinygpu-abi-notes.md:54`).
 

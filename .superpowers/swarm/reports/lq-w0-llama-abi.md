@@ -32,11 +32,11 @@ Accepted assets must identify the same lowercase SHA-256 in their descriptor and
 
 ## Source-grounded decisions
 
-- Stage names and required descriptor fields: `docs/tasks/native-r9700-producer/phase-c1r-native-llama-delivery.md:45-58`.
-- Model geometry and fp16 K/V `(1,8,N,64)`: `docs/tasks/native-r9700-producer/phase-c1r-native-llama-delivery.md:20-25`.
-- Source-asset identities follow the planned Llama source filenames in `docs/superpowers/plans/2026-08-22-llama-qwen-native-producer-delivery.md:81-87,102-113`.
+- Stage names and required descriptor fields: `docs/archive/tasks/native-r9700-producer/phase-c1r-native-llama-delivery.md:45-58`.
+- Model geometry and fp16 K/V `(1,8,N,64)`: `docs/archive/tasks/native-r9700-producer/phase-c1r-native-llama-delivery.md:20-25`.
+- Source-asset identities follow the planned Llama source filenames in `docs/archive/superpowers/plans/2026-08-22-llama-qwen-native-producer-delivery.md:81-87,102-113`.
 - Existing safetensors binder validation and byte-only behavior: `native_r9700/model_weight_binder.h` and `native_r9700/model_weight_binder.cpp`.
-- Metadata-only/no numerical CPU path: `docs/superpowers/plans/2026-08-22-llama-qwen-native-producer-delivery.md:11-22`.
+- Metadata-only/no numerical CPU path: `docs/archive/superpowers/plans/2026-08-22-llama-qwen-native-producer-delivery.md:11-22`.
 
 ## Scope proof
 

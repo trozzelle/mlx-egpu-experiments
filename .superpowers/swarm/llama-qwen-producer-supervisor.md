@@ -2,8 +2,8 @@
 
 ## Source and resume state
 
-- Master plan: `docs/superpowers/plans/2026-08-22-llama-qwen-native-producer-delivery.md`.
-- Execution packets: `docs/tasks/native-r9700-producer/phase-c1r-native-llama-delivery.md`, `phase-qwen3-8-native-text-delivery.md`, and `phase-native-producer-swarm-integration.md`.
+- Master plan: `docs/archive/superpowers/plans/2026-08-22-llama-qwen-native-producer-delivery.md`.
+- Execution packets: `docs/archive/tasks/native-r9700-producer/phase-c1r-native-llama-delivery.md`, `phase-qwen3-8-native-text-delivery.md`, and `phase-native-producer-swarm-integration.md`.
 - Durable ledger: `.superpowers/swarm/progress.md`.
 - Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer` (current feature branch; every executor stays in this checkout).
 - Preserved evidence: standalone C0 kernel proof, lower-BAR resident VRAM smoke, and real Llama safetensors embedding HSA smoke pass on `1002:7551` / `gfx1201`.

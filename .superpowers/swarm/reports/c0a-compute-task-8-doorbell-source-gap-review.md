@@ -18,7 +18,7 @@ implementation_dispatch_allowed: false
 - `.superpowers/swarm/reports/c0a-compute-task-8-doorbell-source-gap-decision.md`
 - `.superpowers/swarm/reports/c0a-compute-task-8-gdc-s2a-instrumentation-review.md`
 - `logs/c0d-native-amdev-doorbell-source-gap.log`
-- `docs/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`
+- `docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`
 
 No validation commands, tests, linters, formatters, package managers, git commands, project-wide suites, or hardware commands were run by this reviewer.
 
@@ -43,7 +43,7 @@ None.
 pass — every scoped `matches` claim is tied to source or log evidence, and no scoped report selects `source_consistency: contradicts`.
 
 - BAR2 selector: `.superpowers/swarm/reports/c0a-compute-task-8-bar2-assignment-selector.md:61` reports `source_consistency: matches`; its source refs cite the Tinygrad selector path, native queue assumptions, and Linux assignment/unit cross-checks, and its evidence section at lines 63-71 explains why queue 0 selects NAVI10/DOORBELL64 index `3`, BAR2 byte offset `0x18`, and CP/HQD dword offset `6`. The decision consumes that exact evidence at `.superpowers/swarm/reports/c0a-compute-task-8-doorbell-source-gap-decision.md:21-23`.
-- CP MEC range: the phase doc requires the CP MEC range to remain `matches` unless new evidence contradicts it (`docs/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:15`). The decision keeps `mec_range_status: matches` and states no Task 8 report introduced a contradiction (`.superpowers/swarm/reports/c0a-compute-task-8-doorbell-source-gap-decision.md:11,25-28`); the current hardware log still records the same `mec_doorbell_range_lower=0x00000000` and `mec_doorbell_range_upper=0x000000f8` values (`logs/c0d-native-amdev-doorbell-source-gap.log:115`).
+- CP MEC range: the phase doc requires the CP MEC range to remain `matches` unless new evidence contradicts it (`docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:15`). The decision keeps `mec_range_status: matches` and states no Task 8 report introduced a contradiction (`.superpowers/swarm/reports/c0a-compute-task-8-doorbell-source-gap-decision.md:11,25-28`); the current hardware log still records the same `mec_doorbell_range_lower=0x00000000` and `mec_doorbell_range_upper=0x000000f8` values (`logs/c0d-native-amdev-doorbell-source-gap.log:115`).
 - GDC/S2A programming equivalence: `.superpowers/swarm/reports/c0a-compute-task-8-gdc-s2a-coverage.md:63` reports `programming_matches_linux: true`; the report cites Tinygrad/native/Linux raw programming sources and evidence at lines 7-15 and 78-82, while keeping `coverage_semantics.status: gap` and `source_consistency: gap` at lines 65-76.
 - GDC/S2A route readback: `logs/c0d-native-amdev-doorbell-source-gap.log:119-120` records raw entry 0/3 values `0x30000007`/`0x3000000d` and `compute_doorbell_route_classification: gdc_s2a_route_readback_matches`. The readback report cites those log lines at `.superpowers/swarm/reports/c0a-compute-task-8-gdc-s2a-readback.md:16-27`, records `route_readback_classification: gdc_s2a_route_readback_matches` at line 46, and still keeps `source_consistency: gap` at lines 34-47.
 - Contradiction handling: no scoped report selects a `contradicts` classification. The decision rejects contradiction/fix lanes because BAR2 is `matches`, GDC/S2A remains `gap`, and no Task 8 lane reports `contradicts` (`.superpowers/swarm/reports/c0a-compute-task-8-doorbell-source-gap-decision.md:44-47`).
@@ -55,7 +55,7 @@ pass — the decision matrix is applied as BAR2 `matches` + GDC/S2A coverage/rea
 - Decision status lines set `bar2_index_value_status: matches`, `mec_range_status: matches`, `gdc_s2a_coverage_readback_status: gap`, and `selected_follow_up_lane: blocked_source_gap` (`.superpowers/swarm/reports/c0a-compute-task-8-doorbell-source-gap-decision.md:10-13`).
 - The matrix row explicitly maps `matches` + `gap` to `blocked_source_gap` (`.superpowers/swarm/reports/c0a-compute-task-8-doorbell-source-gap-decision.md:41`).
 - No fix lane is selected from a `gap`: `hqd_pq_consumption_diagnostic` is withheld because it requires both BAR2 and GDC/S2A to be `matches`; BAR2 and GDC/S2A fix lanes are withheld because neither lane produced a cited `contradicts` result (`.superpowers/swarm/reports/c0a-compute-task-8-doorbell-source-gap-decision.md:44-47`).
-- The selected lane obeys the Phase 4/5 gate: the phase doc says no BAR2 index/value, CP MEC range, GDC/S2A route, PM4 packet, scheduler, retry loop, AQL, Linux HIP fallback, allocator/runtime framework, or C1/C2/C3 work is authorized from a `gap`, and if any lane remains `gap`, the phase must stop at `blocked_source_gap` (`docs/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:29,277`).
+- The selected lane obeys the Phase 4/5 gate: the phase doc says no BAR2 index/value, CP MEC range, GDC/S2A route, PM4 packet, scheduler, retry loop, AQL, Linux HIP fallback, allocator/runtime framework, or C1/C2/C3 work is authorized from a `gap`, and if any lane remains `gap`, the phase must stop at `blocked_source_gap` (`docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:29,277`).
 
 ### Route-readback promotion boundary
 
@@ -69,7 +69,7 @@ pass — `gdc_s2a_route_readback_matches` is not promoted into GDC/S2A coverage 
 
 pass — all downstream lanes remain blocked because there are no CPU pass tokens and no user-approved fallback/split path.
 
-- The phase dependency states C0A/C1/C2/C3 remain blocked until CPU-verified pass tokens exist or the user explicitly approves a fallback/split path (`docs/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:16`).
+- The phase dependency states C0A/C1/C2/C3 remain blocked until CPU-verified pass tokens exist or the user explicitly approves a fallback/split path (`docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:16`).
 - The hardware log records `cpu_comparison_status: not_run_blocked_by_kernel_timeline_timeout`, `host_device_transfer_status: not_run_blocked_by_kernel_timeline_timeout`, `failure_stage: kernel_timeline_timeout`, and `wrapper_exit_status: 1` (`logs/c0d-native-amdev-doorbell-source-gap.log:125-130`).
 - The decision carries this forward: CPU pass tokens do not exist, C0A remains blocked, and C1/C2/C3 remain blocked until C0 produces CPU-verified pass tokens or the user approves a fallback/split path (`.superpowers/swarm/reports/c0a-compute-task-8-doorbell-source-gap-decision.md:49-53`).
 

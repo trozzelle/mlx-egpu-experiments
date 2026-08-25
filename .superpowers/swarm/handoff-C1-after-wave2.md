@@ -75,13 +75,13 @@ Continue the C1 native producer parity work after the completed Wave 2 (C1 task 
 - Probe untouched (`git diff --stat experiments/...probe.cpp` empty); `git diff --check` clean.
 
 ## Working tree (current, safe to leave)
-- Pre-existing untracked (leave alone): `docs.zip`, `docs/research/`, `docs/tasks/amdev-doorbell-delivery/phase-9-cp-mec-rs64-handoff.md`.
+- Pre-existing untracked (leave alone): `docs.zip`, `docs/research/`, `docs/archive/tasks/amdev-doorbell-delivery/phase-9-cp-mec-rs64-handoff.md`.
 - Gitlog HEAD: `268671f` (Wave 2) → `861c794` (Wave 1) → `34a09ce` (contract freeze) → `dd90595` (ADR 0004) → `33a7036` → `65414e0` → `45d7b95` → `120ef29`.
 
 ## Next Steps (recommended next wave = C1 task set 6, Attention/RoPE/KV writer)
 
 1. **Confirm boundary**: `git branch --show-current` == `feature/native-r9700-producer`; confirm tree state matches this handoff (no uncommitted changes beyond the 3 pre-existing untracked files).
-2. **Read task set 6 spec** in `docs/tasks/native-r9700-producer/phase-c1-native-producer-parity.md` (§Task set 6, lines ~225-273). It requires: attention input projection / head shaping for single-layer K/V; Llama-3 RoPE scaling exactly per the MLX sidecar config; emit K/V in temporal order shape `(1,8,N,64)`; compare vs MLX reference fixtures (from C1-3!); record per-layer max/mean deltas; `N == S-1` explicit.
+2. **Read task set 6 spec** in `docs/archive/tasks/native-r9700-producer/phase-c1-native-producer-parity.md` (§Task set 6, lines ~225-273). It requires: attention input projection / head shaping for single-layer K/V; Llama-3 RoPE scaling exactly per the MLX sidecar config; emit K/V in temporal order shape `(1,8,N,64)`; compare vs MLX reference fixtures (from C1-3!); record per-layer max/mean deltas; `N == S-1` explicit.
 3. **Dispatch Wave 3**: C1-6 is the next sequential lane (NOT parallel with C1-7, which depends on C1-6). Treat the "stale blocker" on the C1-6 ledger row as cleared when dispatching — update the row from `Blocked` to `In progress` first alarmits blocker text is stale ("missing C0-selected substrate" — false; substrate is selected and all deps Done).
    - Lane must consume the existing primitives (`native_r9700/primitives.py`) and reference fixtures (`native_r9700/ref_fixtures.py`, `tests/native_r9700/fixtures/kv_state.npz`) — reuses not reinvents.
    - RoPE scaling must come from the MLX config sidecar (the loader already validates rope_theta 500000 + llama3 rope_scaling).

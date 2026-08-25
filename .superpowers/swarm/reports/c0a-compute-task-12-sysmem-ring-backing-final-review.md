@@ -39,7 +39,7 @@ The report's `ring_backing_classification: unchanged_timeout_ring_backing_elimin
 `next_blocker: cp_mec_rs64_instr_state_needs_firmware_config` is well-grounded:
 
 - Ring backing ruled out (Check 1): the failure persists identically with sysmem/GART backing.
-- MEC enable negative: referenced from the prior reviewed Phase 9 handoff (`docs/tasks/amdev-doorbell-delivery/phase-9-cp-mec-rs64-handoff.md`), where `_enable_mec()` / `regCP_MEC_RS64_CNTL` active write changed nothing and `cp_mec_rs64_exception_status` stayed `0x0000c67a`.
+- MEC enable negative: referenced from the prior reviewed Phase 9 handoff (`docs/archive/tasks/amdev-doorbell-delivery/phase-9-cp-mec-rs64-handoff.md`), where `_enable_mec()` / `regCP_MEC_RS64_CNTL` active write changed nothing and `cp_mec_rs64_exception_status` stayed `0x0000c67a`.
 - unord_dispatch is hardware-forced (bit 28 re-applied), not host-writable — both runs end at `0x1000050c` regardless of the host-encoded value.
 
 With ring backing, MEC enable, and host control bits all eliminated, `instr_pntr` pinned at `0x60e` with `exception_status` reporting page-fault+misaligned narrows the failure to the RS64 MEC firmware/instruction state. The prescribed next step — configuring RS64 MEC PFP/ME/MEC program counters from gc_12_0_0 firmware ucode (`_config_mec()` replay) or a full AMDev reset/firmware reload — directly follows.

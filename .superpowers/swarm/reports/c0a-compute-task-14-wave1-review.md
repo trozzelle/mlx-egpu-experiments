@@ -4,7 +4,7 @@
 **Reviewer:** C0A23Wave1Review
 **Scope:** Task 1 (readback classifier) + Task 2 (kernel-text decode) — `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`, `tests/test_native_amdev_transfer_contract.py`
 **Reviewed reports:** `.superpowers/swarm/reports/c0a-compute-task-14a-readback-classifier.md`, `c0a-compute-task-14b-kernel-decode.md`
-**Plan:** `docs/superpowers/plans/2026-08-18-compute-output-readback-byte-swap.md` (Tasks 1-2)
+**Plan:** `docs/archive/superpowers/plans/2026-08-18-compute-output-readback-byte-swap.md` (Tasks 1-2)
 **Baseline:** `c263e11` (C0A22 impl)
 
 **Verdict: accepted**

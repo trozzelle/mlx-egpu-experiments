@@ -7,7 +7,7 @@ scope:
   - .superpowers/swarm/reports/c0a-compute-task-7-mec-doorbell-range.md
   - .superpowers/swarm/reports/c0a-compute-task-7-gdc-s2a-routing.md
   - .superpowers/swarm/reports/c0a-compute-task-7-doorbell-source-grounding.md
-  - docs/tasks/amdev-doorbell-delivery/phase-4-doorbell-source-grounding.md
+  - docs/archive/tasks/amdev-doorbell-delivery/phase-4-doorbell-source-grounding.md
 review_method: Scoped report/document read only. No validation, hardware, test, lint, package-manager, git, fallback-path, C1/C2/C3, commit, or push work was performed by this reviewer.
 
 ## Counts

@@ -25,8 +25,8 @@ Qwen3.8-27B is a product goal, but it is a separate target-expansion slice from 
 - `tests/native_r9700/` — staged C1/C2 tests for loader, primitives, attention, prefill, cache emitter, parity, serving, and runtime contracts.
 - `tests/native_r9700/fixtures/` — committed oracle fixture data and schemas used by C1/C2 tests.
 - `tests/` — Phase 0 harness/exporter tests plus native AMDev C++ probe contracts.
-- `docs/` — architecture, design, roadmap, ADRs, validation results, upstream interface notes, and task plans.
-- `docs/tasks/native-r9700-producer/` — primary working plan, validation command ledger, phase docs, and current native R9700 acceptance status.
+- `docs/` — current architecture, design, roadmap, implementation plan, references, ADRs, validation results, and active command ledger.
+- `docs/archive/` — completed/superseded task packets, implementation plans, design specs, and diagnostic handoffs; historical evidence only.
 - `.superpowers/swarm/` — swarm ledger/reports. Use `progress.md` for freshest status when it conflicts with older reports.
 - `experiments/native-r9700-runtime/` — native runtime probes and stale negative controls.
 - `logs/`, `build/`, `mlx_models/`, `artifacts/` — local/generated; do not commit unless a task explicitly promotes a fixture/report.
@@ -110,11 +110,11 @@ DEV=AMD JITBEAM=2 HF_HOME=${HOME}/Development/ml/models \
 - `CONTEXT.md` — canonical terms and project language.
 - `docs/ARCHITECTURE.md` — producer/consumer boundary and high-level flows.
 - `docs/DESIGN.md` — KV interchange, producer, validation, runtime-discovery, and serving contracts.
-- `docs/ROADMAP.md` — phase ordering and capability gates.
+- `docs/ROADMAP.md` — current F1–F6, P1–P5, Q1 capability ordering and G0–G3 integration gates.
 - `docs/adr/0004-macos-substrate-selection.md` — accepted macOS TinyGPU/AMDev substrate.
 - `docs/adr/0005-cpu-reference-is-not-native-r9700-producer.md` — critical native-acceptance correction.
 - `docs/pinned-upstream-interfaces.md` — mlx-lm prompt-cache ABI, TinyGPU/tinygrad AMD facts, oMLX notes.
-- `docs/tasks/native-r9700-producer/README.md` — current phase guide, production milestone discipline, blockers, and Qwen warning.
+- `docs/IMPLEMENTATION_PLAN.md` — current two-track high-level implementation plan; archived phase packets are indexed by `docs/archive/README.md`.
 - `docs/tasks/native-r9700-producer/validation-commands.md` — exact command ledger; add discovered commands here, not placeholders.
 - `docs/path-a-validation-results.md` — validation report and reclassified reference/native status.
 - `.superpowers/swarm/progress.md` — freshest swarm status ledger.

@@ -8,9 +8,9 @@ Done. C0B handoff records the native AMDev/SDMA transfer pass. C0A minimal kerne
 
 - `.superpowers/swarm/progress.md`
 - `.superpowers/swarm/native-r9700-producer-supervisor.md`
-- `docs/tasks/native-r9700-producer/README.md`
-- `docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`
-- `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
+- `docs/archive/tasks/native-r9700-producer/README.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
 - `docs/tasks/native-r9700-producer/validation-commands.md`
 - `.superpowers/swarm/reports/c0a-task-3-transfer-proof.md`
 - `.superpowers/swarm/reports/c0b-task-5-transfer-proof.md`
@@ -46,9 +46,9 @@ wrapper_exit_status: 0
 
 ## Handoff state
 
-- `docs/tasks/native-r9700-producer/README.md`: C0 status now says host-device transfer passed; final selected state remains blocked until kernel proof and C0 decision rerun.
-- `docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`: task set 3 is Done; task set 4 minimal kernel launch proof is Not started and unblocked; task set 5 decision rerun remains Blocked on task set 4.
-- `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`: task set 5 and task set 6 are Done.
+- `docs/archive/tasks/native-r9700-producer/README.md`: C0 status now says host-device transfer passed; final selected state remains blocked until kernel proof and C0 decision rerun.
+- `docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`: task set 3 is Done; task set 4 minimal kernel launch proof is Not started and unblocked; task set 5 decision rerun remains Blocked on task set 4.
+- `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`: task set 5 and task set 6 are Done.
 - `.superpowers/swarm/progress.md`: C0A-4 and C0B-5 are Done; C0A-5 is Not started; C0A-6/C1/C2/C3 remain blocked.
 
 ## Quality bar

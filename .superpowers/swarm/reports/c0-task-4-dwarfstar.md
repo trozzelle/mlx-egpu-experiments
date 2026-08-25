@@ -4,13 +4,13 @@ Status: Done.
 
 Artifacts updated:
 
-- `docs/tasks/native-r9700-producer/dwarfstar-reference-notes.md`
-- `docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md` task set 4 ledger row
+- `docs/archive/tasks/native-r9700-producer/dwarfstar-reference-notes.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md` task set 4 ledger row
 
 Supervisor docs check command to run outside OMP task mode:
 
 ```sh
-git diff --check docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/tasks/native-r9700-producer/dwarfstar-reference-notes.md .superpowers/swarm/reports/c0-task-4-dwarfstar.md
+git diff --check docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/archive/tasks/native-r9700-producer/dwarfstar-reference-notes.md .superpowers/swarm/reports/c0-task-4-dwarfstar.md
 ```
 
 I did not run validation commands, linters, tests, package managers, or git commands in task mode.

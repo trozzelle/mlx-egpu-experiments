@@ -7,7 +7,7 @@ Done. Supervisor verified the no-hardware pytest contract is RED for the expecte
 ## Changed files
 
 - `tests/test_native_amdev_transfer_contract.py`
-- `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
 - `.superpowers/swarm/reports/c0b-task-1-red-contract.md`
 
 `docs/tasks/native-r9700-producer/validation-commands.md` was inspected and already contained the C0B contract-test command plus expected RED result, so it was not edited.

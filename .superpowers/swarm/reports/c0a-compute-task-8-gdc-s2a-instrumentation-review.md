@@ -12,7 +12,7 @@ quality_bar_result: pass
 - `tests/test_native_amdev_transfer_contract.py`
 - `.superpowers/swarm/reports/c0a-compute-task-8-gdc-s2a-contract.md`
 - `.superpowers/swarm/reports/c0a-compute-task-8-gdc-s2a-instrumentation.md`
-- Phase 5 Task set 3 requirements in `docs/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`
+- Phase 5 Task set 3 requirements in `docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`
 
 No validation commands, tests, linters, formatters, package managers, project-wide suites, or hardware commands were run by this reviewer.
 

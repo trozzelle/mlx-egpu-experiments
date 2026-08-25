@@ -40,7 +40,7 @@ Linux ROCm/HIP can proceed independently as the production-candidate/reference l
 
 ## Task doc update
 
-Updated only task set 2's row in `docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md` with the source path, exact blocker, and Linux-lane independence.
+Updated only task set 2's row in `docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md` with the source path, exact blocker, and Linux-lane independence.
 
 ## Validation not run
 

@@ -8,11 +8,11 @@ Done. Supervisor verified the no-hardware contract suite and the hardware transf
 
 - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`
 - `tests/test_native_amdev_transfer_contract.py`
-- `docs/superpowers/plans/2026-08-17-native-sdma-ring-transfer.md`
-- `docs/superpowers/specs/2026-08-17-native-sdma-ring-transfer-design.md`
-- `docs/tasks/native-r9700-producer/README.md`
-- `docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`
-- `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
+- `docs/archive/superpowers/plans/2026-08-17-native-sdma-ring-transfer.md`
+- `docs/archive/superpowers/specs/2026-08-17-native-sdma-ring-transfer-design.md`
+- `docs/archive/tasks/native-r9700-producer/README.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
 - `docs/tasks/native-r9700-producer/validation-commands.md`
 - `.superpowers/swarm/progress.md`
 - `.superpowers/swarm/native-r9700-producer-supervisor.md`

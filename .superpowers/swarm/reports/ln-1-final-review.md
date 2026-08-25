@@ -11,7 +11,7 @@ However, the focused tests still do not substantively defend two explicit LN-1 c
 ### P1 — The oracle determinism gate is untested
 
 - **Location:** `tests/native_r9700/test_llama_stage_oracle.py:72-132`
-- **Contract:** `docs/tasks/native-r9700-producer/phase-llama-numerical-trace.md:43-45` and `2026-08-23-llama-numerical-debug-plan.md:41`
+- **Contract:** `docs/archive/tasks/native-r9700-producer/phase-llama-numerical-trace.md:43-45` and `2026-08-23-llama-numerical-debug-plan.md:41`
 - The all-stage synthetic test invokes each stage exactly once. It verifies schema, finite count, byte length, and metadata round-trip, but never emits the same layer-0/token-0/stage request twice and compares metadata, digest, finite count, and raw bytes.
 - This is the Phase-A acceptance gate, not incidental coverage. A regression involving mutable state, non-deterministic input ordering, or unstable serialization can therefore pass all current oracle tests.
 

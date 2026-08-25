@@ -2,8 +2,8 @@
 
 ## Files changed
 
-- `docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md`
-- `docs/tasks/native-r9700-producer/README.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md`
+- `docs/archive/tasks/native-r9700-producer/README.md`
 - `docs/tasks/native-r9700-producer/validation-commands.md`
 - `.superpowers/swarm/reports/c0-task-6-handoff.md`
 
@@ -18,7 +18,7 @@ Evidence paths:
 - macOS lane: `logs/c0-macos-egpu-minimal-runtime.log`, `.superpowers/swarm/reports/c0-task-2-macos-egpu.md`
 - Linux HIP lane: `experiments/native-r9700-runtime/linux_hip_minimal.cpp`, `.superpowers/swarm/reports/c0-task-3-linux-hip.md`
 - Substrate decision: `.superpowers/swarm/reports/c0-task-5-substrate-decision.md`
-- DwarfStar reference-only note: `docs/tasks/native-r9700-producer/dwarfstar-reference-notes.md`, `.superpowers/swarm/reports/c0-task-4-dwarfstar.md`
+- DwarfStar reference-only note: `docs/archive/tasks/native-r9700-producer/dwarfstar-reference-notes.md`, `.superpowers/swarm/reports/c0-task-4-dwarfstar.md`
 
 ## C1/C2/C3 dependency state
 
@@ -38,5 +38,5 @@ Evidence paths:
 OMP task executors do not run validation, linters, formatters, package managers, git commands, proof commands, or project-wide suites. Supervisor should run:
 
 ```sh
-git diff --check docs/tasks/native-r9700-producer/README.md docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/tasks/native-r9700-producer/validation-commands.md
+git diff --check docs/archive/tasks/native-r9700-producer/README.md docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/tasks/native-r9700-producer/validation-commands.md
 ```

@@ -1,8 +1,8 @@
 contract_name: gdc_s2a_route_coverage
 
 source_refs:
-  - docs/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:73-101 defines Task set 2, requires source-only reporting, raw route decode, Tinygrad/Linux programming equivalence, BAR2 `0x18` coverage semantics, and exactly one `source_consistency` classification.
-  - docs/superpowers/plans/2026-08-17-doorbell-source-gap-resolution.md:20-25 asks whether ports 0/3 cover the BAR2 MEC doorbell write at byte offset `0x18`; lines 126-155 require separating `programming_matches_linux` from `coverage_semantics`.
+  - docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:73-101 defines Task set 2, requires source-only reporting, raw route decode, Tinygrad/Linux programming equivalence, BAR2 `0x18` coverage semantics, and exactly one `source_consistency` classification.
+  - docs/archive/superpowers/plans/2026-08-17-doorbell-source-gap-resolution.md:20-25 asks whether ports 0/3 cover the BAR2 MEC doorbell write at byte offset `0x18`; lines 126-155 require separating `programming_matches_linux` from `coverage_semantics`.
   - .superpowers/swarm/reports/c0a-compute-task-7-gdc-s2a-routing.md:33-42 previously classified GDC/S2A routing as a gap because native/Tinygrad route values matched but no source established `range_offset=0`, `range_size=0` coverage semantics for BAR2 offset `0x18`.
   - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:37-38 clears `strap_no_soft_reset_dev0_f2` on non-NBIO-7.9 hardware and enables `regRCC_DEV0_EPF0_RCC_DOORBELL_APER_EN`.
   - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:42-48 defines `doorbell_enable(...)` with default `offset=0`, `size=0`, encodes enable/AWID/range-size/awaddr/range-offset fields, and writes the selected GDC/S2A register on gfx12.

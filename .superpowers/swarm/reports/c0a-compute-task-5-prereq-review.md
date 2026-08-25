@@ -16,8 +16,8 @@ Review mode: read-only code/doc/report/log review. I did not run tests, linters,
 - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`
 - `tests/test_native_amdev_transfer_contract.py`
 - `.superpowers/swarm/reports/c0a-compute-task-5-dispatch.md`
-- `docs/tasks/gx1202-compute-dispatch/phase-4-kernel-image-dispatch-readback.md`
-- `docs/superpowers/plans/2026-08-17-gfx1201-compute-dispatch.md` lines 604-779
+- `docs/archive/tasks/gx1202-compute-dispatch/phase-4-kernel-image-dispatch-readback.md`
+- `docs/archive/superpowers/plans/2026-08-17-gfx1201-compute-dispatch.md` lines 604-779
 - `.superpowers/swarm/reports/c0a-task-4-kernel-proof.md`
 - Recorded supervisor logs only, for evidence: `logs/c0b-native-amdev-sdma-transfer.log` and `logs/c0b-native-amdev-kernel-ref.log`
 

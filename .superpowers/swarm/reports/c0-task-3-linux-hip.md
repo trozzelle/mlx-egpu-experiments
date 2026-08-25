@@ -3,7 +3,7 @@
 ## Files changed
 
 - `experiments/native-r9700-runtime/linux_hip_minimal.cpp`
-- `docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md` row 3 only
+- `docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md` row 3 only
 - `.superpowers/swarm/progress.md` C0-3 row only
 - `.superpowers/swarm/reports/c0-task-3-linux-hip.md`
 

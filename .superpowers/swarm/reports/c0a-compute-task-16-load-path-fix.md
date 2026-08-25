@@ -1,6 +1,6 @@
 # C0A25 Load-Path Value-Lane Fix — Hardware Result Report (Task 16)
 
-Plan: `docs/tasks/native-r9700-producer/phase-c0a25-load-path-fix.md` (executed via SDD swarm:
+Plan: `docs/archive/tasks/native-r9700-producer/phase-c0a25-load-path-fix.md` (executed via SDD swarm:
 fused Tasks 1+2 implementer + reviewer, supervisor verify + commit).
 Branch: `feature/native-r9700-producer`. Commit: `45d7b95` (load-path fix + guardrail + plan doc).
 Hardware log: `logs/c0p-native-amdev-kernel-load-fix.log`.

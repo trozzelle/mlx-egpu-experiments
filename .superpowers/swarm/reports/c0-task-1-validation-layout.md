@@ -5,7 +5,7 @@
 
 ## Files changed
 
-- `docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md`
 - `docs/tasks/native-r9700-producer/validation-commands.md`
 - `.superpowers/swarm/reports/c0-task-1-validation-layout.md`
 
@@ -24,7 +24,7 @@ Rationale: the repo currently has a top-level Python package (`tinygrad_kv_worke
 ## Supervisor verification command to run
 
 ```sh
-git diff --check docs/tasks/native-r9700-producer/validation-commands.md docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md
+git diff --check docs/tasks/native-r9700-producer/validation-commands.md docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md
 ```
 
 I did not run this command in OMP task mode.

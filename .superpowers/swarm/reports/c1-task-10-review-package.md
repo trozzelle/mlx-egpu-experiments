@@ -75,7 +75,7 @@ Focused tests:
 
 Docs/evidence:
 
-- `docs/tasks/native-r9700-producer/phase-c1-native-producer-parity.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c1-native-producer-parity.md`
 - `docs/tasks/native-r9700-producer/validation-commands.md`
 - `docs/path-a-validation-results.md`
 - `.superpowers/swarm/progress.md`

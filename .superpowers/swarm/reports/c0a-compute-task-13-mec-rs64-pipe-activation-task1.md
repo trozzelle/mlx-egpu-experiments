@@ -1,6 +1,6 @@
 # C0A Compute Task 13 MEC RS64 Pipe-Activation Replay (Task 1 of plan)
 
-**Status:** Implemented (Task 1 of `docs/superpowers/plans/2026-08-17-mec-rs64-pipe-activation.md`). No hardware run performed in this OMP task-mode; supervisor runs build + focused pytest + hardware validation (Task 2 of the plan).
+**Status:** Implemented (Task 1 of `docs/archive/superpowers/plans/2026-08-17-mec-rs64-pipe-activation.md`). No hardware run performed in this OMP task-mode; supervisor runs build + focused pytest + hardware validation (Task 2 of the plan).
 
 ## Files modified
 - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`

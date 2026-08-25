@@ -16,14 +16,14 @@ quality_bar_result: PASS with minor documentation cleanup. The RED contract targ
 findings:
 - severity: Minor
   title: Update Phase 7 progress ledger after completed lane
-  file_path: docs/tasks/amdev-doorbell-delivery/phase-7-mqd-hqd-copy-fix.md
+  file_path: docs/archive/tasks/amdev-doorbell-delivery/phase-7-mqd-hqd-copy-fix.md
   line_start: 21
   line_end: 25
   body: The progress ledger still marks all five task sets as `Not started`, while the reviewed artifacts record the RED contract failure, the focused GREEN and full focused pytest passes, and the hardware proof resolving the MQD/HQD mismatch. This stale ledger can mislead the next reviewer/supervisor about completed work even though the selected-lane evidence is otherwise valid.
   suggested_fix: Mark task sets 1-4 complete with links to the contract/fix/proof evidence and mark task set 5 complete once this review/checkpoint is consumed.
 
 required_fixes:
-- Minor: update `docs/tasks/amdev-doorbell-delivery/phase-7-mqd-hqd-copy-fix.md:21-25` so the progress ledger reflects completed Phase 7 work.
+- Minor: update `docs/archive/tasks/amdev-doorbell-delivery/phase-7-mqd-hqd-copy-fix.md:21-25` so the progress ledger reflects completed Phase 7 work.
 
 review_evidence:
 - RED contract: `.superpowers/swarm/reports/c0a-compute-task-10-mqd-hqd-copy-contract.md:9-20` records `observed_mismatch: field=cp_hqd_pq_control,expected=0x0000050c,observed=0x1000050c` and the expected self-test token `hqd_copy_expect_cp_hqd_pq_control: 0x1000050c`; `tests/test_native_amdev_transfer_contract.py:276` contains that exact expected line and `tests/test_native_amdev_transfer_contract.py:508-513` asserts the complete self-test output.

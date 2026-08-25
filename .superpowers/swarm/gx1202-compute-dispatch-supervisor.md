@@ -1,12 +1,12 @@
-# Swarm Supervisor Plan: docs/tasks/gx1202-compute-dispatch/
+# Swarm Supervisor Plan: docs/archive/tasks/gx1202-compute-dispatch/
 
 ## Source and resume state
 - Source docs read:
-  - `docs/tasks/gx1202-compute-dispatch/phase-1-contracts-and-layout.md`
-  - `docs/tasks/gx1202-compute-dispatch/phase-2-gc-hub-tlb-preflight.md`
-  - `docs/tasks/gx1202-compute-dispatch/phase-3-compute-ring-mqd-hqd.md`
-  - `docs/tasks/gx1202-compute-dispatch/phase-4-kernel-image-dispatch-readback.md`
-  - `docs/tasks/gx1202-compute-dispatch/phase-5-review-decision-checkpoint.md`
+  - `docs/archive/tasks/gx1202-compute-dispatch/phase-1-contracts-and-layout.md`
+  - `docs/archive/tasks/gx1202-compute-dispatch/phase-2-gc-hub-tlb-preflight.md`
+  - `docs/archive/tasks/gx1202-compute-dispatch/phase-3-compute-ring-mqd-hqd.md`
+  - `docs/archive/tasks/gx1202-compute-dispatch/phase-4-kernel-image-dispatch-readback.md`
+  - `docs/archive/tasks/gx1202-compute-dispatch/phase-5-review-decision-checkpoint.md`
 - Ledger path: `.superpowers/swarm/progress.md`
 - Rows preserved: existing Tinygrad KV Path A and Native R9700 Producer rows are preserved. C0A-5 remains `Blocked`; C0A-6 and C1/C2/C3 rows remain blocked until C0A-5 passes twice or the user approves a split/fallback decision.
 - Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; current feature branch, not a new fallback.
@@ -344,7 +344,7 @@ Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, 
 
 ## Wave 12: MEC doorbell delivery / ring-fetch diagnostic
 ### Source and resume state
-- Source docs read: `docs/tasks/amdev-doorbell-delivery/phase-1-no-hardware-contract.md`, `phase-2-diagnostic-proof.md`, `phase-3-review-ledger-checkpoint.md`, and `docs/superpowers/plans/2026-08-17-mec-doorbell-delivery.md`.
+- Source docs read: `docs/archive/tasks/amdev-doorbell-delivery/phase-1-no-hardware-contract.md`, `phase-2-diagnostic-proof.md`, `phase-3-review-ledger-checkpoint.md`, and `docs/archive/superpowers/plans/2026-08-17-mec-doorbell-delivery.md`.
 - Ledger path: `.superpowers/swarm/progress.md`.
 - Rows preserved: C0A Compute 1-15 remain as recorded; C0A/C1/C2/C3 remain blocked until CPU-verified pass tokens exist or user-approved fallback/split changes the path.
 - Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; current feature branch, no new fallback worktree.
@@ -402,11 +402,11 @@ Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, 
 
 ## Wave 14: Doorbell source-gap resolution/blocker
 ### Source and resume state
-- Source docs read: `docs/superpowers/plans/2026-08-17-doorbell-source-gap-resolution.md`, `docs/tasks/amdev-doorbell-delivery/phase-4-doorbell-source-grounding.md`, `.superpowers/swarm/progress.md`, and this supervisor artifact.
+- Source docs read: `docs/archive/superpowers/plans/2026-08-17-doorbell-source-gap-resolution.md`, `docs/archive/tasks/amdev-doorbell-delivery/phase-4-doorbell-source-grounding.md`, `.superpowers/swarm/progress.md`, and this supervisor artifact.
 - Ledger path: `.superpowers/swarm/progress.md`.
 - Rows preserved: C0A Compute 1-17 remain as recorded; C0A/C1/C2/C3 remain blocked until CPU pass tokens exist or user-approved fallback/split changes the path.
 - Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; current feature branch, no new fallback worktree.
-- Phase task doc: `docs/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`.
+- Phase task doc: `docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`.
 
 ### Orchestration map
 - Sequential blockers:
@@ -454,11 +454,11 @@ Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, 
 
 ## Wave 15: Doorbell blocker resolution
 ### Source and resume state
-- Source docs read: `docs/superpowers/plans/2026-08-17-c0-doorbell-blocker-resolution.md`, `docs/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`, `.superpowers/swarm/progress.md`, this supervisor artifact, and Task 8 reports/logs.
+- Source docs read: `docs/archive/superpowers/plans/2026-08-17-c0-doorbell-blocker-resolution.md`, `docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`, `.superpowers/swarm/progress.md`, this supervisor artifact, and Task 8 reports/logs.
 - Ledger path: `.superpowers/swarm/progress.md`.
 - Rows preserved: C0A Compute 1-18 remain as recorded; C0A Compute 19 opened for the user-approved blocker-resolution ladder; C1/C2/C3 remain blocked until CPU pass tokens exist or user-approved fallback/split changes the path.
 - Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; current feature branch, no new fallback worktree.
-- Phase task doc: `docs/tasks/amdev-doorbell-delivery/phase-6-doorbell-blocker-resolution.md`.
+- Phase task doc: `docs/archive/tasks/amdev-doorbell-delivery/phase-6-doorbell-blocker-resolution.md`.
 
 ### Orchestration map
 - Sequential blockers:
@@ -697,7 +697,7 @@ Move the native compute dispatch ring from fixed VRAM backing to sysmem/GART bac
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer` (current feature branch; no new fallback worktree).
-- Plan: `docs/superpowers/plans/2026-08-17-sysmem-ring-backing-isolation.md` (Tasks 1-4).
+- Plan: `docs/archive/superpowers/plans/2026-08-17-sysmem-ring-backing-isolation.md` (Tasks 1-4).
 - Forbidden: BAR2 index/value, GDC/S2A route values, CP MEC doorbell ranges, PM4 packet sequence, scheduler/retry/AQL/fallback/allocator/runtime framework, C1/C2/C3 work, and changing ring VA/MQD ring addr/ring size/VM indices.
 - Validation policy: OMP task executors never run tests, linters, formatters, package managers, git, project-wide suites, compiles, or hardware commands; supervisor runs verification after each wave.
 - Reporting path: `.superpowers/swarm/reports/c0a-compute-task-12-sysmem-ring-backing-task<N>.md` per task; ledger update per row.

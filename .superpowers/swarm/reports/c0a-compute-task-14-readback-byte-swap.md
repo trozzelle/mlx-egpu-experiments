@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-18
 **Wave:** C0A Compute 23 (Task 3 — hardware validation + cause)
-**Plan:** `docs/superpowers/plans/2026-08-18-compute-output-readback-byte-swap.md`
+**Plan:** `docs/archive/superpowers/plans/2026-08-18-compute-output-readback-byte-swap.md`
 **Baseline:** `3aaa6bb` (C0A22 docs); source baseline `c263e11` (C0A22 impl)
 **Files touched by C0A23 (reviewed Wave 1, accepted):**
 - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`

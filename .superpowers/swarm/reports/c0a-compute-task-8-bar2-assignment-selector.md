@@ -1,7 +1,7 @@
 contract_name: bar2_assignment_family_selector
 source_refs:
-  - docs/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:44-71 defines Task set 1, the report path, required selector question, unit conversions, native queue assumptions, and documentation-only validation.
-  - docs/superpowers/plans/2026-08-17-doorbell-source-gap-resolution.md:20-25 asks whether gfx1201/TinyGPU compute queue 0 uses NAVI10/DOORBELL64 index 3, generic index 16, or LAYOUT1 start 8; lines 91-124 define the BAR2 assignment-family audit and expected closure rule.
+  - docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:44-71 defines Task set 1, the report path, required selector question, unit conversions, native queue assumptions, and documentation-only validation.
+  - docs/archive/superpowers/plans/2026-08-17-doorbell-source-gap-resolution.md:20-25 asks whether gfx1201/TinyGPU compute queue 0 uses NAVI10/DOORBELL64 index 3, generic index 16, or LAYOUT1 start 8; lines 91-124 define the BAR2 assignment-family audit and expected closure rule.
   - .superpowers/swarm/reports/c0a-compute-task-7-bar2-doorbell-index.md:35-42 classified Phase 4 as a gap because generic index 16 and LAYOUT1 range 8..15 were present but no inspected selector proved NAVI10/DOORBELL64 for gfx1201/TinyGPU.
   - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:315-328 computes pipe and queue from idx, assigns doorbell = am.AMDGPU_NAVI10_DOORBELL_MEC_RING0, selects ME=1, and encodes CP_HQD_PQ_DOORBELL_CONTROL with doorbell_offset=doorbell*2.
   - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:340-347 writes the MQD/registers, activates the HQD, flushes HDP, restores GRBM selection, and returns the selected doorbell.

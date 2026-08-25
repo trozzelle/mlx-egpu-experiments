@@ -21,7 +21,7 @@ Implemented `native_r9700.parity`, the C1 Llama native/R token parity harness.
 
 ## Requirements
 
-From `docs/tasks/native-r9700-producer/phase-c1-native-producer-parity.md` task set 9:
+From `docs/archive/tasks/native-r9700-producer/phase-c1-native-producer-parity.md` task set 9:
 
 1. Build the C1 parity harness.
    - Native producer prefill/export for each Phase 0 prompt.

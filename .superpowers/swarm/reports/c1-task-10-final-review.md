@@ -10,7 +10,7 @@ Verdict: **APPROVE** after fixes.
 1. C2 handoff lacked a request token-id producer invocation and only showed fixture prompt names.
 2. `native_r9700.prefill` rejected one-token S-1 prefixes even though a two-token prompt is valid under the S-1/final-token contract.
 3. `native_r9700.kv_cache` could emit a final cache and then fail to write a log if the log parent was missing.
-4. `docs/tasks/native-r9700-producer/phase-c1-native-producer-parity.md` progress rows were stale.
+4. `docs/archive/tasks/native-r9700-producer/phase-c1-native-producer-parity.md` progress rows were stale.
 
 ## Fixes
 
@@ -26,7 +26,7 @@ Verdict: **APPROVE** after fixes.
 - token-id C2 invocation: `.superpowers/swarm/reports/c1-task-10-review-handoff.md`, `native_r9700/prefill.py`;
 - one-token prefix behavior: `native_r9700/prefill.py`, `tests/native_r9700/test_prefill.py`;
 - KV-cache log preflight/removal: `native_r9700/kv_cache.py`, `tests/native_r9700/test_kv_cache.py`;
-- refreshed ledger: `docs/tasks/native-r9700-producer/phase-c1-native-producer-parity.md`;
+- refreshed ledger: `docs/archive/tasks/native-r9700-producer/phase-c1-native-producer-parity.md`;
 - grounded Path C evidence: `docs/path-a-validation-results.md`, `logs/c1-parity/run.log`, `logs/c1-parity/result.json`.
 
 ## Fresh supervisor verification after re-review
@@ -59,7 +59,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
 ```
 
 ```sh
-git diff --check docs/path-a-validation-results.md docs/tasks/native-r9700-producer/phase-c1-native-producer-parity.md docs/tasks/native-r9700-producer/validation-commands.md
+git diff --check docs/path-a-validation-results.md docs/archive/tasks/native-r9700-producer/phase-c1-native-producer-parity.md docs/tasks/native-r9700-producer/validation-commands.md
 # no output
 
 git diff --check

@@ -9,7 +9,7 @@
 No Critical, Important, or Minor findings.
 
 ## Evidence reviewed
-- Task contract tuple/test/help requirements: `docs/tasks/amdev-doorbell-delivery/phase-1-no-hardware-contract.md` lines 49-84 and 116-125.
+- Task contract tuple/test/help requirements: `docs/archive/tasks/amdev-doorbell-delivery/phase-1-no-hardware-contract.md` lines 49-84 and 116-125.
 - Pytest contract tuple and focused test: `tests/test_native_amdev_transfer_contract.py` lines 307-326 and 495-500.
 - Help assertion order around PM4/doorbell/GC: `tests/test_native_amdev_transfer_contract.py` lines 535-537.
 - C++ diagnostic constants: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp` lines 386-403.

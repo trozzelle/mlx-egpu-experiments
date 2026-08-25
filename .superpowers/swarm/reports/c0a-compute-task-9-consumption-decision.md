@@ -17,6 +17,6 @@ why_not_other_lanes:
 c0a_c1_c2_c3_blocking_state: blocked until the selected MQD/HQD copy lane is reviewed, fixed, and hardware-proven; no CPU pass token exists yet.
 implementation_fix_allowed: true
 implementation_fix_allowed_reason: decision review `.superpowers/swarm/reports/c0a-compute-task-9-consumption-decision-review.md` found 0 Critical/Important/Minor and accepted only the selected `mqd_hqd_copy_fix` lane.
-next_task_doc: docs/tasks/amdev-doorbell-delivery/phase-7-mqd-hqd-copy-fix.md
+next_task_doc: docs/archive/tasks/amdev-doorbell-delivery/phase-7-mqd-hqd-copy-fix.md
 
 Required review gate: zero Critical/Important findings on this decision before any source fix dispatch.

@@ -5,7 +5,7 @@ Decision: **defer oMLX imported-cache integration out of C2**. Task set 6 is **D
 
 ## Evidence read
 
-- `docs/tasks/native-r9700-producer/phase-c2-serving-integration.md`: C2 required outcome is real mlx-lm serving through the imported-cache seam; oMLX is optional and task set 6 is gated on this decision.
+- `docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md`: C2 required outcome is real mlx-lm serving through the imported-cache seam; oMLX is optional and task set 6 is gated on this decision.
 - `docs/DESIGN.md`: terminal interchange consumer is mlx-lm `generate_step` / BatchGenerator; oMLX wraps the same prompt-cache seam, while native oMLX/R9700 scheduling is a later backend phase.
 - `docs/pinned-upstream-interfaces.md` §3: oMLX is a Python wrapper around mlx-lm and uses monkey-patched `make_prompt_cache` / `PromptProcessingBatch` / batch-aware cache helpers; external-process precedent is stdio newline-delimited JSON in `cluster/worker.py`.
 - `.superpowers/swarm/reports/c2-task-1-contract.md`: C2 contract is already frozen around `native_r9700/serving.py`, `tests/native_r9700/test_serving.py`, `NativePrefillConfig(...)`, `generate_with_native_prefill(...)`, local subprocess/file producer invocation, full C1 ABI validation before `accepted_cache=true`, and no post-acceptance full-prompt recompute.
@@ -28,7 +28,7 @@ Decision: **defer oMLX imported-cache integration out of C2**. Task set 6 is **D
 
 ## Ledger/report updates made
 
-- Updated `docs/tasks/native-r9700-producer/phase-c2-serving-integration.md`:
+- Updated `docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md`:
   - task set 5 row: Done, owner `C2OMLXScope`, decision defer;
   - task set 6 row: Dropped/Deferred, no C2 source/test paths or validation commands;
   - task set 5 result section with rationale and handoff.
@@ -50,7 +50,7 @@ Use these row intents when Main reconciles C2 progress:
 Command:
 
 ```sh
-git diff --check docs/tasks/native-r9700-producer/phase-c2-serving-integration.md docs/DESIGN.md
+git diff --check docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md docs/DESIGN.md
 ```
 
 Output: no output; exit status 0.

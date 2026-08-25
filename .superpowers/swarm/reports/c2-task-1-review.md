@@ -14,7 +14,7 @@ Verdict: **APPROVE** after fixes.
 ## Fixes landed
 
 - `.superpowers/swarm/reports/c2-task-1-contract.md` now freezes `NativePrefillConfig.producer_model_dir`, `threshold_tokens`, `producer_timeout_s`, CLI `--producer-model`, `--threshold-tokens`, and `--producer-timeout-s`; requires full C1 ABI before `accepted_cache=true`; records full fixture-suite and unavailable fallback command shapes.
-- `docs/tasks/native-r9700-producer/phase-c2-serving-integration.md` now records the same source/test paths, full ABI acceptance, timeout override, mutation/no-reuse rule, and required commands.
+- `docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md` now records the same source/test paths, full ABI acceptance, timeout override, mutation/no-reuse rule, and required commands.
 - `docs/tasks/native-r9700-producer/validation-commands.md` now records exact C2 focused test, full fixture-suite CLI, producer-unavailable fallback CLI, and full-suite commands.
 
 ## Re-review
@@ -24,6 +24,6 @@ Verdict: **APPROVE** after fixes.
 ## Supervisor verification
 
 ```sh
-git diff --check docs/tasks/native-r9700-producer/phase-c2-serving-integration.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/reports/c2-task-1-contract.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/progress.md
+git diff --check docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/reports/c2-task-1-contract.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/progress.md
 # no output
 ```

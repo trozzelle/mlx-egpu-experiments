@@ -3,7 +3,7 @@
 **Reviewer:** MecRs64PipeActivationReviewer
 **Date:** 2026-08-17
 **Branch:** feature/native-r9700-producer
-**Scope:** `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`, `tests/test_native_amdev_transfer_contract.py` (Task 1 of plan `docs/superpowers/plans/2026-08-17-mec-rs64-pipe-activation.md`)
+**Scope:** `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`, `tests/test_native_amdev_transfer_contract.py` (Task 1 of plan `docs/archive/superpowers/plans/2026-08-17-mec-rs64-pipe-activation.md`)
 
 ## Verification performed
 - Full `git diff` of both files reviewed against plan Task 1.

@@ -12,7 +12,7 @@
 - Important: none.
 
 ## Minor / low-confidence notes to track
-1. Phase 3 Task set 3 still needs to propagate the reviewed C0D result into durable checkpoint sections after this review. Evidence: `docs/tasks/amdev-doorbell-delivery/phase-3-review-ledger-checkpoint.md` assigns that ledger/checkpoint work to Task set 3; current `docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md` rows 37-38 still cite the prior C0C blocker state, and `.superpowers/swarm/native-r9700-producer-supervisor.md` lines 540-544 still summarize the prior C0A compute-dispatch split decision. This is not a Critical/Important fix-loop item because `.superpowers/swarm/progress.md` line 116 and `.superpowers/swarm/gx1202-compute-dispatch-supervisor.md` lines 345-383 already keep the C0D review/checkpoint flow blocked until this review finishes.
+1. Phase 3 Task set 3 still needs to propagate the reviewed C0D result into durable checkpoint sections after this review. Evidence: `docs/archive/tasks/amdev-doorbell-delivery/phase-3-review-ledger-checkpoint.md` assigns that ledger/checkpoint work to Task set 3; current `docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md` rows 37-38 still cite the prior C0C blocker state, and `.superpowers/swarm/native-r9700-producer-supervisor.md` lines 540-544 still summarize the prior C0A compute-dispatch split decision. This is not a Critical/Important fix-loop item because `.superpowers/swarm/progress.md` line 116 and `.superpowers/swarm/gx1202-compute-dispatch-supervisor.md` lines 345-383 already keep the C0D review/checkpoint flow blocked until this review finishes.
 
 ## Evidence review
 
@@ -41,7 +41,7 @@
 ### 5. Downstream C0A/C1/C2/C3 remain blocked because no CPU pass tokens exist
 - The C0D log does not contain pass tokens: it records `kernel_launch_status: fail`, `cpu_comparison_status: not_run_blocked_by_kernel_timeline_timeout`, `host_device_transfer_status: not_run_blocked_by_kernel_timeline_timeout`, `failure_stage: kernel_timeline_timeout`, `exit_status: 1`, and `wrapper_exit_status: 1` at `logs/c0d-native-amdev-doorbell-delivery.log` lines 121-128.
 - `.superpowers/swarm/progress.md` line 116 keeps C0A Compute 16 at `Needs review` and states C0A/C1/C2/C3 remain blocked.
-- `docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md` line 38 keeps the mac-focused C0 decision rerun blocked until CPU-verified pass tokens or an approved split/fallback decision exist.
+- `docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md` line 38 keeps the mac-focused C0 decision rerun blocked until CPU-verified pass tokens or an approved split/fallback decision exist.
 - `docs/tasks/native-r9700-producer/validation-commands.md` lines 223-236 keep C1/C2/C3 commands blocked or undiscovered.
 
 ### 6. No broad/fallback work accepted in this scope

@@ -6,8 +6,8 @@ Pinned the working macOS R9700 substrate as TinyGPU.app over `APLRemotePCIDevice
 
 ## Changed files
 
-- `docs/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md` — new ABI note with observed substrate, source map, transfer contract, kernel-launch contract, native boundary, unresolved facts, and next task instructions.
-- `docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md` — task set 2 progress row updated to `Done`.
+- `docs/archive/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md` — new ABI note with observed substrate, source map, transfer contract, kernel-launch contract, native boundary, unresolved facts, and next task instructions.
+- `docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md` — task set 2 progress row updated to `Done`.
 - `.superpowers/swarm/reports/c0a-task-2-tinygpu-abi.md` — this report.
 
 ## Facts pinned
@@ -29,5 +29,5 @@ Pinned the working macOS R9700 substrate as TinyGPU.app over `APLRemotePCIDevice
 Do not run this from an OMP task executor; supervisor should run:
 
 ```sh
-git diff --check docs/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md .superpowers/swarm/reports/c0a-task-2-tinygpu-abi.md
+git diff --check docs/archive/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md .superpowers/swarm/reports/c0a-task-2-tinygpu-abi.md
 ```

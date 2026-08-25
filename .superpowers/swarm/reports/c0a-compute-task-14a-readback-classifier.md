@@ -1,7 +1,7 @@
 # C0A Compute 23 Task 1: CPU-side Compute Readback Anomaly Classifier (T1)
 
 task: c0a-compute-task-14a-readback-classifier
-plan: `docs/superpowers/plans/2026-08-18-compute-output-readback-byte-swap.md` (Task 1)
+plan: `docs/archive/superpowers/plans/2026-08-18-compute-output-readback-byte-swap.md` (Task 1)
 changed_files:
 - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`
 - `tests/test_native_amdev_transfer_contract.py`

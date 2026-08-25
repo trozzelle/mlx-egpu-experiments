@@ -16,7 +16,7 @@ validation_commands_run_by_reviewer: none
 
 - `.superpowers/swarm/reports/c0a-compute-task-9-consumption-hardware.md`
 - `.superpowers/swarm/reports/c0a-compute-task-9-consumption-decision.md`
-- `docs/superpowers/plans/2026-08-17-c0-doorbell-blocker-resolution.md` Task 5 decision matrix
+- `docs/archive/superpowers/plans/2026-08-17-c0-doorbell-blocker-resolution.md` Task 5 decision matrix
 - Source log value check against `logs/c0e-native-amdev-doorbell-consumption.log`
 
 ## Evidence and checks
@@ -31,7 +31,7 @@ validation_commands_run_by_reviewer: none
 
 ### Task 5 matrix application
 
-- `docs/superpowers/plans/2026-08-17-c0-doorbell-blocker-resolution.md:436` maps `mqd_hqd_copy_mismatch` to selected lane `mqd_hqd_copy_fix` and allowed next work `Fix MQD indices/copy span only.`
+- `docs/archive/superpowers/plans/2026-08-17-c0-doorbell-blocker-resolution.md:436` maps `mqd_hqd_copy_mismatch` to selected lane `mqd_hqd_copy_fix` and allowed next work `Fix MQD indices/copy span only.`
 - `.superpowers/swarm/reports/c0a-compute-task-9-consumption-hardware.md:6` records `consumption_classification: mqd_hqd_copy_mismatch`.
 - `.superpowers/swarm/reports/c0a-compute-task-9-consumption-decision.md:4` selects `mqd_hqd_copy_fix`, and `.superpowers/swarm/reports/c0a-compute-task-9-consumption-decision.md:6` limits work to `Fix MQD indices/copy span only.` This matches the matrix exactly.
 

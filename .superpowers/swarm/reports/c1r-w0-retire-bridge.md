@@ -14,7 +14,7 @@
 - `native_r9700/runtime.cpp`: implemented `RuntimeSession::legacy_primitive_diagnostic`; removed primitive-chain and native-layer0 bridge execution; simplified `RuntimeSession::native_prefill_proof` to the fail-closed cutover result.
 - `native_r9700/runner.cpp`: removed product-facing primitive, chain, and layer0 modes/help; added `--legacy-primitive-diagnostic`.
 - `tests/native_r9700/test_runtime_contract.py`: removed archive-derived primitive/chain/layer0 assertions; retained lifecycle/kernarg/C0/transfer tests; added injected legacy-diagnostic protocol coverage and the no-injection native-prefill contract.
-- `docs/tasks/native-r9700-producer/README.md` and `validation-commands.md`: mark the retired source archive forensic-only and document the explicit legacy diagnostic limitation.
+- `docs/archive/tasks/native-r9700-producer/README.md` and `validation-commands.md`: mark the retired source archive forensic-only and document the explicit legacy diagnostic limitation.
 
 ## RED gate observed before this change
 

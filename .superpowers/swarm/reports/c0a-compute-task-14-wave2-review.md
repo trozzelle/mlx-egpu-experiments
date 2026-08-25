@@ -9,7 +9,7 @@
 - `.superpowers/swarm/reports/c0a-compute-task-14b-kernel-decode.md` (decode, accepted in Wave 1)
 - `.superpowers/swarm/reports/c0a-compute-task-14a-readback-classifier.md` (T1, accepted in Wave 1)
 - `.superpowers/swarm/reports/c0a-compute-task-14-wave1-review.md` (Wave 1 review, accepted)
-**Plan:** `docs/superpowers/plans/2026-08-18-compute-output-readback-byte-swap.md` (Task 3)
+**Plan:** `docs/archive/superpowers/plans/2026-08-18-compute-output-readback-byte-swap.md` (Task 3)
 **Baseline:** `c263e11` (C0A22 impl)
 
 **Verdict: accepted**

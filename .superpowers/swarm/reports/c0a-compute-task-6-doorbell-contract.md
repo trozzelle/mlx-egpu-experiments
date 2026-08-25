@@ -7,7 +7,7 @@
 ## Changed files
 - `tests/test_native_amdev_transfer_contract.py`
 - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`
-- `docs/tasks/amdev-doorbell-delivery/phase-1-no-hardware-contract.md`
+- `docs/archive/tasks/amdev-doorbell-delivery/phase-1-no-hardware-contract.md`
 - `.superpowers/swarm/reports/c0a-compute-task-6-doorbell-contract.md`
 
 ## Task set 1 RED contract

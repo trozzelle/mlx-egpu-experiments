@@ -3,7 +3,7 @@
 Status: Layer-0 acceptance open; C1R-6b fp16 matmul primitive proof complete
 
 Source facts:
-- Plan acceptance (`docs/tasks/native-r9700-producer/phase-c1-c2-r9700-recovery-plan.md`): C1R-6 requires a complete layer-0 hardware prefill pass for the `S-1` prefix, comparison of layer-0 K/V and post-layer hidden state against CPU fixtures, and logs proving every model-forward tensor op used hardware.
+- Plan acceptance (`docs/archive/tasks/native-r9700-producer/phase-c1-c2-r9700-recovery-plan.md`): C1R-6 requires a complete layer-0 hardware prefill pass for the `S-1` prefix, comparison of layer-0 K/V and post-layer hidden state against CPU fixtures, and logs proving every model-forward tensor op used hardware.
 - Llama contract (`native_r9700/prefill.py`, `native_r9700/config.py`): hidden=2048, heads=32, KV heads=8, head_dim=64, intermediate=8192, 16 layers. Layer flow is embedding -> RMSNorm -> Q/K/V projections -> RoPE -> attention -> O projection/residual -> post-RMSNorm -> gate/up/down MLP -> residual.
 - Prompt-0 contract (`tests/native_r9700/fixtures/prompts.json`, `fixtures_schema.json`): prompt-0 has S=6, S-1 prefix length 5, final token 374. Full K/V oracle shape is `(1,8,5,64)` fp16. Existing layer trace is compact only: 2 tokens, 2 heads, 16 dims, and is not a full hidden-state oracle.
 - Runtime topology (`native_r9700/c1_primitive_bridge.cpp`, `native_r9700/c1_transfer_bridge.cpp`, frozen C0 probe): current hardware bridges prove one fixed input pointer/page, one output pointer/page, one 8-lane dispatch, SDMA upload/download, and exact byte comparison. They do not provide resident multi-page tensors, tiled/multi-workgroup GEMM, multiple kernel code slots, or full layer scheduling.

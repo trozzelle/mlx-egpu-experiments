@@ -1,7 +1,7 @@
 # Swarm Supervisor Plan: Native R9700 Producer
 
 ## Source and resume state
-- Source docs read: `docs/tasks/native-r9700-producer/README.md`, phase C0-C3 docs, `validation-commands.md`, existing `.superpowers/swarm/progress.md`.
+- Source docs read: `docs/archive/tasks/native-r9700-producer/README.md`, phase C0-C3 docs, `validation-commands.md`, existing `.superpowers/swarm/progress.md`.
 - Ledger path: `.superpowers/swarm/progress.md`.
 - Rows preserved: prior Path A Phase 0 rows remain unchanged and are treated as completed baseline evidence.
 - Baseline command on fallback worktree: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v` -> `17 passed, 2 warnings`.
@@ -41,7 +41,7 @@
   - C1/C2/C3 are blocked until preceding gates pass; do not let agents skip phase gates.
 - Verification gates:
   - Baseline: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v`.
-  - C0 docs: `git diff --check docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/tasks/native-r9700-producer/validation-commands.md` plus exact C0 probe commands discovered by task set 1.
+  - C0 docs: `git diff --check docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/tasks/native-r9700-producer/validation-commands.md` plus exact C0 probe commands discovered by task set 1.
   - C1/C2/C3: exact commands must be recorded in `validation-commands.md` by their contract-discovery task sets before execution.
 - Publish boundary:
   - Supervisor makes local checkpoint commits after reviewed/verified waves. Agents never run git. Push remains the user's responsibility.
@@ -50,7 +50,7 @@
 
 - Steering received after C0 handoff: work initially on the mac eGPU runtime.
 - Decision: keep C0 final state `blocked` because no substrate passed, but make the next execution plan macOS-first.
-- New task doc: `docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`.
+- New task doc: `docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`.
 - Linux ROCm/HIP remains a reference fallback, not the initial work lane.
 - C1 remains blocked until the macOS proof, or an explicitly reactivated fallback proof, produces CPU-verified minimal kernel launch/transfer/readback evidence and C0 task set 5 reruns to a selected substrate.
 
@@ -79,7 +79,7 @@ Freeze C0 proof-lane command shape and source root so macOS, Linux, and DwarfSta
 - Report checks: source root chosen once; C0 macOS/Linux/doc commands recorded or blocked with exact prerequisite; no probe implementation done.
 - Quality bar result: passed; supervisor docs check completed.
 - Review agents: after wave if docs/commands are ambiguous or over-broad.
-- Verification command(s) supervisor will run: `git diff --check docs/tasks/native-r9700-producer/validation-commands.md docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md`.
+- Verification command(s) supervisor will run: `git diff --check docs/tasks/native-r9700-producer/validation-commands.md docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md`.
 - Ledger update: mark C0 task set 1 `Needs review`, then `Done` after review/verification.
 
 ## Wave 2: C0 proof lanes
@@ -111,7 +111,7 @@ Produce C0 macOS, Linux HIP, and DwarfStar reference evidence after C0 task set 
 - Report checks: proof sources exist where claimed; rows record evidence; DwarfStar note separates use/non-use; no proof agent made the final substrate decision.
 - Quality bar result: passed for C0 proof wave after reviewer found only ledger-resume cleanup; final C0 state is blocked, not successful substrate selection.
 - Review agents: after wave if native probe code or docs carry ambiguity/over-engineering risk.
-- Verification command(s) supervisor will run: C0 macOS command, Linux command or blocker confirmation, `git diff --check docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/tasks/native-r9700-producer/validation-commands.md` plus any new note path.
+- Verification command(s) supervisor will run: C0 macOS command, Linux command or blocker confirmation, `git diff --check docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/tasks/native-r9700-producer/validation-commands.md` plus any new note path.
 - Ledger update: mark C0-2/3/4 `Needs review`, then `Done` or `Blocked` after verification.
 
 ## Wave 3: Mac-first C0A planning
@@ -137,7 +137,7 @@ Convert user steering into a macOS-first continuation plan without falsely unblo
 ### Supervisor gates
 - Report checks: new C0A doc has executable task sets, exact validation where known, and no C1 unblocking without a passing macOS proof.
 - Quality bar result: pending verification/review.
-- Verification command(s) supervisor will run: `git diff --check docs/tasks/native-r9700-producer/README.md docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md`.
+- Verification command(s) supervisor will run: `git diff --check docs/archive/tasks/native-r9700-producer/README.md docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md`.
 - Ledger update: mark C0A plan row Done; C0A execution rows are now tracked separately in `.superpowers/swarm/progress.md`.
 
 ## Wave 4: C0A mac device visibility rerun
@@ -182,7 +182,7 @@ Pin the minimal native contract behind the working macOS TinyGPU.app/APLRemotePC
 - Report path: `.superpowers/swarm/reports/c0a-task-2-tinygpu-abi.md`.
 
 # Contract
-- ABI note path: `docs/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md`.
+- ABI note path: `docs/archive/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md`.
 - Must cover `APLRemotePCIDevice`, `RemotePCIDevice`, `PCIIface`, `PCIIfaceBase`, `AMDev`, allocation/mapping/readback, queue creation/submission/synchronization, and where TinyGPU.app/kernel extension owns privileged operations.
 - Must distinguish tinygrad reference commands from Path C tinygrad-free native producer requirements.
 
@@ -191,7 +191,7 @@ Pin the minimal native contract behind the working macOS TinyGPU.app/APLRemotePC
 - Reviewer: `C0AABIReviewer` found no Critical findings and two Important wording/validation findings: stale libusb visibility dependency and task sets 3/4 pointing at the negative-control command.
 - Fix result: supervisor corrected `phase-c0a-macos-egpu-runtime-focus.md` and `validation-commands.md` so task sets 3/4 must discover TinyGPU.app/APLRemotePCIDevice/PCIIface commands and must not use the stale libusb command for acceptance.
 - Quality bar result: correctness passed after correction; maintainability passed because the active substrate and negative control are now separated; architectural fit passed because Path C remains tinygrad-free and tinygrad remains reference/discovery only; simplicity passed because no runtime abstraction was added.
-- Verification command(s) supervisor ran: `git diff --check docs/tasks/native-r9700-producer/validation-commands.md docs/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md .superpowers/swarm/reports/c0a-task-2-tinygpu-abi.md` -> no output.
+- Verification command(s) supervisor ran: `git diff --check docs/tasks/native-r9700-producer/validation-commands.md docs/archive/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md .superpowers/swarm/reports/c0a-task-2-tinygpu-abi.md` -> no output.
 - Ledger update: C0A ABI pinning is Done; C0A transfer proof is In progress.
 
 ## Wave 6: C0A host-device transfer proof
@@ -201,7 +201,7 @@ Implement or precisely block the smallest tinygrad-free host↔device transfer p
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
-- Source of truth for discovery and ABI: `docs/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md` and `${HOME}/Development/ml/tools/tinygrad/`.
+- Source of truth for discovery and ABI: `docs/archive/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md` and `${HOME}/Development/ml/tools/tinygrad/`.
 - Do not call or import tinygrad from the native proof; tinygrad is allowed only for separately labeled reference/discovery commands already recorded in `validation-commands.md`.
 - Do not use `USBIface`, libusb, or `USB3.list_devices(0xADD1, 0x0001)` as the working path; `experiments/native-r9700-runtime/macos_tinygpu_minimal.cpp` is a stale negative control unless replaced/bypassed.
 - No model code, no generic runtime framework, no C1 runtime wrapper, no kernel dispatch in this wave.
@@ -217,7 +217,7 @@ Implement or precisely block the smallest tinygrad-free host↔device transfer p
 - Report checks: passed; report states source was not changed, stale libusb was not used, and command discovery is blocked rather than faked.
 - Reviewer: `C0ATransferReviewer` found no Critical or Important findings. Minor documentation consistency finding on `macos-tinygpu-abi-notes.md` line 124 was fixed.
 - Quality bar result: correctness passed for a blocked gate because the blocker is source-grounded; maintainability passed because the next unblocker is explicit; architectural fit passed because Path C does not import tinygrad and does not use stale libusb for acceptance; simplicity passed because no partial AMDev/SDMA scaffold or broad runtime framework was added.
-- Verification command(s) supervisor will run: `git diff --check docs/tasks/native-r9700-producer/README.md docs/tasks/native-r9700-producer/validation-commands.md docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md docs/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md .superpowers/swarm/reports/c0a-task-3-transfer-proof.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md`.
+- Verification command(s) supervisor will run: `git diff --check docs/archive/tasks/native-r9700-producer/README.md docs/tasks/native-r9700-producer/validation-commands.md docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md docs/archive/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md .superpowers/swarm/reports/c0a-task-3-transfer-proof.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md`.
 - Ledger update: C0A transfer proof is Blocked; C0A kernel proof and mac-focused decision rerun are Blocked downstream.
 
 ## Wave 7: C0B task documentation and RED contract setup
@@ -227,9 +227,9 @@ Convert the approved native AMDev/SDMA boundary spec into executable task docume
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
-- Source spec: `docs/superpowers/specs/2026-08-16-native-amdev-sdma-boundary-design.md`.
-- Implementation plan: `docs/superpowers/plans/2026-08-16-native-amdev-sdma-transfer.md`.
-- Task doc: `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`.
+- Source spec: `docs/archive/superpowers/specs/2026-08-16-native-amdev-sdma-boundary-design.md`.
+- Implementation plan: `docs/archive/superpowers/plans/2026-08-16-native-amdev-sdma-transfer.md`.
+- Task doc: `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`.
 - TDD gate: no production C++ source before supervisor observes the focused contract pytest fail for expected missing-source reason.
 - OMP task executors do not run tests, linters, formatters, package managers, project-wide suites, or git commands.
 
@@ -247,7 +247,7 @@ Convert the approved native AMDev/SDMA boundary spec into executable task docume
 - Report checks: passed; report names changed files, exact supervisor command, expected RED failure text, and confirms no production source was added.
 - Quality bar result: correctness passed because both tests fail only on the required missing-source assertion before task set 2; maintainability passed because the test names and required log-field list match the public contract; architectural fit passed because the gate does not import tinygrad, use libusb, or touch hardware; simplicity passed because the contract has two focused self-test checks and no helper framework.
 - Review agents: `C0BRedReviewer` accepted with no Critical, Important, or Minor findings.
-- Verification command(s) supervisor ran: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> exit `1`, `2 failed`, both at `AssertionError: native transfer probe source missing`; `git diff --check docs/superpowers/plans/2026-08-16-native-amdev-sdma-transfer.md docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md docs/tasks/native-r9700-producer/README.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/reports/c0b-task-1-red-contract.md tests/test_native_amdev_transfer_contract.py` -> no output.
+- Verification command(s) supervisor ran: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> exit `1`, `2 failed`, both at `AssertionError: native transfer probe source missing`; `git diff --check docs/archive/superpowers/plans/2026-08-16-native-amdev-sdma-transfer.md docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md docs/archive/tasks/native-r9700-producer/README.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/reports/c0b-task-1-red-contract.md tests/test_native_amdev_transfer_contract.py` -> no output.
 - Ledger update: C0B-1 Done; C0B-2 unblocked.
 
 ## Wave 8: C0B RemoteCmd transport self-tests
@@ -257,7 +257,7 @@ Turn the RED no-hardware contract green by adding the minimal native probe sourc
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
-- Task doc: `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md` task set 2.
+- Task doc: `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md` task set 2.
 - Source target: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`.
 - This wave must not connect to TinyGPU.app, map BAR/sysmem, create VM mappings, run SDMA, use libusb, import/call tinygrad, or touch C1/C2/C3.
 - OMP task executors do not run tests, linters, formatters, package managers, project-wide suites, or git commands.
@@ -276,7 +276,7 @@ Turn the RED no-hardware contract green by adding the minimal native probe sourc
 - Report checks: passed; report names changed files, provenance, guardrails, exact supervisor command, and expected/observed `2 passed`.
 - Quality bar result: correctness passed because pytest validates the exact 33-byte little-endian frame hex and required log fields; maintainability passed because the C++ source is a small local CLI with direct helpers; architectural fit passed because it only ports the pinned RemoteCmd framing and does not connect to TinyGPU.app or introduce runtime tinygrad/libusb; simplicity passed because no transport framework or allocator was added.
 - Review agents: `C0BRemoteCmdReviewer` accepted with no Critical, Important, or Minor findings.
-- Verification command(s) supervisor ran: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `2 passed in 0.68s`; `git diff --check experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp tests/test_native_amdev_transfer_contract.py docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/reports/c0b-task-2-remote-pci.md` -> no output.
+- Verification command(s) supervisor ran: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `2 passed in 0.68s`; `git diff --check experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp tests/test_native_amdev_transfer_contract.py docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/reports/c0b-task-2-remote-pci.md` -> no output.
 - Ledger update: C0B-2 Done; C0B-3 unblocked.
 
 ## Wave 9: C0B TinyGPU discovery smoke
@@ -286,7 +286,7 @@ Extend the native probe from no-hardware RemoteCmd self-tests to a TinyGPU.app d
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
-- Task doc: `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md` task set 3.
+- Task doc: `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md` task set 3.
 - Source target: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`.
 - Tests target: `tests/test_native_amdev_transfer_contract.py`; supervisor already observed RED help coverage fail on missing `--discovery-smoke` while the two existing self-tests passed.
 - This wave may connect to TinyGPU.app over UNIX socket and map BAR0/BAR2/BAR5. It must not create VM mappings, map sysmem, run SDMA, run kernel dispatch, use libusb, import/call tinygrad, or touch C1/C2/C3.
@@ -317,7 +317,7 @@ Extend the native probe from discovery-only evidence to the minimal sysmem page-
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
-- Task doc: `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md` task set 4.
+- Task doc: `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md` task set 4.
 - Source target: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`.
 - Tests target: `tests/test_native_amdev_transfer_contract.py`.
 - Report target: `.superpowers/swarm/reports/c0b-task-4-vm-sysmem.md`.
@@ -349,7 +349,7 @@ Move from VM/sysmem evidence to the actual 32-byte SDMA transfer proof or a prec
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
-- Task doc: `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md` task set 5.
+- Task doc: `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md` task set 5.
 - Source target: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`.
 - Tests target: `tests/test_native_amdev_transfer_contract.py`.
 - Validation command target: `docs/tasks/native-r9700-producer/validation-commands.md`.
@@ -383,7 +383,7 @@ Record the reviewed C0B outcome and keep downstream C0A/C1/C2/C3 gates blocked b
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
-- Task doc: `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md` task set 6.
+- Task doc: `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md` task set 6.
 - Handoff must not select a C0 substrate without transfer pass plus later kernel evidence.
 - Non-goals: no source implementation, no kernel proof, no production runtime wrapper.
 
@@ -401,7 +401,7 @@ Record the reviewed C0B outcome and keep downstream C0A/C1/C2/C3 gates blocked b
 - Report checks: first final reviewer found stale global `C0A-4` blocker wording and pending-diff-check wording; supervisor corrected both. Re-review accepted.
 - Quality bar result: correctness passed because C0B blocker/downstream gates are consistent across ledger, README, C0A/C0B docs, and report; maintainability passed because the next gate is exact and log-backed; architectural fit passed because no substrate is selected without transfer/kernel evidence; simplicity passed because no new workaround path or fallback abstraction was added.
 - Review agents: `C0BHandoffReviewer` rejected first pass with one Important and one Minor finding; `C0BHandoffReReviewer` accepted with no remaining findings.
-- Verification command(s) supervisor ran after review fixes: `git diff --check docs/tasks/native-r9700-producer/README.md docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/reports/c0b-task-6-review-handoff.md` -> no output.
+- Verification command(s) supervisor ran after review fixes: `git diff --check docs/archive/tasks/native-r9700-producer/README.md docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/reports/c0b-task-6-review-handoff.md` -> no output.
 - Ledger update: C0B-6 Done; C0B remains blocked at `vm_mapping`.
 
 ## Wave 13: gfx12 VM/PTE/TLB prerequisite planning
@@ -415,21 +415,21 @@ Split the reviewed C0B `vm_mapping` blocker into an implementation plan and agen
 - Preserve C0B-5 history; add C0B-4.5 as the explicit missing prerequisite.
 
 # Contract
-- Implementation plan path: `docs/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md`.
-- Task docs folder: `docs/tasks/native-r9700-gfx12-vm-pte-tlb/`.
+- Implementation plan path: `docs/archive/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md`.
+- Task docs folder: `docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/`.
 - C0A/C0B docs and progress ledger point to the new prerequisite.
 - C1/C2/C3 remain blocked.
 
 ### Agents
 | Agent | Task row | Target | Depends on | Report | Status |
 |---|---|---|---|---|---|
-| Main | C0B-4.5 planning | VM/PTE/TLB implementation plan and task docs | C0B-5 reviewed blocker | `docs/tasks/native-r9700-gfx12-vm-pte-tlb/README.md` | Done |
+| Main | C0B-4.5 planning | VM/PTE/TLB implementation plan and task docs | C0B-5 reviewed blocker | `docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/README.md` | Done |
 
 ### Supervisor gates
 - Report checks: implementation plan and task docs created; C0B-4.5 inserted without deleting C0B-5 evidence.
 - Quality bar result: correctness passed because the new docs preserve the reviewed `vm_mapping` blocker and do not unblock C0A/C1/C2/C3; maintainability passed because the missing prerequisite is isolated as C0B-4.5 with source refs, TDD gates, exact validation commands, and handoff rules; architectural fit passed because no C0 substrate is selected and no new runtime boundary is invented; simplicity passed because the implementation scope is one fixed VM/PTE/TLB prerequisite, not a broad allocator/backend framework.
 - Review agents: not dispatched; this is a task-doc creation wave, not implementation.
-- Verification command(s) supervisor ran: `git diff --check docs/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md docs/tasks/native-r9700-gfx12-vm-pte-tlb/README.md docs/tasks/native-r9700-gfx12-vm-pte-tlb/phase-1-contracts-and-source-grounding.md docs/tasks/native-r9700-gfx12-vm-pte-tlb/phase-2-fixed-vm-mapping.md docs/tasks/native-r9700-gfx12-vm-pte-tlb/phase-3-transfer-resume-and-handoff.md docs/tasks/native-r9700-producer/README.md docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md` -> no output.
+- Verification command(s) supervisor ran: `git diff --check docs/archive/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/README.md docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/phase-1-contracts-and-source-grounding.md docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/phase-2-fixed-vm-mapping.md docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/phase-3-transfer-resume-and-handoff.md docs/archive/tasks/native-r9700-producer/README.md docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md` -> no output.
 - Ledger update: C0B-4.5 Not started; C0B-5 remains Blocked on C0B-4.5.
 
 ## Wave 14: C0B-4.5 gfx12 VM/PTE/TLB prerequisite execution
@@ -439,8 +439,8 @@ Implement the split-out gfx12 VM/PTE/TLB prerequisite for the native TinyGPU.app
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every C0B-4.5 executor stays in this cwd/branch.
-- Task docs: `docs/tasks/native-r9700-gfx12-vm-pte-tlb/`.
-- Implementation plan: `docs/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md`.
+- Task docs: `docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/`.
+- Implementation plan: `docs/archive/superpowers/plans/2026-08-16-gfx12-vm-pte-tlb-mapping.md`.
 - Source target: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`.
 - Tests target: `tests/test_native_amdev_transfer_contract.py`.
 - Report targets: `.superpowers/swarm/reports/c0b-vm-task-1-contracts.md`, `.superpowers/swarm/reports/c0b-vm-task-2-selftests.md`, `.superpowers/swarm/reports/c0b-vm-task-3-hardware-mapping.md`, `.superpowers/swarm/reports/c0b-vm-task-4-transfer-resume.md`.
@@ -509,7 +509,7 @@ Prove the smallest tinygrad-free macOS R9700 kernel dispatch/readback path on th
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every executor and reviewer stays in this cwd/branch.
 - Source target: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`.
 - Test target: `tests/test_native_amdev_transfer_contract.py`.
-- Task doc row: `docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md` task set 4 / ledger row `C0A-5. Minimal kernel launch proof`.
+- Task doc row: `docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md` task set 4 / ledger row `C0A-5. Minimal kernel launch proof`.
 - Report target: `.superpowers/swarm/reports/c0a-task-4-kernel-proof.md`.
 - Validation ledger target: `docs/tasks/native-r9700-producer/validation-commands.md`.
 - Runtime path must remain tinygrad-free. tinygrad source may be read only as source/provenance reference.
@@ -709,7 +709,7 @@ Prove the smallest tinygrad-free macOS R9700 kernel dispatch/readback path on th
 - Fallback frozen: below-threshold and producer/cache failures before acceptance may fall back; after `load_prompt_cache(..., return_metadata=True)` plus full C1 ABI validation (`offset`, `num_layers`, `n_kv_heads`, `head_dim`, 16 `KVCache` layers, per-layer shape/offset), decode failures are errors and must not recompute the offloaded prefix.
 - mlx-lm facts re-verified: local `mlx_lm.generate.generate_step` always processes supplied prompt and mutates supplied cache; standard `KVCache` offset comes from loaded K/V shape; therefore C2 must pass only `[final_token_id]` with the accepted imported cache and must not reuse that cache across independent requests.
 - Review fixes: initial reviewer required full ABI before acceptance, exact full-suite/unavailable-fallback commands, and named timeout override; `C2ContractReReview` approved with 0 Critical, 0 Important, 0 Minor.
-- Verification command(s) supervisor ran: `git diff --check docs/tasks/native-r9700-producer/phase-c2-serving-integration.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/reports/c2-task-1-contract.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md` printed no output.
+- Verification command(s) supervisor ran: `git diff --check docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/reports/c2-task-1-contract.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md` printed no output.
 - Ledger update: C2-1 Done; C2-2/C2-3/C2-5 unblocked. TDD gate: write/observe focused C2 serving RED tests before production wrapper implementation.
 
 ## Wave 27: C2 wrapper, fallback tests, integration, and review
@@ -773,7 +773,7 @@ Prove the smallest tinygrad-free macOS R9700 kernel dispatch/readback path on th
 - Seam decision: no direct backend yet / defer C3 implementation. `mlx-lm` direct backend, oMLX direct backend, and shared backend layer are rejected for C3 because they either miss the measured bottleneck or require a broad consumer/backend rewrite.
 - Boundary decision: no ADR/design update required; serialized KV prompt-cache artifacts remain the product/review/fallback boundary under ADR 0001.
 - Ledger update: C3-1/C3-2 Done; C3-3 Not required; C3-4/C3-5 Dropped/Deferred; C3-6 Done.
-- Final review: `C3FinalReview` initially returned CHANGES_REQUIRED because the C3-6 handoff report was missing and the phase handoff note was stale. Both findings were fixed in `.superpowers/swarm/reports/c3-task-6-final-handoff.md` and `docs/tasks/native-r9700-producer/phase-c3-native-backend-decision.md`.
+- Final review: `C3FinalReview` initially returned CHANGES_REQUIRED because the C3-6 handoff report was missing and the phase handoff note was stale. Both findings were fixed in `.superpowers/swarm/reports/c3-task-6-final-handoff.md` and `docs/archive/tasks/native-r9700-producer/phase-c3-native-backend-decision.md`.
 
 ## Wave 30: Qwen objective audit and closure fix
 ### Shared context
@@ -799,7 +799,7 @@ Prove the smallest tinygrad-free macOS R9700 kernel dispatch/readback path on th
 - Reopened C1R: implement Llama 3.2 1B model-forward prefill tensor work on the AMD Radeon AI PRO R9700 through the selected macOS TinyGPU/AMDev substrate, emit the accepted prompt-cache artifact, and pass token-exact `P == R`.
 - Reopened C2R: route large prompts through the accepted R9700/eGPU producer from C1R and preserve wrapper fallback/security semantics.
 - Reclassified historical C3: CPU-reference timing does not justify direct backend implementation; real C3 remains blocked pending C2R evidence.
-- Durable plan: `docs/tasks/native-r9700-producer/phase-c1-c2-r9700-recovery-plan.md`.
+- Durable plan: `docs/archive/tasks/native-r9700-producer/phase-c1-c2-r9700-recovery-plan.md`.
 ## C1R-6s K projection cols0:16 tiled accumulation
 
 - Decision: advance C1R-6 with a proof-only two-output-tile K projection chain rather than jumping to attention/context. This reuses the proven split-A/B first-chunk kernel and full-inner accumulator kernel.
@@ -820,11 +820,11 @@ Prove the smallest tinygrad-free macOS R9700 kernel dispatch/readback path on th
 ## Wave 32: Native prefill worker execution kickoff
 ### Shared context
 # Goal
-Execute `docs/superpowers/plans/2026-08-21-native-r9700-prefill-worker-benchmark.md` toward a real `r9700_native` Llama prefill worker and benchmark path.
+Execute `docs/archive/superpowers/plans/2026-08-21-native-r9700-prefill-worker-benchmark.md` toward a real `r9700_native` Llama prefill worker and benchmark path.
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; this is the current feature branch, so every agent stays in this checkout.
-- Existing untracked user/local files are preserved: `.DS_Store`, `AGENTS.md`, `artifacts/`, and `docs/superpowers/plans/2026-08-21-native-r9700-prefill-worker-benchmark.md`.
+- Existing untracked user/local files are preserved: `.DS_Store`, `AGENTS.md`, `artifacts/`, and `docs/archive/superpowers/plans/2026-08-21-native-r9700-prefill-worker-benchmark.md`.
 - OMP task executors do not run tests, linters, formatters, package managers, hardware commands, project-wide suites, or git commands. They may write focused reports naming the supervisor commands to run.
 - Required TDD: production behavior changes start with failing tests/contracts. Executor reports must identify the RED tests/contracts they added or explain why the task is read-only.
 - No production tinygrad import/call for `r9700_native`; CPU reference remains `cpu_reference` only.
@@ -880,7 +880,7 @@ Execute the C1R product-worker rearchitecture from the approved 2026-08-21 maste
 ## Wave 34: Task9 fresh-asset capability gate
 ### Shared context
 # Goal
-Execute `docs/superpowers/plans/2026-08-21-native-r9700-task9-fast-path.md` from the first open blocker: identify one fresh source-to-gfx1201 asset compiler path without touching production kernel/catalog code.
+Execute `docs/archive/superpowers/plans/2026-08-21-native-r9700-task9-fast-path.md` from the first open blocker: identify one fresh source-to-gfx1201 asset compiler path without touching production kernel/catalog code.
 
 # Constraints
 - Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; this is the current feature branch, and every agent stays in this checkout.

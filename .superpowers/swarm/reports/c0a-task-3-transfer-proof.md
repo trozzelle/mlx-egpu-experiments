@@ -6,9 +6,9 @@ Done. The C0B native AMDev/SDMA proof now provides the tinygrad-free TinyGPU.app
 
 ## Changed files
 
-- `docs/tasks/native-r9700-producer/README.md`
-- `docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`
-- `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
+- `docs/archive/tasks/native-r9700-producer/README.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
 - `docs/tasks/native-r9700-producer/validation-commands.md`
 - `.superpowers/swarm/progress.md`
 - `.superpowers/swarm/reports/c0a-task-3-transfer-proof.md`

@@ -14,7 +14,7 @@ Add an honest layer0 proof wrapper that composes the currently proven C1R hardwa
 
 - `.superpowers/swarm/progress.md`
 - `.superpowers/swarm/reports/c1-task-7*.md`
-- `docs/tasks/native-r9700-producer/phase-c1-c2-r9700-recovery-plan.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c1-c2-r9700-recovery-plan.md`
 - `native_r9700/runtime.h`
 - `native_r9700/runtime.cpp`
 - `native_r9700/runner.cpp`

@@ -42,7 +42,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m tinygrad_kv_worker.harness --c2-se
 ```
 Result: exit `0`, `gate_result=pass`, `route=native_producer`, `accepted_cache=true`, `producer_kind=cpu_reference`, decoded tokens `[12366, 13, 578, 469]` exactly matched baseline.
 
-Task-doc alignment: `docs/tasks/native-r9700-producer/phase-c2-serving-integration.md` and `docs/tasks/native-r9700-producer/phase-c1-c2-r9700-recovery-plan.md` now include the 2026-08-21 pivot note so future agents see the accepted product/reference path separately from the still-open native R9700 objective.
+Task-doc alignment: `docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md` and `docs/archive/tasks/native-r9700-producer/phase-c1-c2-r9700-recovery-plan.md` now include the 2026-08-21 pivot note so future agents see the accepted product/reference path separately from the still-open native R9700 objective.
 
 ## Acceptance status
 - C2 reference-wrapper integration: accepted for Llama CPU-reference imported-cache serving.

@@ -4,8 +4,8 @@ Status: implemented for supervisor review.
 
 ## Source evidence
 
-- C2 goal/dependencies: `docs/tasks/native-r9700-producer/phase-c2-serving-integration.md:14-24` requires real mlx-lm serving integration after C1, through the stable C1 producer contract.
-- C2 task set 1 acceptance: `docs/tasks/native-r9700-producer/phase-c2-serving-integration.md:56-83` requires source paths, threshold behavior, fallback semantics, and exact commands.
+- C2 goal/dependencies: `docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md:14-24` requires real mlx-lm serving integration after C1, through the stable C1 producer contract.
+- C2 task set 1 acceptance: `docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md:56-83` requires source paths, threshold behavior, fallback semantics, and exact commands.
 - Stable producer invocation: `.superpowers/swarm/reports/c1-task-10-review-handoff.md:29-40` requires request token ids via `native_r9700.prefill --token-ids-json` followed by `native_r9700.kv_cache`.
 - Imported-cache rule: `.superpowers/swarm/reports/c1-task-10-review-handoff.md:43-47`, `docs/DESIGN.md:138-144`, and `docs/pinned-upstream-interfaces.md:78-84` require an imported `S-1` cache plus only the final prompt token to `mlx_lm.generate.generate_step`.
 - Fallback boundary: `docs/DESIGN.md:178-181` permits consumer fallback only before accepting an imported cache; ADR 0002 `docs/adr/0002-producer-owns-kv-truth.md:7-12` says the consumer must not recompute producer-owned KV as a per-request verification path.
@@ -19,7 +19,7 @@ Status: implemented for supervisor review.
 
 - Wrapper source: `native_r9700/serving.py`.
 - Focused tests: `tests/native_r9700/test_serving.py`.
-- Report/ledger updates: `docs/path-a-validation-results.md`, `docs/tasks/native-r9700-producer/phase-c2-serving-integration.md`, `docs/tasks/native-r9700-producer/validation-commands.md`, and `.superpowers/swarm/progress.md`.
+- Report/ledger updates: `docs/path-a-validation-results.md`, `docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md`, `docs/tasks/native-r9700-producer/validation-commands.md`, and `.superpowers/swarm/progress.md`.
 
 ### Public API shape for task set 2
 

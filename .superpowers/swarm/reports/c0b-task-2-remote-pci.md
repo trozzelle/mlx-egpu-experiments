@@ -7,7 +7,7 @@ Done. Supervisor verified the focused pytest passes and reviewer accepted the Re
 ## Changed files
 
 - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`
-- `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
 - `.superpowers/swarm/reports/c0b-task-2-remote-pci.md`
 
 ## Source provenance

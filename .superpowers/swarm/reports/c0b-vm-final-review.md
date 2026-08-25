@@ -18,10 +18,10 @@ Accepted. C0B-4.5 VM/PTE/TLB prerequisite is complete and the handoff state is c
 - `.superpowers/swarm/reports/c0b-vm-task-3-hardware-mapping.md`
 - `.superpowers/swarm/reports/c0b-vm-phase2-review.md`
 - `.superpowers/swarm/reports/c0b-vm-task-4-transfer-resume.md`
-- `docs/tasks/native-r9700-gfx12-vm-pte-tlb/`
-- `docs/tasks/native-r9700-producer/README.md`
-- `docs/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`
-- `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
+- `docs/archive/tasks/native-r9700-gfx12-vm-pte-tlb/`
+- `docs/archive/tasks/native-r9700-producer/README.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
 - `docs/tasks/native-r9700-producer/validation-commands.md`
 
 ## Findings

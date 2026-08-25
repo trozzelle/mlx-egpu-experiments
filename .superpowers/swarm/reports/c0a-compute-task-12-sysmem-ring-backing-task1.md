@@ -1,7 +1,7 @@
 # Task 1 Report — Extend compute_control sysmem allocation to carry the ring
 
 **Agent:** SysmemRingAlloc
-**Plan:** docs/superpowers/plans/2026-08-17-sysmem-ring-backing-isolation.md, Task 1
+**Plan:** docs/archive/superpowers/plans/2026-08-17-sysmem-ring-backing-isolation.md, Task 1
 **Date:** 2026-08-17
 **Worktree:** ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer (branch `feature/native-r9700-producer`, checkpoint `9862430`)
 

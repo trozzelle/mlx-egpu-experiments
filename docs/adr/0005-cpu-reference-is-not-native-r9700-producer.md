@@ -39,4 +39,4 @@ Conflating "tinygrad-free" with "R9700/eGPU compute" hid the missing model-kerne
 
 By 2026-08-25 the reopened gates were satisfied: native 16-layer Llama prefill produced hardware-backed `r9700_native` artifacts, C1R was token-exact through prompt-128, and C2R accepted the actual R9700 producer route with no fallback. The CPU/NumPy classification and hardware-evidence requirement remain in force.
 
-**Links:** `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/ROADMAP.md`, `docs/tasks/native-r9700-producer/phase-c1-native-producer-parity.md`, `docs/tasks/native-r9700-producer/phase-c2-serving-integration.md`.
+**Links:** `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `docs/ROADMAP.md`, `docs/archive/tasks/native-r9700-producer/phase-c1-native-producer-parity.md`, `docs/archive/tasks/native-r9700-producer/phase-c2-serving-integration.md`.

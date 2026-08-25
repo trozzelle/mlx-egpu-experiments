@@ -6,8 +6,8 @@
 - `.superpowers/swarm/reports/c0a-compute-task-4-ring-setup.md`
 
 ## Source refs
-- `docs/tasks/gx1202-compute-dispatch/phase-3-compute-ring-mqd-hqd.md` lines 31-58
-- `docs/superpowers/plans/2026-08-17-gfx1201-compute-dispatch.md` lines 499-517
+- `docs/archive/tasks/gx1202-compute-dispatch/phase-3-compute-ring-mqd-hqd.md` lines 31-58
+- `docs/archive/superpowers/plans/2026-08-17-gfx1201-compute-dispatch.md` lines 499-517
 
 ## Exact expected compute lines/values added
 The no-hardware `--self-test kernel-proof-contract` tuple now includes these deterministic lines before kernel launch/cpu/failure fields:
@@ -63,8 +63,8 @@ Accepted. This task changed the no-hardware/log contract only; no register-write
 - `.superpowers/swarm/reports/c0a-compute-task-4-ring-setup.md`
 
 ### Source refs
-- `docs/tasks/gx1202-compute-dispatch/phase-3-compute-ring-mqd-hqd.md` lines 59-87
-- `docs/superpowers/plans/2026-08-17-gfx1201-compute-dispatch.md` lines 518-560
+- `docs/archive/tasks/gx1202-compute-dispatch/phase-3-compute-ring-mqd-hqd.md` lines 59-87
+- `docs/archive/superpowers/plans/2026-08-17-gfx1201-compute-dispatch.md` lines 518-560
 - `tinygrad/tinygrad/runtime/autogen/am/am.py` lines 1821-1905 (`struct_v12_compute_mqd` field order)
 - `tinygrad/tinygrad/runtime/autogen/am/regs.py` lines 5981-6037 (`regCP_MQD_BASE_ADDR..regCP_HQD_PQ_WPTR_HI`)
 - `tinygrad/tinygrad/runtime/autogen/am/regs.py` lines 6049, 6060, and 6694 (`regGRBM_GFX_CNTL`, `regCP_MEC_RS64_CNTL`, `regSPI_COMPUTE_QUEUE_RESET`)
@@ -113,8 +113,8 @@ Accepted. Supervisor tightened the executor output so `build_compute_mqd()` fill
 - `.superpowers/swarm/reports/c0a-compute-task-4-ring-setup.md`
 
 ### Source refs
-- `docs/tasks/gx1202-compute-dispatch/phase-3-compute-ring-mqd-hqd.md` lines 89-136
-- `docs/superpowers/plans/2026-08-17-gfx1201-compute-dispatch.md` lines 562-600
+- `docs/archive/tasks/gx1202-compute-dispatch/phase-3-compute-ring-mqd-hqd.md` lines 89-136
+- `docs/archive/superpowers/plans/2026-08-17-gfx1201-compute-dispatch.md` lines 562-600
 - `tinygrad/tinygrad/runtime/support/am/ip.py` lines 340-342 and 371-405 (`mqd_st_mv[0x80 + i]` HQD copy and reset/dequeue flow)
 - `tinygrad/tinygrad/runtime/autogen/am/regs.py` gfx12 `regCP_MQD_BASE_ADDR..regCP_HQD_PQ_WPTR_HI`
 

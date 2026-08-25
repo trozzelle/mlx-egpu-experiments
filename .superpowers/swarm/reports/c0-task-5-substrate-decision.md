@@ -8,7 +8,7 @@ Status: Blocked.
 |---|---|---|---|
 | macOS TinyGPU/libusb eGPU probe | `logs/c0-macos-egpu-minimal-runtime.log`; `.superpowers/swarm/reports/c0-task-2-macos-egpu.md` | Failed C0 runtime-discovery gate. The probe compiled/ran and logged `runtime_substrate: macOS TinyGPU USB/libusb tinygrad-free probe`, but `tinygpu_device_count: 0`, `device_output_sample: unavailable`, `cpu_comparison_status: not_run_missing_native_tinygpu_dma_and_kernel_launch_abi`, `host_device_transfer_status: not_run_missing_native_tinygpu_dma_protocol`, `kernel_launch_status: not_run_missing_native_tinygpu_command_queue_and_kernel_dispatch_abi`, and `exit_status: 3`. | Not promotable as local macOS production substrate. Missing visible TinyGPU/R9700 USB device and pinned tinygrad-free TinyGPU DMA/queue/kernel-dispatch ABI. |
 | Linux ROCm/HIP probe | `.superpowers/swarm/reports/c0-task-3-linux-hip.md`; `experiments/native-r9700-runtime/linux_hip_minimal.cpp` described there; recorded command in `docs/tasks/native-r9700-producer/validation-commands.md` | Failed C0 runtime-discovery gate in current evidence. Source exists and the command is concrete, but no SSH-configured/attached ROCm-capable AMD Linux host is available, local `hipcc` is absent, and no HIP log proves transfer, kernel launch, readback, or CPU comparison. | Not promotable as Linux ROCm/HIP production substrate. Missing provisioned AMD Linux ROCm/HIP host/toolchain and passing run log. |
-| DwarfStar reference | `.superpowers/swarm/reports/c0-task-4-dwarfstar.md`; `docs/tasks/native-r9700-producer/dwarfstar-reference-notes.md` | Reference extraction complete, but it is not target runtime evidence. DS4 ROCm facts are Strix Halo/gfx1151-oriented and DwarfStar is reference-only. | Useful for C1 runtime shape and diagnostics after a substrate is selected; not a production or reference substrate decision by itself. |
+| DwarfStar reference | `.superpowers/swarm/reports/c0-task-4-dwarfstar.md`; `docs/archive/tasks/native-r9700-producer/dwarfstar-reference-notes.md` | Reference extraction complete, but it is not target runtime evidence. DS4 ROCm facts are Strix Halo/gfx1151-oriented and DwarfStar is reference-only. | Useful for C1 runtime shape and diagnostics after a substrate is selected; not a production or reference substrate decision by itself. |
 
 ## Decision
 
@@ -31,7 +31,7 @@ C1 must not start model kernels, native runtime implementation, or native produc
 
 ## Files updated
 
-- `docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md`
 - `docs/tasks/native-r9700-producer/validation-commands.md`
 - `.superpowers/swarm/reports/c0-task-5-substrate-decision.md`
 
@@ -40,5 +40,5 @@ C1 must not start model kernels, native runtime implementation, or native produc
 OMP task executors do not run validation, linters, formatters, package managers, git commands, proof commands, or project-wide suites. Supervisor should run:
 
 ```sh
-git diff --check docs/DESIGN.md docs/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/tasks/native-r9700-producer/validation-commands.md
+git diff --check docs/DESIGN.md docs/archive/tasks/native-r9700-producer/phase-c0-runtime-discovery.md docs/tasks/native-r9700-producer/validation-commands.md
 ```

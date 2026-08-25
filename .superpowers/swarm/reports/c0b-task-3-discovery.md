@@ -9,7 +9,7 @@ Done. Implemented and verified the native TinyGPU.app discovery-smoke path; revi
 - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`
 - `tests/test_native_amdev_transfer_contract.py`
 - `docs/tasks/native-r9700-producer/validation-commands.md`
-- `docs/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
+- `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
 - `.superpowers/swarm/reports/c0b-task-3-discovery.md`
 
 `test_help_lists_hardware_modes()` was added to require `--discovery-smoke` and `--transfer-proof` help coverage before the hardware mode implementation.

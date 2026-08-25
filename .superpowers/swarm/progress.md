@@ -2,10 +2,10 @@
 
 ## Authority
 
-- Primary execution plan: `docs/tasks/native-r9700-producer/2026-08-23-llama-numerical-debug-plan.md`.
-- Task packets: `phase-llama-numerical-trace.md` and `phase-llama-numerical-remediation.md`.
-- Durable project status: `docs/tasks/native-r9700-producer/README.md`.
-- Historical ledgers, plans, supervisor handoffs, SDD task sets, and pre-LN reports: `docs/archive/`.
+- Current implementation plan: `docs/IMPLEMENTATION_PLAN.md`.
+- Current capability gates: `docs/ROADMAP.md`.
+- Active command ledger: `docs/tasks/native-r9700-producer/validation-commands.md`.
+- Completed producer packets, plans, handoffs, and diagnostic task sets: `docs/archive/README.md`.
 
 ## Current facts
 
@@ -23,7 +23,7 @@
   (`c8f5770`), missing query RoPE (`36bf94a`), fused gated-MLP PCIe blowup
   (`6036802`), and the 64-key attention span (`c26f801`).
 
-## Active ledger
+## Current follow-up ledger
 
 | Task | Status | Evidence | Blocker |
 |---|---|---|---|
@@ -31,20 +31,20 @@
 | LN-3 Layer-0 recurrence | Done | 2/6/16/64/128 ULP-correct | — |
 | LN-4 All-layer recurrence | Done | 16-layer prefill ULP-correct | — |
 | LN-5 Native C1R/C2R | Done | C1R token-exact (prompt-0/16/64/128); C2R no-fallback | — |
-| Llama score-kernel RoPE precompute | Open | — | Performance only. |
-| Qwen producer | Open | — | Separate target-expansion slice; resumes after Llama (now done). |
+| F3 candidate: score-kernel RoPE precompute | Open | — | Performance only; reprofile after F2 WMMA foundation. |
+| Q1 Qwen contract/oracle package | Open | Existing `native_r9700/qwen_*` controls | Native promotion remains downstream of the shared matrix/attention foundation. |
 
 ## Guardrails
 
 - Stop at the first non-finite or out-of-tolerance stage.
 - CPU/NumPy is oracle evidence only; it cannot produce an accepted native artifact.
 - Preserve `S-1` cache semantics and final-token injection.
-- Do not resume Qwen work before the 128-token Llama acceptance gate passes.
+- Q1 contract/oracle research may proceed in parallel; native Qwen performance acceptance waits for its selected F2–F4 prerequisites.
 
 ## Launch/Transport Optimization (2026-08-24)
 
-Plan: `docs/superpowers/plans/2026-08-24-native-prefill-launch-transport-optimization.md`.
-Work boundary: current checkout, branch `feature/native-r9700-producer` @ `3d314bc` (no worktree fork — branch is not main/master).
+Related archived plans: `docs/archive/superpowers/plans/2026-08-24-native-prefill-compute-side-optimization.md` and `docs/archive/superpowers/plans/2026-08-24-native-prefill-compute-batching-inpage-kernargs.md`.
+Historical work boundary: branch `feature/native-r9700-producer` at `3d314bc`; this section records a completed/dropped experiment, not the current checkout authority.
 Baseline: 128-token native prefill 104.6 s wall / 12.7 s CPU; kernel_count=20480; transfer_bytes=2072649728.
 
 Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) → W3 = T4+T5 (parallel, disjoint files) → W4 = T6 (supervisor verify).
