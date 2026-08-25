@@ -6246,6 +6246,9 @@ struct NativePrefillRequest {
   std::string out_npz_path;
   std::string log_path;
   bool gpu_stage_profile = false;
+  ComputeCompletionPolicy compute_completion_policy =
+      ComputeCompletionPolicy::PerStageTimeline;
+  ComputeBarrierPolicy compute_barrier_policy = ComputeBarrierPolicy::Full;
 };
 
 struct NativePrefillResult {

@@ -56,8 +56,9 @@ void print_help(const char* argv0) {
   std::printf("  --legacy-primitive-diagnostic <name>\n");
   std::printf("                         run only an explicitly injected historical primitive executable\n");
   std::printf("                         (requires NATIVE_R9700_C1_PRIMITIVE_BRIDGE; not a product proof)\n");
-  std::printf("  --native-prefill-proof --model <mlx-model-dir> --token-ids-json '[...]' --out <npz> --log <path> [--gpu-stage-profile]\n");
-  std::printf("                         16-layer streamed HSA Llama prefill; optional raw GPU stage ticks\n");
+  std::printf("  --native-prefill-proof --model <mlx-model-dir> --token-ids-json '[...]' --out <npz> --log <path>\\\n");
+  std::printf("      [--gpu-stage-profile] [--completion-policy per-stage|terminal] [--barrier-policy full|overlap-kv]\n");
+  std::printf("                         16-layer streamed HSA Llama prefill; optional diagnostic GPU policies\n");
   std::printf("  --llama-stage-trace --model <dir> --token-id <uint32> --layer 0 --position 0 \\\n");
   std::printf("      --stage <boundary> --trace-dir <dir> [--rmsnorm-unit-scale [--rmsnorm-zero-input [--rmsnorm-output-sentinel [--rmsnorm-zero-store]]]]\n");
   std::printf("                         trace one layer-0/token-0 resident boundary; zero-store requires normalized zero-input unit-scale sentinel\n");
@@ -715,15 +716,15 @@ int main(int argc, char** argv) {
   }
   if (std::strcmp(argv[1], "--native-prefill-proof") == 0) {
     native_r9700::NativePrefillResult result;
-    const bool gpu_stage_profile =
-        argc == 11 && std::strcmp(argv[10], "--gpu-stage-profile") == 0;
-    if ((argc != 10 && !gpu_stage_profile) || std::strcmp(argv[2], "--model") != 0 ||
+    const char* const native_prefill_usage =
+        "--native-prefill-proof expects --model <mlx-model-dir> --token-ids-json '[...]' "
+        "--out <npz> --log <path> [--gpu-stage-profile] "
+        "[--completion-policy per-stage|terminal] [--barrier-policy full|overlap-kv]";
+    if (argc < 10 || std::strcmp(argv[2], "--model") != 0 ||
         std::strcmp(argv[4], "--token-ids-json") != 0 ||
         std::strcmp(argv[6], "--out") != 0 || std::strcmp(argv[8], "--log") != 0) {
       result.failure_stage = "native_prefill_request";
-      result.failure_text =
-          "--native-prefill-proof expects --model <mlx-model-dir> --token-ids-json '[...]' "
-          "--out <npz> --log <path> [--gpu-stage-profile]";
+      result.failure_text = native_prefill_usage;
       result.exit_status = 2;
       print_native_prefill_result(result);
       return result.exit_status;
@@ -733,7 +734,54 @@ int main(int argc, char** argv) {
     request.model_dir = argv[3];
     request.out_npz_path = argv[7];
     request.log_path = argv[9];
-    request.gpu_stage_profile = gpu_stage_profile;
+    bool saw_gpu_stage_profile = false;
+    bool saw_completion_policy = false;
+    bool saw_barrier_policy = false;
+    bool options_valid = true;
+    for (int index = 10; index < argc && options_valid;) {
+      if (std::strcmp(argv[index], "--gpu-stage-profile") == 0 &&
+          !saw_gpu_stage_profile) {
+        saw_gpu_stage_profile = true;
+        request.gpu_stage_profile = true;
+        ++index;
+      } else if (std::strcmp(argv[index], "--completion-policy") == 0 &&
+                 !saw_completion_policy && index + 1 < argc) {
+        saw_completion_policy = true;
+        if (std::strcmp(argv[index + 1], "per-stage") == 0) {
+          request.compute_completion_policy =
+              native_r9700::ComputeCompletionPolicy::PerStageTimeline;
+        } else if (std::strcmp(argv[index + 1], "terminal") == 0) {
+          request.compute_completion_policy =
+              native_r9700::ComputeCompletionPolicy::TerminalTimeline;
+        } else {
+          options_valid = false;
+        }
+        index += 2;
+      } else if (std::strcmp(argv[index], "--barrier-policy") == 0 &&
+                 !saw_barrier_policy && index + 1 < argc) {
+        saw_barrier_policy = true;
+        if (std::strcmp(argv[index + 1], "full") == 0) {
+          request.compute_barrier_policy =
+              native_r9700::ComputeBarrierPolicy::Full;
+        } else if (std::strcmp(argv[index + 1], "overlap-kv") == 0) {
+          request.compute_barrier_policy =
+              native_r9700::ComputeBarrierPolicy::OverlapKvProjections;
+        } else {
+          options_valid = false;
+        }
+        index += 2;
+      } else {
+        options_valid = false;
+      }
+    }
+    if (!options_valid) {
+      result.failure_stage = "native_prefill_request";
+      result.failure_text = native_prefill_usage;
+      result.exit_status = 2;
+      print_native_prefill_result(result);
+      return result.exit_status;
+    }
+
     std::string parse_error;
     const bool parsed_tokens = parse_token_ids_json(argv[5], &request.token_ids, &parse_error);
     if (!parsed_tokens) request.token_ids.clear();

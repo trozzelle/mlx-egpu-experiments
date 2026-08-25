@@ -917,7 +917,11 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
                      std::to_string(persistent_dispatch.layer_stages[layer].size()));
         if (!resident.dispatch_batch(
                 persistent_dispatch.layer_stages[layer], &dispatch_result, &detail,
-                ResidentHsaBatchOptions{request.gpu_stage_profile})) {
+                ResidentHsaBatchOptions{
+                    request.gpu_stage_profile,
+                    request.compute_completion_policy,
+                    request.compute_barrier_policy,
+                })) {
           compute_failure = 2;
           failed_position = block.position;
           break;

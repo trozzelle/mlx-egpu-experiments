@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "amdev_packets.h"
 #include "hsa_code_image_asset.h"
 #include "kernel_catalog.h"
 namespace native_r9700 {
@@ -153,9 +154,51 @@ inline bool gpu_stage_tick_deltas(const GpuStageTickSample& sample,
   return true;
 }
 
+enum class ComputeCompletionPolicy {
+  PerStageTimeline,
+  TerminalTimeline,
+};
+
+enum class ComputeBarrierPolicy {
+  Full,
+  OverlapKvProjections,
+};
+
 struct ResidentHsaBatchOptions {
   bool capture_gpu_timestamps = false;
+  ComputeCompletionPolicy completion_policy =
+      ComputeCompletionPolicy::PerStageTimeline;
+  ComputeBarrierPolicy barrier_policy = ComputeBarrierPolicy::Full;
 };
+
+inline Pm4StageTail compute_stage_tail(const ResidentHsaBatchOptions& options,
+                                      std::size_t stage_index,
+                                      std::size_t stage_count) {
+  const bool terminal_stage = stage_index + 1U == stage_count;
+  return {
+      options.barrier_policy != ComputeBarrierPolicy::OverlapKvProjections ||
+          stage_index != 1U,
+      true,
+      !options.capture_gpu_timestamps &&
+          (options.completion_policy == ComputeCompletionPolicy::PerStageTimeline ||
+           terminal_stage),
+  };
+}
+
+inline bool compute_batch_uses_terminal_timeline_signal(
+    const ResidentHsaBatchOptions& options) {
+  return options.capture_gpu_timestamps;
+}
+
+inline std::size_t compute_batch_host_signal_count(
+    const ResidentHsaBatchOptions& options, std::size_t stage_count) {
+  if (stage_count == 0U) return 0U;
+  if (compute_batch_uses_terminal_timeline_signal(options) ||
+      options.completion_policy == ComputeCompletionPolicy::TerminalTimeline) {
+    return 1U;
+  }
+  return stage_count;
+}
 
 struct ResidentHsaDispatchResult {
   std::string hardware_identity;
@@ -224,12 +267,11 @@ class ResidentHsaSession {
   bool close(std::string* error_text);
 
  private:
-  // Per-stage PM4 transform (preflight, kernarg slot bind, build). The frozen
-  // path appends 59 dwords and advances next_timeline_value; the profiled path
-  // keeps cache completion but leaves the host timeline for the batch terminal.
+  // Per-stage PM4 transform (preflight, kernarg slot bind, build). Policy
+  // selection changes only the stage tail; the dispatch body remains frozen.
   bool build_stage_pm4(const ResidentHsaStage& stage, uint32_t slot,
                        std::vector<uint32_t>* words, std::string* error_text,
-                       bool write_timeline = true);
+                       const Pm4StageTail& tail = {});
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

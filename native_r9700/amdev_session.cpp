@@ -2446,7 +2446,8 @@ bool ResidentHsaSession::dispatch(const ResidentHsaStage& stage,
 
 bool ResidentHsaSession::build_stage_pm4(const ResidentHsaStage& stage, uint32_t slot,
                                          std::vector<uint32_t>* words,
-                                         std::string* error_text, bool write_timeline) {
+                                         std::string* error_text,
+                                         const Pm4StageTail& tail) {
   Impl& state = *impl_;
   // preflight: image index, entry offset (256-aligned), nonempty kernargs <= slot,
   // nonzero geometry, in-bounds non-overlapping bindings — the former dispatch()
@@ -2521,10 +2522,8 @@ bool ResidentHsaSession::build_stage_pm4(const ResidentHsaStage& stage, uint32_t
                               stage.workgroup_y, stage.workgroup_z, stage.global_x,
                               stage.global_y, stage.global_z, state.next_timeline_value};
   const std::vector<uint32_t> stage_words =
-      write_timeline
-          ? build_pm4_dispatch_words(pm4)
-          : build_pm4_dispatch_words(pm4, Pm4StageTail{true, true, false});
-  if (write_timeline) ++state.next_timeline_value;
+      build_pm4_dispatch_words(pm4, tail);
+  if (tail.write_timeline) ++state.next_timeline_value;
   words->insert(words->end(), stage_words.begin(), stage_words.end());
   return true;
 }
@@ -2553,34 +2552,35 @@ bool ResidentHsaSession::dispatch_batch(const std::vector<ResidentHsaStage>& sta
   uint32_t expected_timeline_value = 0;
   {
     ScopedUsec timer(&state.phase_timers.pm4_build_usec);
-    if (!options.capture_gpu_timestamps) {
-      // Keep the production stream on the frozen per-stage PM4 path.
-      for (size_t index = 0; index < stages.size(); ++index) {
-        std::string detail;
-        if (!build_stage_pm4(stages[index], static_cast<uint32_t>(index), &batch, &detail))
-          return fail("preflight", detail);
-      }
-      expected_timeline_value = state.next_timeline_value - 1U;
-    } else {
+    const auto append_words = [&](const std::vector<uint32_t>& words) {
+      batch.insert(batch.end(), words.begin(), words.end());
+    };
+    if (options.capture_gpu_timestamps) {
       uint8_t* const timestamp_bytes =
           static_cast<uint8_t*>(state.compute_control_mapping.data) +
           am_compute::kGpuTimestampCpuOffset;
       std::memset(timestamp_bytes, 0, am_compute::kGpuTimestampByteCount);
-      const auto append_words = [&](const std::vector<uint32_t>& words) {
-        batch.insert(batch.end(), words.begin(), words.end());
-      };
       append_words(build_pm4_gpu_timestamp_words(am_compute::kGpuTimestampVa));
-      for (size_t index = 0; index < stages.size(); ++index) {
-        std::string detail;
-        if (!build_stage_pm4(stages[index], static_cast<uint32_t>(index), &batch, &detail,
-                             false))
-          return fail("preflight", detail);
+    }
+    for (size_t index = 0; index < stages.size(); ++index) {
+      std::string detail;
+      const Pm4StageTail tail =
+          compute_stage_tail(options, index, stages.size());
+      if (!build_stage_pm4(stages[index], static_cast<uint32_t>(index),
+                           &batch, &detail, tail)) {
+        return fail("preflight", detail);
+      }
+      if (options.capture_gpu_timestamps) {
         append_words(build_pm4_gpu_timestamp_words(
             am_compute::kGpuTimestampVa + (index + 1U) * sizeof(uint64_t)));
       }
+    }
+    if (compute_batch_uses_terminal_timeline_signal(options)) {
       expected_timeline_value = state.next_timeline_value++;
       append_words(build_pm4_timeline_signal_words(am_compute::kTimelineVa,
                                                    expected_timeline_value));
+    } else {
+      expected_timeline_value = state.next_timeline_value - 1U;
     }
   }
 
