@@ -44,10 +44,11 @@ Build a tinygrad-free prefill producer on the AMD Radeon AI PRO R9700 that emits
   policies, and token blocks `1,2,4,8,16,32` with zero-padded exact-fill
   embedding uploads. Production defaults remain block size 1,
   `PerStageTimeline`, and `Full`; no unmeasured policy has been promoted.
-- Hardware-free changed-path verification is 105/105 passing and the full native
-  runner builds without warnings. The broader native suite reports 575 passed /
-  64 documented baseline failures, primarily test compile closures missing
-  `hardware_lock.cpp`.
+- Hardware-free final changed-boundary verification is 232/232 passing and the
+  full native runner builds without warnings. Whole-branch correctness/security
+  review is clean for reachable software. The current broader native suite reports
+  670 passed / 64 documented baseline failures, primarily test compile closures
+  missing `hardware_lock.cpp`.
 - Current hard blocker: two fresh kernel-proof attempts on 2026-08-25 reached
   TinyGPU but `CFG_READ` returned `Driver not available`. No server restart or
   process kill was attempted. Until R9700 access is restored, the GPU timestamp
