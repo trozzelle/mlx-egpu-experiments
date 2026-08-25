@@ -114,7 +114,7 @@ EXPECTED_AM_VM_TLB_SEQUENCE_LINES = (
     "invalidate_l1_ptes: 1",
     "clear_protection_fault_status_addr: 0",
     "mm_waits: sem,ack",
-    "gc_waits: sem,ack",
+    "gc_waits: ack",
     "status: pass",
 )
 

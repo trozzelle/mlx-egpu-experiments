@@ -1390,7 +1390,7 @@ int run_am_vm_tlb_sequence_self_test() {
   std::printf("invalidate_l1_ptes: 1\n");
   std::printf("clear_protection_fault_status_addr: 0\n");
   std::printf("mm_waits: sem,ack\n");
-  std::printf("gc_waits: sem,ack\n");
+  std::printf("gc_waits: ack\n");
   std::printf("status: pass\n");
   return 0;
 }
