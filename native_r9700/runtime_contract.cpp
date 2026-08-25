@@ -26,6 +26,8 @@
 
 namespace native_r9700 {
 namespace {
+constexpr size_t kLlamaEmbeddingRowBytes = 2048U * sizeof(uint16_t);
+
 
 std::filesystem::path resolve_path_for_comparison(const std::string& path_text) {
   const std::filesystem::path absolute_path =
@@ -61,6 +63,20 @@ void fail(NativePrefillResult* result, const char* stage, const std::string& tex
 
 bool blank(const std::string& value) {
   return value.find_first_not_of(" \t\r\n") == std::string::npos;
+}
+
+bool allowed_prefill_block_tokens(uint32_t block_tokens) {
+  switch (block_tokens) {
+    case 1:
+    case 2:
+    case 4:
+    case 8:
+    case 16:
+    case 32:
+      return true;
+    default:
+      return false;
+  }
 }
 
 void log_progress(const std::string& text) {
@@ -676,11 +692,17 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
   *result = NativePrefillResult{};
   result->prefill_npz_path = request.out_npz_path;
   result->hardware_log_path = request.log_path;
+  result->block_tokens = request.block_tokens;
   if (!request.out_npz_path.empty() && !request.log_path.empty() &&
       resolve_path_for_comparison(request.out_npz_path) ==
           resolve_path_for_comparison(request.log_path)) {
     fail(result, "output_path_conflict", "prefill output path must differ from hardware log path",
          error_text);
+    return 1;
+  }
+  if (!allowed_prefill_block_tokens(request.block_tokens)) {
+    fail(result, "native_prefill_request",
+         "block tokens must be one of 1, 2, 4, 8, 16, or 32", error_text);
     return 1;
   }
 
@@ -757,15 +779,16 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
   bool persistent_dispatch_ok = false;
   {
     ScopedPhaseUsec timer(&result->phase_timers.dispatch_build_inclusive_usec);
-    persistent_dispatch_ok =
-        build_llama_persistent_dispatch(weight_table,
-                                        static_cast<uint32_t>(request.token_ids.size()), 1U,
-                                        &persistent_dispatch, &detail);
+    persistent_dispatch_ok = build_llama_persistent_dispatch(
+        weight_table, static_cast<uint32_t>(request.token_ids.size()),
+        request.block_tokens, &persistent_dispatch, &detail);
   }
   if (!persistent_dispatch_ok) {
     fail(result, "persistent_dispatch_build", detail, error_text);
     return 1;
   }
+  result->block_count =
+      static_cast<uint32_t>(persistent_dispatch.token_blocks.size());
   ResidentHsaSession resident;
   ResidentHsaDispatchResult dispatch_result;
   auto close_resident_and_snapshot = [&](std::string* close_error) {
@@ -841,22 +864,43 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
     return true;
   };
 
-  // Layer-major execution: each request block's raw embedding rows are
-  // uploaded into its contiguous hidden window once. Each layer then streams
+  // Layer-major execution: each request block's live embedding rows are packed
+  // into one zero-padded capacity-sized hidden upload. Each layer then streams
   // its nine weight windows once and dispatches blocks in causal order. K/V
-  // caches accumulate per layer across blocks; this runtime cutover keeps
-  // block capacity at one until multi-row embedding upload is available.
+  // caches accumulate per layer across blocks.
+  auto upload_embedding_block = [&](const LlamaTokenBlock& block) -> bool {
+    std::vector<uint8_t> embedding_bytes(
+        static_cast<size_t>(persistent_dispatch.block_capacity) *
+        kLlamaEmbeddingRowBytes);
+    for (uint32_t offset = 0; offset < block.token_count; ++offset) {
+      Fp16WeightSpan row;
+      if (!select_llama_embedding_row(weight_table.embed_tokens,
+                                      request.token_ids[block.position + offset],
+                                      &row, &detail)) {
+        return false;
+      }
+      std::ifstream source(row.shard_path, std::ios::binary);
+      source.seekg(static_cast<std::streamoff>(row.data_offset));
+      source.read(
+          reinterpret_cast<char*>(embedding_bytes.data() +
+                                  static_cast<size_t>(offset) *
+                                      kLlamaEmbeddingRowBytes),
+          static_cast<std::streamsize>(kLlamaEmbeddingRowBytes));
+      if (source.gcount() != static_cast<std::streamsize>(kLlamaEmbeddingRowBytes)) {
+        detail = "embedding block source_read_failed";
+        return false;
+      }
+    }
+    const std::string& block_name =
+        persistent_dispatch.request.buffers[block.hidden_buffer_index].name;
+    return resident.upload_named(block_name, embedding_bytes.data(),
+                                 embedding_bytes.size(), &dispatch_result, &detail);
+  };
   bool embedding_upload_ok = true;
   {
     ScopedPhaseUsec timer(&result->phase_timers.embedding_upload_inclusive_usec);
     for (const LlamaTokenBlock& block : persistent_dispatch.token_blocks) {
-      Fp16WeightSpan embedding_row;
-      if (!select_llama_embedding_row(weight_table.embed_tokens,
-                                      request.token_ids[block.position],
-                                      &embedding_row, &detail) ||
-          !upload_span("block_position=" + std::to_string(block.position) +
-                           " embedding_row",
-                       block.hidden_buffer_index, embedding_row)) {
+      if (!upload_embedding_block(block)) {
         embedding_upload_ok = false;
         break;
       }

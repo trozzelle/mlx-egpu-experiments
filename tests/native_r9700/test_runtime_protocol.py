@@ -625,6 +625,10 @@ def test_native_prefill_proof_redacts_token_ids_from_stdout_and_hardware_log(
     assert "token_ids_json: <redacted>" in log_text
     assert "[1,2,3]" not in log_text
     assert "gpu_stage_profile_sample_count: 0" in completed.stdout
+    assert "block_tokens: 1" in completed.stdout
+    assert "block_count: 0" in completed.stdout
+    assert "block_tokens: 1" in log_text
+    assert "block_count: 0" in log_text
 
 
 def test_native_prefill_proof_rejects_equal_output_and_log_paths(tmp_path, monkeypatch):

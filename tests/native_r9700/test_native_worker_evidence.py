@@ -64,6 +64,8 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
                     f"prefill_npz_path: {out_path}",
                     "kernel_count: 4",
                     "transfer_bytes: 4096",
+                    "block_tokens: 8",
+                    "block_count: 1",
                     "failure_stage: ",
                     "exit_status: 0",
                 )
@@ -84,6 +86,8 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
                     "prefill_npz_path": str(out_path),
                     "kernel_count": 4,
                     "transfer_bytes": 4096,
+                    "block_tokens": 8,
+                    "block_count": 1,
                     "failure_stage": "",
                     "exit_status": 0,
                 }
@@ -102,6 +106,8 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
     assert result["prefill_npz_path"] == str(out_path)
     assert result["kernel_count"] == 4
     assert result["transfer_bytes"] == 4096
+    assert result["block_tokens"] == 8
+    assert result["block_count"] == 1
     assert result["exit_status"] == 0
 
 def test_native_worker_rejects_pass_without_full_layer_loop_evidence(tmp_path):
@@ -568,3 +574,62 @@ def test_native_worker_rejects_pass_without_explicit_hardware_log_evidence(
     assert result["failure_stage"] == "worker_result_validation"
     assert "missing hardware_log_path evidence" in result["failure_text"]
     assert not out_path.exists()
+
+
+def test_native_worker_forwards_valid_diagnostic_block_capacity(monkeypatch, tmp_path):
+    """The diagnostic environment selects one exact allowed runner argument pair."""
+    from native_r9700 import native_worker
+
+    monkeypatch.setenv("NATIVE_R9700_PREFILL_BLOCK_TOKENS", "8")
+    command = native_worker._build_runner_command(
+        "synthetic-model",
+        [1, 2],
+        tmp_path / "block-prefill.npz",
+        tmp_path / "block-prefill.log",
+    )
+
+    assert command[-2:] == ["--block-tokens", "8"]
+
+
+def test_native_worker_omits_block_override_when_environment_is_absent(
+    monkeypatch, tmp_path
+):
+    """Legacy worker invocations leave the runner's capacity-one default intact."""
+    from native_r9700 import native_worker
+
+    monkeypatch.delenv("NATIVE_R9700_PREFILL_BLOCK_TOKENS", raising=False)
+    command = native_worker._build_runner_command(
+        "synthetic-model",
+        [1, 2],
+        tmp_path / "block-prefill.npz",
+        tmp_path / "block-prefill.log",
+    )
+
+    assert "--block-tokens" not in command
+
+
+@pytest.mark.parametrize("invalid_value", ["", "0", "3", "129", "-1", "eight"])
+def test_native_worker_rejects_invalid_block_capacity_before_subprocess(
+    monkeypatch, tmp_path, invalid_value
+):
+    """Invalid diagnostic environment cannot reach the native subprocess."""
+    from native_r9700 import native_worker
+
+    runner_calls = []
+
+    def fake_run(*args, **kwargs):
+        runner_calls.append((args, kwargs))
+        raise AssertionError("invalid block capacity reached subprocess.run")
+
+    monkeypatch.setenv("NATIVE_R9700_PREFILL_BLOCK_TOKENS", invalid_value)
+    monkeypatch.setattr(native_worker.subprocess, "run", fake_run)
+
+    with pytest.raises(ValueError, match="NATIVE_R9700_PREFILL_BLOCK_TOKENS"):
+        native_worker.run_native_prefill(
+            "synthetic-model",
+            [1, 2],
+            tmp_path / "block-prefill.npz",
+            tmp_path / "block-prefill.log",
+        )
+
+    assert runner_calls == []

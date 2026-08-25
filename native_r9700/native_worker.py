@@ -14,6 +14,8 @@ R9700_NATIVE_PRODUCER_KIND = "r9700_native"
 _OPEN_ACCEPTANCE = "open"
 _PASS_ACCEPTANCE = "pass"
 _DEFAULT_RUNNER_ENV = "NATIVE_R9700_PREFILL_RUNNER"
+_BLOCK_TOKENS_ENV = "NATIVE_R9700_PREFILL_BLOCK_TOKENS"
+_ALLOWED_BLOCK_TOKENS = frozenset({"1", "2", "4", "8", "16", "32"})
 _EXPECTED_RUNTIME_SUBSTRATE = "TinyGPU.app/APLRemotePCIDevice/PCIIface"
 _NUM_LAYERS = 16
 _BATCH = 1
@@ -29,6 +31,8 @@ _REQUIRED_FIELDS = (
     "prefill_npz_path",
     "kernel_count",
     "transfer_bytes",
+    "block_tokens",
+    "block_count",
     "failure_stage",
     "exit_status",
 )
@@ -139,7 +143,7 @@ def _build_runner_command(
     runner = os.environ.get(_DEFAULT_RUNNER_ENV)
     if not runner:
         runner = str(Path(__file__).with_name("runner"))
-    return [
+    command = [
         runner,
         "--native-prefill-proof",
         "--model",
@@ -151,6 +155,15 @@ def _build_runner_command(
         "--log",
         str(log_path),
     ]
+    block_tokens = os.environ.get(_BLOCK_TOKENS_ENV)
+    if block_tokens is not None:
+        if block_tokens not in _ALLOWED_BLOCK_TOKENS:
+            allowed = ", ".join(sorted(_ALLOWED_BLOCK_TOKENS, key=int))
+            raise ValueError(
+                f"{_BLOCK_TOKENS_ENV} must be one of {allowed}, got {block_tokens!r}"
+            )
+        command.extend(["--block-tokens", block_tokens])
+    return command
 
 def validate_native_prefill_npz(
     path: os.PathLike[str] | str,
@@ -300,6 +313,8 @@ def _normalize_result(
         "prefill_npz_path": _string_field(parsed, "prefill_npz_path", ""),
         "kernel_count": _int_field(parsed, "kernel_count", 0),
         "transfer_bytes": _int_field(parsed, "transfer_bytes", 0),
+        "block_tokens": _int_field(parsed, "block_tokens", 1),
+        "block_count": _int_field(parsed, "block_count", 0),
         "failure_stage": _string_field(parsed, "failure_stage", ""),
         "exit_status": _int_field(parsed, "exit_status", int(runner_exit_status)),
         "failure_text": _string_field(parsed, "failure_text", ""),
@@ -401,6 +416,8 @@ def _open_result(
         "prefill_npz_path": "",
         "kernel_count": 0,
         "transfer_bytes": 0,
+        "block_tokens": 1,
+        "block_count": 0,
         "failure_stage": failure_stage,
         "exit_status": int(exit_status),
         "failure_text": failure_text,

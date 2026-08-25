@@ -6249,6 +6249,7 @@ struct NativePrefillRequest {
   ComputeCompletionPolicy compute_completion_policy =
       ComputeCompletionPolicy::PerStageTimeline;
   ComputeBarrierPolicy compute_barrier_policy = ComputeBarrierPolicy::Full;
+  uint32_t block_tokens = 1;
 };
 
 struct NativePrefillResult {
@@ -6257,6 +6258,8 @@ struct NativePrefillResult {
   std::string prefill_npz_path;
   std::string hardware_log_path;
   uint64_t kernel_count = 0;
+  uint32_t block_tokens = 1;
+  uint32_t block_count = 0;
   uint64_t transfer_bytes = 0;
   // These fields make a non-accepting result actionable without attributing
   // fixture or retired-diagnostic work to the native prefill producer.

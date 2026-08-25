@@ -57,7 +57,7 @@ void print_help(const char* argv0) {
   std::printf("                         run only an explicitly injected historical primitive executable\n");
   std::printf("                         (requires NATIVE_R9700_C1_PRIMITIVE_BRIDGE; not a product proof)\n");
   std::printf("  --native-prefill-proof --model <mlx-model-dir> --token-ids-json '[...]' --out <npz> --log <path>\\\n");
-  std::printf("      [--gpu-stage-profile] [--completion-policy per-stage|terminal] [--barrier-policy full|overlap-kv]\n");
+  std::printf("      [--gpu-stage-profile] [--completion-policy per-stage|terminal] [--barrier-policy full|overlap-kv] [--block-tokens 1|2|4|8|16|32]\n");
   std::printf("                         16-layer streamed HSA Llama prefill; optional diagnostic GPU policies\n");
   std::printf("  --llama-stage-trace --model <dir> --token-id <uint32> --layer 0 --position 0 \\\n");
   std::printf("      --stage <boundary> --trace-dir <dir> [--rmsnorm-unit-scale [--rmsnorm-zero-input [--rmsnorm-output-sentinel [--rmsnorm-zero-store]]]]\n");
@@ -258,6 +258,8 @@ std::string native_prefill_key_value(const native_r9700::NativePrefillResult& re
       "kernel_count: " + std::to_string(result.kernel_count) + "\n" +
       "transfer_bytes: " + std::to_string(result.transfer_bytes) + "\n" +
       "n_prefix: " + std::to_string(result.n_prefix) + "\n" +
+      "block_tokens: " + std::to_string(result.block_tokens) + "\n" +
+      "block_count: " + std::to_string(result.block_count) + "\n" +
       "wall_usec: " + std::to_string(result.wall_usec) + "\n" +
       "tokens_per_sec: " + std::to_string(tokens_per_sec(result)) + "\n" +
       "phase_timer model_load_usec: " + std::to_string(result.phase_timers.model_load_usec) + "\n" +
@@ -311,6 +313,8 @@ std::string native_prefill_json(const native_r9700::NativePrefillResult& result)
       "\",\"kernel_count\":" + std::to_string(result.kernel_count) +
       ",\"transfer_bytes\":" + std::to_string(result.transfer_bytes) +
       ",\"n_prefix\":" + std::to_string(result.n_prefix) +
+      ",\"block_tokens\":" + std::to_string(result.block_tokens) +
+      ",\"block_count\":" + std::to_string(result.block_count) +
       ",\"wall_usec\":" + std::to_string(result.wall_usec) +
       ",\"tokens_per_sec\":" + std::to_string(tokens_per_sec(result)) +
       ",\"model_load_usec\":" + std::to_string(result.phase_timers.model_load_usec) +
@@ -420,6 +424,20 @@ bool parse_u32_strict(const char* text, uint32_t* out) {
   }
   *out = static_cast<uint32_t>(value);
   return true;
+}
+
+bool allowed_block_tokens(uint32_t block_tokens) {
+  switch (block_tokens) {
+    case 1:
+    case 2:
+    case 4:
+    case 8:
+    case 16:
+    case 32:
+      return true;
+    default:
+      return false;
+  }
 }
 
 
@@ -719,32 +737,48 @@ int main(int argc, char** argv) {
     const char* const native_prefill_usage =
         "--native-prefill-proof expects --model <mlx-model-dir> --token-ids-json '[...]' "
         "--out <npz> --log <path> [--gpu-stage-profile] "
-        "[--completion-policy per-stage|terminal] [--barrier-policy full|overlap-kv]";
-    if (argc < 10 || std::strcmp(argv[2], "--model") != 0 ||
-        std::strcmp(argv[4], "--token-ids-json") != 0 ||
-        std::strcmp(argv[6], "--out") != 0 || std::strcmp(argv[8], "--log") != 0) {
-      result.failure_stage = "native_prefill_request";
-      result.failure_text = native_prefill_usage;
-      result.exit_status = 2;
-      print_native_prefill_result(result);
-      return result.exit_status;
-    }
+        "[--completion-policy per-stage|terminal] [--barrier-policy full|overlap-kv] "
+        "[--block-tokens 1|2|4|8|16|32]";
 
     native_r9700::NativePrefillRequest request;
-    request.model_dir = argv[3];
-    request.out_npz_path = argv[7];
-    request.log_path = argv[9];
+    const char* token_ids_json = nullptr;
+    bool saw_model = false;
+    bool saw_token_ids_json = false;
+    bool saw_out = false;
+    bool saw_log = false;
     bool saw_gpu_stage_profile = false;
     bool saw_completion_policy = false;
     bool saw_barrier_policy = false;
+    bool saw_block_tokens = false;
     bool options_valid = true;
-    for (int index = 10; index < argc && options_valid;) {
-      if (std::strcmp(argv[index], "--gpu-stage-profile") == 0 &&
-          !saw_gpu_stage_profile) {
+    for (int index = 2; index < argc && options_valid;) {
+      const char* const option = argv[index];
+      if (std::strcmp(option, "--model") == 0 && !saw_model &&
+          index + 1 < argc) {
+        saw_model = true;
+        request.model_dir = argv[index + 1];
+        index += 2;
+      } else if (std::strcmp(option, "--token-ids-json") == 0 &&
+                 !saw_token_ids_json && index + 1 < argc) {
+        saw_token_ids_json = true;
+        token_ids_json = argv[index + 1];
+        index += 2;
+      } else if (std::strcmp(option, "--out") == 0 && !saw_out &&
+                 index + 1 < argc) {
+        saw_out = true;
+        request.out_npz_path = argv[index + 1];
+        index += 2;
+      } else if (std::strcmp(option, "--log") == 0 && !saw_log &&
+                 index + 1 < argc) {
+        saw_log = true;
+        request.log_path = argv[index + 1];
+        index += 2;
+      } else if (std::strcmp(option, "--gpu-stage-profile") == 0 &&
+                 !saw_gpu_stage_profile) {
         saw_gpu_stage_profile = true;
         request.gpu_stage_profile = true;
         ++index;
-      } else if (std::strcmp(argv[index], "--completion-policy") == 0 &&
+      } else if (std::strcmp(option, "--completion-policy") == 0 &&
                  !saw_completion_policy && index + 1 < argc) {
         saw_completion_policy = true;
         if (std::strcmp(argv[index + 1], "per-stage") == 0) {
@@ -757,7 +791,7 @@ int main(int argc, char** argv) {
           options_valid = false;
         }
         index += 2;
-      } else if (std::strcmp(argv[index], "--barrier-policy") == 0 &&
+      } else if (std::strcmp(option, "--barrier-policy") == 0 &&
                  !saw_barrier_policy && index + 1 < argc) {
         saw_barrier_policy = true;
         if (std::strcmp(argv[index + 1], "full") == 0) {
@@ -770,11 +804,23 @@ int main(int argc, char** argv) {
           options_valid = false;
         }
         index += 2;
+      } else if (std::strcmp(option, "--block-tokens") == 0 &&
+                 !saw_block_tokens && index + 1 < argc) {
+        saw_block_tokens = true;
+        uint32_t block_tokens = 0;
+        if (!parse_u32_strict(argv[index + 1], &block_tokens) ||
+            !allowed_block_tokens(block_tokens)) {
+          options_valid = false;
+        } else {
+          request.block_tokens = block_tokens;
+        }
+        index += 2;
       } else {
         options_valid = false;
       }
     }
-    if (!options_valid) {
+    if (!options_valid || !saw_model || !saw_token_ids_json || !saw_out ||
+        !saw_log) {
       result.failure_stage = "native_prefill_request";
       result.failure_text = native_prefill_usage;
       result.exit_status = 2;
@@ -783,7 +829,8 @@ int main(int argc, char** argv) {
     }
 
     std::string parse_error;
-    const bool parsed_tokens = parse_token_ids_json(argv[5], &request.token_ids, &parse_error);
+    const bool parsed_tokens =
+        parse_token_ids_json(token_ids_json, &request.token_ids, &parse_error);
     if (!parsed_tokens) request.token_ids.clear();
     timeval wall_start{};
     timeval wall_end{};
