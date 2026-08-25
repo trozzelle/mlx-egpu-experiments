@@ -437,6 +437,23 @@ def test_fresh_embed_row_source_generates_a_page_layout_preserving_hsa_image(
 
     image = image_path.read_bytes()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert set(manifest) == {
+        "descriptor_offset",
+        "elf_admission",
+        "entry_offset",
+        "image_layout",
+        "image_path",
+        "image_sha256",
+        "image_size",
+        "kernarg_schema",
+        "name",
+        "rsrc1",
+        "rsrc2",
+        "rsrc3",
+        "source_path",
+        "source_sha256",
+        "target",
+    }, "default-zero LDS generation must preserve the exact loader manifest schema"
     assert image and not image.startswith(b"\x7fELF"), "output must be a loadable HSA image"
     assert manifest["name"] == KERNEL_NAME
     assert manifest["target"] == TARGET
@@ -507,16 +524,13 @@ def test_fresh_embed_row_source_generates_a_page_layout_preserving_hsa_image(
     assert struct.unpack_from("<H", image, descriptor_offset + 56)[0] == 0x408
     assert struct.unpack_from("<H", image, descriptor_offset + 58)[0] == 0
     descriptor_resources = {
-        "descriptor_rsrc1": struct.unpack_from("<I", image, descriptor_offset + 48)[0],
-        "descriptor_rsrc2": struct.unpack_from("<I", image, descriptor_offset + 52)[0],
-        "descriptor_rsrc3": struct.unpack_from("<I", image, descriptor_offset + 44)[0],
+        "rsrc1": struct.unpack_from("<I", image, descriptor_offset + 48)[0],
+        "rsrc2": struct.unpack_from("<I", image, descriptor_offset + 52)[0],
+        "rsrc3": struct.unpack_from("<I", image, descriptor_offset + 44)[0],
     }
     for resource, value in descriptor_resources.items():
         assert manifest[resource] == value
         assert value > 0
-    assert manifest["rsrc1"] == descriptor_resources["descriptor_rsrc1"]
-    assert manifest["rsrc2"] == descriptor_resources["descriptor_rsrc2"]
-    assert manifest["rsrc3"] == descriptor_resources["descriptor_rsrc3"]
 
 
 @pytest.mark.parametrize(

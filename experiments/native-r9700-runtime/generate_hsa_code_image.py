@@ -1050,19 +1050,25 @@ def _descriptor(
     # COMPUTE_PGM_RSRC2 even though COMGR leaves that field clear in the descriptor.
     lds_size = ((group + 511) // 512) & 0x1FF
     dispatch_rsrc2 = descriptor_rsrc2 | (lds_size << 15)
-    return {
-        "group_segment_bytes": group,
-        "private_segment_bytes": private,
-        "kernarg_bytes": kernarg_schema["bytes"],
-        "kernel_code_properties": properties,
-        "kernarg_preload_bytes": preload,
-        "descriptor_rsrc1": descriptor_rsrc1,
-        "descriptor_rsrc2": descriptor_rsrc2,
-        "descriptor_rsrc3": descriptor_rsrc3,
+    resources = {
         "rsrc1": descriptor_rsrc1,
         "rsrc2": dispatch_rsrc2,
         "rsrc3": descriptor_rsrc3,
     }
+    if group:
+        resources.update(
+            {
+                "group_segment_bytes": group,
+                "private_segment_bytes": private,
+                "kernarg_bytes": kernarg_schema["bytes"],
+                "kernel_code_properties": properties,
+                "kernarg_preload_bytes": preload,
+                "descriptor_rsrc1": descriptor_rsrc1,
+                "descriptor_rsrc2": descriptor_rsrc2,
+                "descriptor_rsrc3": descriptor_rsrc3,
+            }
+        )
+    return resources
 
 
 def _reviewed_asset(

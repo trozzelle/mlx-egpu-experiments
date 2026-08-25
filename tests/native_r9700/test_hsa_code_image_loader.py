@@ -5,6 +5,9 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
+
+import pytest
 
 
 HSA_CODE_IMAGE_HEADER = Path("native_r9700/hsa_code_image_asset.h")
@@ -22,6 +25,9 @@ CANONICAL_SCHEMA = (
     '{"name":"hidden_output","offset":8,"type":"uint64"},'
     '{"name":"selected_row","offset":16,"type":"uint64"}]}'
 )
+GENERATOR = Path("experiments/native-r9700-runtime/generate_hsa_code_image.py")
+FRESH_HIP_SOURCE = Path("native_r9700/kernels/llama_embed_row_f16.cpp")
+WORKSPACE_TINYGRAD_ROOT = Path(__file__).resolve().parents[5] / "tinygrad"
 
 
 def _copy_asset_directory(tmp_path: Path, name: str) -> Path:
@@ -150,6 +156,47 @@ def _run_probe(executable: Path, mode: str, asset_dir: Path) -> None:
         [str(executable), mode, str(asset_dir)], capture_output=True, text=True, check=False
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_loader_accepts_fresh_regenerated_default_zero_lds_manifest(
+    tmp_path: Path,
+) -> None:
+    """Default-zero generation remains exactly compatible with the strict embed loader."""
+    if not WORKSPACE_TINYGRAD_ROOT.is_dir():
+        pytest.skip("optional capability: no workspace Tinygrad checkout")
+    output_dir = tmp_path / "fresh-default-zero-lds"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(GENERATOR),
+            "--source",
+            str(FRESH_HIP_SOURCE),
+            "--target",
+            "gfx1201",
+            "--tinygrad-root",
+            str(WORKSPACE_TINYGRAD_ROOT),
+            "--schema",
+            CANONICAL_SCHEMA,
+            "--out-dir",
+            str(output_dir),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    manifest = _load_manifest(output_dir)
+    assert not {
+        "descriptor_rsrc1",
+        "descriptor_rsrc2",
+        "descriptor_rsrc3",
+        "group_segment_bytes",
+        "private_segment_bytes",
+        "kernarg_bytes",
+        "kernel_code_properties",
+        "kernarg_preload_bytes",
+    } & manifest.keys()
+    _run_probe(_compile_loader_probe(tmp_path), "valid", output_dir)
 
 
 def test_loader_admits_only_the_generated_manifest_bound_hsa_image(tmp_path: Path) -> None:
