@@ -105,17 +105,25 @@ std::vector<uint32_t> build_batch(native_r9700::ComputeCompletionPolicy completi
 int main() {
   const native_r9700::ResidentHsaBatchOptions defaults;
   if (defaults.completion_policy !=
-          native_r9700::ComputeCompletionPolicy::PerStageTimeline ||
+          native_r9700::ComputeCompletionPolicy::TerminalTimeline ||
       defaults.barrier_policy != native_r9700::ComputeBarrierPolicy::Full) {
     return 1;
   }
 
   const native_r9700::NativePrefillRequest request_defaults;
   if (request_defaults.compute_completion_policy !=
-          native_r9700::ComputeCompletionPolicy::PerStageTimeline ||
+          native_r9700::ComputeCompletionPolicy::TerminalTimeline ||
       request_defaults.compute_barrier_policy !=
           native_r9700::ComputeBarrierPolicy::Full) {
     return 2;
+  }
+
+  const native_r9700::NativePrefillResult result_defaults;
+  if (result_defaults.compute_completion_policy !=
+          native_r9700::ComputeCompletionPolicy::TerminalTimeline ||
+      result_defaults.compute_barrier_policy !=
+          native_r9700::ComputeBarrierPolicy::Full) {
+    return 3;
   }
 
   print_words("per_stage_full",
@@ -209,7 +217,7 @@ def encoded_streams(tmp_path_factory: pytest.TempPathFactory) -> dict[str, tuple
     return streams
 
 
-def test_default_per_stage_full_batch_preserves_frozen_stage_packets(encoded_streams):
+def test_explicit_per_stage_full_batch_preserves_frozen_stage_packets(encoded_streams):
     words = encoded_streams["per_stage_full"]
     stages = _dispatch_stage_packets(words)
     assert len(stages) == 10
@@ -437,11 +445,11 @@ def test_runner_rejects_malformed_or_duplicate_compute_ab_policy_flags(
 @pytest.mark.parametrize(
     ("optional_arguments", "completion", "barrier"),
     [
-        ([], "per-stage", "full"),
+        ([], "terminal", "full"),
         (["--completion-policy", "per-stage"], "per-stage", "full"),
         (["--completion-policy", "terminal"], "terminal", "full"),
-        (["--barrier-policy", "full"], "per-stage", "full"),
-        (["--barrier-policy", "overlap-kv"], "per-stage", "overlap-kv"),
+        (["--barrier-policy", "full"], "terminal", "full"),
+        (["--barrier-policy", "overlap-kv"], "terminal", "overlap-kv"),
         (
             ["--completion-policy", "per-stage", "--barrier-policy", "full",
              "--gpu-stage-profile"],

@@ -73,6 +73,8 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
         assert argv[0] == "/tmp/fake-native-prefill-runner"
         assert "--native-prefill-proof" in argv
         assert json.loads(argv[argv.index("--token-ids-json") + 1]) == [1, 2, 3]
+        assert "--completion-policy" not in argv
+        assert "--barrier-policy" not in argv
         _write_native_prefill_npz(out_path, n_prefix=3)
         log_path.write_text(
             "\n".join(
@@ -81,7 +83,7 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
                     "native_prefill_acceptance: pass",
                     "native_prefill_full_layer_loop_status: pass",
                     "runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface",
-                    "compute_completion_policy: per-stage",
+                    "compute_completion_policy: terminal",
                     "compute_barrier_policy: full",
                     f"hardware_log_path: {log_path}",
                     f"prefill_npz_path: {out_path}",
@@ -105,7 +107,7 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
                     "native_prefill_acceptance": "pass",
                     "native_prefill_full_layer_loop_status": "pass",
                     "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
-                    "compute_completion_policy": "per-stage",
+                    "compute_completion_policy": "terminal",
                     "compute_barrier_policy": "full",
                     "hardware_log_path": str(log_path),
                     "prefill_npz_path": str(out_path),
@@ -128,6 +130,8 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
     assert seen["argv"][seen["argv"].index("--model") + 1] == "synthetic-model"
     assert result["producer_kind"] == "r9700_native"
     assert result["native_prefill_acceptance"] == "pass"
+    assert result["compute_completion_policy"] == "terminal"
+    assert result["compute_barrier_policy"] == "full"
     assert result["prefill_npz_path"] == str(out_path)
     assert result["kernel_count"] == 4
     assert result["transfer_bytes"] == 4096
@@ -148,7 +152,7 @@ def test_native_worker_rejects_pass_without_full_layer_loop_evidence(tmp_path):
             "producer_kind": "r9700_native",
             "native_prefill_acceptance": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
-            "compute_completion_policy": "per-stage",
+            "compute_completion_policy": "terminal",
             "compute_barrier_policy": "full",
             "hardware_log_path": str(log_path),
             "prefill_npz_path": str(out_path),
@@ -183,7 +187,7 @@ def test_native_worker_rejects_nonzero_exit_and_removes_partial_output(
                     "producer_kind: r9700_native",
                     "native_prefill_acceptance: pass",
                     "runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface",
-                    "compute_completion_policy: per-stage",
+                    "compute_completion_policy: terminal",
                     "compute_barrier_policy: full",
                     f"hardware_log_path: {log_path}",
                     f"prefill_npz_path: {out_path}",
@@ -206,7 +210,7 @@ def test_native_worker_rejects_nonzero_exit_and_removes_partial_output(
                     "producer_kind": "r9700_native",
                     "native_prefill_acceptance": "pass",
                     "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
-                    "compute_completion_policy": "per-stage",
+                    "compute_completion_policy": "terminal",
                     "compute_barrier_policy": "full",
                     "hardware_log_path": str(log_path),
                     "prefill_npz_path": str(out_path),
@@ -249,7 +253,7 @@ def test_native_worker_accepts_runner_key_value_log_when_json_is_absent(
                     "native_prefill_acceptance: pass",
                     "native_prefill_full_layer_loop_status: pass",
                     "runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface",
-                    "compute_completion_policy: per-stage",
+                    "compute_completion_policy: terminal",
                     "compute_barrier_policy: full",
                     f"hardware_log_path: {log_path}",
                     f"prefill_npz_path: {out_path}",
@@ -294,7 +298,7 @@ def test_native_worker_rejects_pass_with_malformed_npz_and_removes_output(
                     "native_prefill_acceptance: pass",
                     "native_prefill_full_layer_loop_status: pass",
                     "runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface",
-                    "compute_completion_policy: per-stage",
+                    "compute_completion_policy: terminal",
                     "compute_barrier_policy: full",
                     f"hardware_log_path: {log_path}",
                     f"prefill_npz_path: {out_path}",
@@ -318,7 +322,7 @@ def test_native_worker_rejects_pass_with_malformed_npz_and_removes_output(
                     "native_prefill_acceptance": "pass",
                     "native_prefill_full_layer_loop_status": "pass",
                     "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
-                    "compute_completion_policy": "per-stage",
+                    "compute_completion_policy": "terminal",
                     "compute_barrier_policy": "full",
                     "hardware_log_path": str(log_path),
                     "prefill_npz_path": str(out_path),
@@ -362,7 +366,7 @@ def test_native_worker_rejects_cpu_reference_masquerade_and_removes_unaccepted_n
                     "producer_kind": "cpu_reference",
                     "native_prefill_acceptance": "pass",
                     "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
-                    "compute_completion_policy": "per-stage",
+                    "compute_completion_policy": "terminal",
                     "compute_barrier_policy": "full",
                     "hardware_log_path": str(log_path),
                     "prefill_npz_path": str(out_path),
@@ -430,7 +434,7 @@ def test_native_worker_preserves_output_cleanup_failure_for_nonempty_output_dire
                     "producer_kind: r9700_native",
                     "native_prefill_acceptance: open",
                     "runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIface",
-                    "compute_completion_policy: per-stage",
+                    "compute_completion_policy: terminal",
                     "compute_barrier_policy: full",
                     f"hardware_log_path: {log_path}",
                     f"prefill_npz_path: {out_path}",
@@ -569,7 +573,7 @@ def test_native_worker_rejects_incomplete_full_result_and_removes_output(
             "native_prefill_acceptance": "pass",
             "native_prefill_full_layer_loop_status": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
-            "compute_completion_policy": "per-stage",
+            "compute_completion_policy": "terminal",
             "compute_barrier_policy": "full",
             "hardware_log_path": str(log_path),
             "prefill_npz_path": str(out_path),
@@ -613,7 +617,7 @@ def test_native_worker_rejects_pass_without_explicit_hardware_log_evidence(
             "producer_kind": "r9700_native",
             "native_prefill_acceptance": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
-            "compute_completion_policy": "per-stage",
+            "compute_completion_policy": "terminal",
             "compute_barrier_policy": "full",
             "prefill_npz_path": str(out_path),
             "kernel_count": 4,
@@ -728,7 +732,7 @@ def _run_worker_with_block_metadata(
             "native_prefill_acceptance": "pass",
             "native_prefill_full_layer_loop_status": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
-            "compute_completion_policy": "per-stage",
+            "compute_completion_policy": "terminal",
             "compute_barrier_policy": "full",
             "hardware_log_path": str(log_path),
             "prefill_npz_path": str(out_path),
@@ -869,7 +873,7 @@ def test_native_worker_does_not_parse_required_values_as_block_option(
             "native_prefill_acceptance": "pass",
             "native_prefill_full_layer_loop_status": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
-            "compute_completion_policy": "per-stage",
+            "compute_completion_policy": "terminal",
             "compute_barrier_policy": "full",
             "hardware_log_path": str(log_path),
             "prefill_npz_path": str(out_path),
@@ -915,7 +919,7 @@ def test_native_worker_rejects_oversized_decimal_key_value_evidence_with_cleanup
             "native_prefill_acceptance": "pass",
             "native_prefill_full_layer_loop_status": "pass",
             "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
-            "compute_completion_policy": "per-stage",
+            "compute_completion_policy": "terminal",
             "compute_barrier_policy": "full",
             "hardware_log_path": str(log_path),
             "prefill_npz_path": str(out_path),
@@ -956,7 +960,7 @@ def _strict_success_evidence(out_path: Path, log_path: Path) -> dict[str, object
         "native_prefill_full_layer_loop_status": "pass",
         "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
         "hardware_log_path": str(log_path),
-        "compute_completion_policy": "per-stage",
+        "compute_completion_policy": "terminal",
         "compute_barrier_policy": "full",
         "prefill_npz_path": str(out_path),
         "kernel_count": 4,
@@ -1343,7 +1347,7 @@ def test_native_worker_preserves_effective_policies_on_strict_pass(
 ):
     result, out_path, _ = _run_worker_with_evidence(tmp_path, monkeypatch)
     assert result["native_prefill_acceptance"] == "pass"
-    assert result["compute_completion_policy"] == "per-stage"
+    assert result["compute_completion_policy"] == "terminal"
     assert result["compute_barrier_policy"] == "full"
     assert out_path.is_file()
 
@@ -1351,7 +1355,7 @@ def test_native_worker_preserves_effective_policies_on_strict_pass(
 @pytest.mark.parametrize(
     "override",
     [
-        {"compute_completion_policy": "terminal"},
+        {"compute_completion_policy": "per-stage"},
         {"compute_barrier_policy": "overlap-kv"},
         {"compute_completion_policy": True},
         {"compute_barrier_policy": "Full"},

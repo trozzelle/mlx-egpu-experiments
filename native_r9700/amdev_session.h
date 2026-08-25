@@ -177,7 +177,7 @@ inline const char* compute_barrier_policy_name(ComputeBarrierPolicy policy) {
 struct ResidentHsaBatchOptions {
   bool capture_gpu_timestamps = false;
   ComputeCompletionPolicy completion_policy =
-      ComputeCompletionPolicy::PerStageTimeline;
+      ComputeCompletionPolicy::TerminalTimeline;
   ComputeBarrierPolicy barrier_policy = ComputeBarrierPolicy::Full;
 };
 
