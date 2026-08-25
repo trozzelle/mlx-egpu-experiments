@@ -98,15 +98,15 @@ def _structured_result(completed: subprocess.CompletedProcess[str]) -> dict[str,
     return json.loads(completed.stdout.splitlines()[-1])
 
 
-def test_legacy_prefill_command_defaults_to_single_token_blocks(runner, tmp_path):
-    """Removing the explicit diagnostic override retains the legacy capacity one."""
+def test_prefill_command_defaults_to_four_token_blocks(runner, tmp_path):
+    """Without an explicit diagnostic override, production uses capacity four."""
     completed = _run_prefill(runner, tmp_path, [])
 
     assert completed.returncode == 1
     assert "failure_stage: layer_weight_table" in completed.stdout
-    assert "block_tokens: 1" in completed.stdout
+    assert "block_tokens: 4" in completed.stdout
     assert "block_count: 0" in completed.stdout
-    assert _structured_result(completed)["block_tokens"] == 1
+    assert _structured_result(completed)["block_tokens"] == 4
     assert _structured_result(completed)["block_count"] == 0
 
 

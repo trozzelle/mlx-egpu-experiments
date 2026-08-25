@@ -17,6 +17,7 @@ _PASS_ACCEPTANCE = "pass"
 _DEFAULT_RUNNER_ENV = "NATIVE_R9700_PREFILL_RUNNER"
 _BLOCK_TOKENS_ENV = "NATIVE_R9700_PREFILL_BLOCK_TOKENS"
 _ALLOWED_BLOCK_TOKENS = frozenset({"1", "2", "4", "8", "16", "32"})
+_DEFAULT_LLAMA_PREFILL_BLOCK_TOKENS = 4
 _EXPECTED_RUNTIME_SUBSTRATE = "TinyGPU.app/APLRemotePCIDevice/PCIIface"
 _SELECTED_COMPLETION_POLICY = "terminal"
 _SELECTED_BARRIER_POLICY = "full"
@@ -223,7 +224,7 @@ def _build_runner_command(
 def _configured_block_tokens() -> tuple[int, str | None]:
     block_tokens = os.environ.get(_BLOCK_TOKENS_ENV)
     if block_tokens is None:
-        return 1, None
+        return _DEFAULT_LLAMA_PREFILL_BLOCK_TOKENS, None
     if block_tokens not in _ALLOWED_BLOCK_TOKENS:
         allowed = ", ".join(sorted(_ALLOWED_BLOCK_TOKENS, key=int))
         raise ValueError(
@@ -648,7 +649,7 @@ def _acceptance_problems(
     log_path: Path,
     expected_n_prefix: int,
     expected_model: str,
-    expected_block_tokens: int = 1,
+    expected_block_tokens: int = _DEFAULT_LLAMA_PREFILL_BLOCK_TOKENS,
     expected_completion_policy: str = _SELECTED_COMPLETION_POLICY,
     expected_barrier_policy: str = _SELECTED_BARRIER_POLICY,
 ) -> list[str]:
@@ -763,7 +764,7 @@ def _open_result(
         "prefill_npz_path": "",
         "kernel_count": 0,
         "transfer_bytes": 0,
-        "block_tokens": 1,
+        "block_tokens": _DEFAULT_LLAMA_PREFILL_BLOCK_TOKENS,
         "block_count": 0,
         "failure_stage": failure_stage,
         "exit_status": int(exit_status),

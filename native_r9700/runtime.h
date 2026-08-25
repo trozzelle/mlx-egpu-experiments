@@ -63,6 +63,7 @@ inline constexpr uint32_t kTransferByteCount = 8U * sizeof(uint32_t);  // 32 byt
 inline constexpr uint64_t kLayerSliceTransferByteCount = 5ULL * 2048ULL * sizeof(uint16_t);
 inline constexpr uint64_t kTransferProofChunkByteCount = 0x1000ULL;
 inline constexpr uint64_t kMaxTransferProofByteCount = 64ULL * 1024ULL * 1024ULL;
+inline constexpr uint32_t kDefaultLlamaPrefillBlockTokens = 4U;
 inline constexpr const char* kFirstPrimitiveName = "fp32_add_scalar";
 inline constexpr const char* kFirstPrimitiveSourceId = "c1r5-fp32-add-scalar-v1";
 inline constexpr const char* kFirstPrimitiveBackend = "hardware";
@@ -6250,7 +6251,7 @@ struct NativePrefillRequest {
   ComputeCompletionPolicy compute_completion_policy =
       ComputeCompletionPolicy::TerminalTimeline;
   ComputeBarrierPolicy compute_barrier_policy = ComputeBarrierPolicy::Full;
-  uint32_t block_tokens = 1;
+  uint32_t block_tokens = kDefaultLlamaPrefillBlockTokens;
 };
 
 struct GpuStageProfileSample {
@@ -6269,7 +6270,7 @@ struct NativePrefillResult {
       ComputeCompletionPolicy::TerminalTimeline;
   ComputeBarrierPolicy compute_barrier_policy = ComputeBarrierPolicy::Full;
   uint64_t kernel_count = 0;
-  uint32_t block_tokens = 1;
+  uint32_t block_tokens = kDefaultLlamaPrefillBlockTokens;
   uint32_t block_count = 0;
   uint64_t transfer_bytes = 0;
   // These fields make a non-accepting result actionable without attributing

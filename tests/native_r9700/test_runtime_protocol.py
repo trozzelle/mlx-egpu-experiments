@@ -27,6 +27,7 @@ RUNNER_SOURCES = [
     Path("native_r9700/amdev_session.cpp"),
     Path("native_r9700/kernel_catalog.cpp"),
     Path("native_r9700/device_memory.cpp"),
+    Path("native_r9700/hardware_lock.cpp"),
     Path("native_r9700/llama_stage_layout.cpp"),
     Path("native_r9700/llama_layer_executor.cpp"),
     Path("native_r9700/kernel_assets.cpp"),
@@ -625,9 +626,9 @@ def test_native_prefill_proof_redacts_token_ids_from_stdout_and_hardware_log(
     assert "token_ids_json: <redacted>" in log_text
     assert "[1,2,3]" not in log_text
     assert "gpu_stage_profile_sample_count: 0" in completed.stdout
-    assert "block_tokens: 1" in completed.stdout
+    assert "block_tokens: 4" in completed.stdout
     assert "block_count: 0" in completed.stdout
-    assert "block_tokens: 1" in log_text
+    assert "block_tokens: 4" in log_text
     assert "block_count: 0" in log_text
 
 

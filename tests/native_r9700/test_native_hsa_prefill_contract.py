@@ -32,6 +32,7 @@ RUNNER_SOURCES = (
     Path("native_r9700/amdev_session.cpp"),
     Path("native_r9700/kernel_catalog.cpp"),
     Path("native_r9700/device_memory.cpp"),
+    Path("native_r9700/hardware_lock.cpp"),
     Path("native_r9700/runtime.cpp"),
     Path("native_r9700/runner.cpp"),
 )
@@ -45,6 +46,7 @@ _HSA_PREFILL_HELP = (
     "--out <npz> --log <path>"
 )
 _HSA_PREFILL_DESCRIPTION = "16-layer streamed HSA Llama prefill"
+_HSA_BLOCK_DEFAULT_HELP = "--block-tokens 1|2|4|8|16|32] (default: 4)"
 
 # These fields are a hardware-attested boundary, not a claim inferred from a
 # syntactically valid NPZ.  A consumer can require this complete result before
@@ -256,3 +258,4 @@ def test_help_advertises_streamed_hsa_prefill_without_opening_tinygpu(
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert _HSA_PREFILL_HELP in completed.stdout
     assert _HSA_PREFILL_DESCRIPTION in completed.stdout
+    assert _HSA_BLOCK_DEFAULT_HELP in completed.stdout

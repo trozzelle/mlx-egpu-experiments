@@ -57,7 +57,8 @@ void print_help(const char* argv0) {
   std::printf("                         run only an explicitly injected historical primitive executable\n");
   std::printf("                         (requires NATIVE_R9700_C1_PRIMITIVE_BRIDGE; not a product proof)\n");
   std::printf("  --native-prefill-proof --model <mlx-model-dir> --token-ids-json '[...]' --out <npz> --log <path>\\\n");
-  std::printf("      [--gpu-stage-profile] [--completion-policy per-stage|terminal] [--barrier-policy full|overlap-kv] [--block-tokens 1|2|4|8|16|32]\n");
+  std::printf("      [--gpu-stage-profile] [--completion-policy per-stage|terminal] [--barrier-policy full|overlap-kv] [--block-tokens 1|2|4|8|16|32] (default: %u)\n",
+              native_r9700::kDefaultLlamaPrefillBlockTokens);
   std::printf("                         16-layer streamed HSA Llama prefill; optional diagnostic GPU policies\n");
   std::printf("  --llama-stage-trace --model <dir> --token-id <uint32> --layer 0 --position 0 \\\n");
   std::printf("      --stage <boundary> --trace-dir <dir> [--rmsnorm-unit-scale [--rmsnorm-zero-input [--rmsnorm-output-sentinel [--rmsnorm-zero-store]]]]\n");
