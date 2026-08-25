@@ -110,7 +110,10 @@ def run_native_prefill(
 
     out_path = Path(out_npz)
     log = Path(log_path)
-    command = _build_runner_command(model_dir, token_ids, out_path, log)
+    expected_block_tokens, block_tokens_override = _configured_block_tokens()
+    command = _build_runner_command_with_override(
+        model_dir, token_ids, out_path, log, block_tokens_override
+    )
     try:
         completed = subprocess.run(command, capture_output=True, text=True, check=False)
     except OSError as exc:
@@ -125,7 +128,6 @@ def run_native_prefill(
         return result
 
     parsed = _parse_worker_result(completed.stdout, completed.stderr, log)
-    expected_block_tokens = _command_block_tokens(command)
     result = _normalize_result(
         parsed,
         completed.returncode,
@@ -147,6 +149,31 @@ def _build_runner_command(
     out_npz: Path,
     log_path: Path,
 ) -> list[str]:
+    _, block_tokens_override = _configured_block_tokens()
+    return _build_runner_command_with_override(
+        model_dir, token_ids, out_npz, log_path, block_tokens_override
+    )
+
+
+def _configured_block_tokens() -> tuple[int, str | None]:
+    block_tokens = os.environ.get(_BLOCK_TOKENS_ENV)
+    if block_tokens is None:
+        return 1, None
+    if block_tokens not in _ALLOWED_BLOCK_TOKENS:
+        allowed = ", ".join(sorted(_ALLOWED_BLOCK_TOKENS, key=int))
+        raise ValueError(
+            f"{_BLOCK_TOKENS_ENV} must be one of {allowed}, got {block_tokens!r}"
+        )
+    return int(block_tokens), block_tokens
+
+
+def _build_runner_command_with_override(
+    model_dir: str,
+    token_ids: Sequence[int],
+    out_npz: Path,
+    log_path: Path,
+    block_tokens_override: str | None,
+) -> list[str]:
     runner = os.environ.get(_DEFAULT_RUNNER_ENV)
     if not runner:
         runner = str(Path(__file__).with_name("runner"))
@@ -162,22 +189,9 @@ def _build_runner_command(
         "--log",
         str(log_path),
     ]
-    block_tokens = os.environ.get(_BLOCK_TOKENS_ENV)
-    if block_tokens is not None:
-        if block_tokens not in _ALLOWED_BLOCK_TOKENS:
-            allowed = ", ".join(sorted(_ALLOWED_BLOCK_TOKENS, key=int))
-            raise ValueError(
-                f"{_BLOCK_TOKENS_ENV} must be one of {allowed}, got {block_tokens!r}"
-            )
-        command.extend(["--block-tokens", block_tokens])
+    if block_tokens_override is not None:
+        command.extend(["--block-tokens", block_tokens_override])
     return command
-
-
-def _command_block_tokens(command: Sequence[str]) -> int:
-    for index in range(2, len(command) - 1):
-        if command[index] == "--block-tokens":
-            return int(command[index + 1])
-    return 1
 
 def validate_native_prefill_npz(
     path: os.PathLike[str] | str,
@@ -304,7 +318,15 @@ def _parse_key_value_text(text: str) -> dict[str, object]:
             continue
         key = key.strip()
         if key in _PARSED_FIELDS:
-            result[key] = value.strip()
+            stripped_value = value.strip()
+            if (
+                key in {"block_tokens", "block_count"}
+                and stripped_value.isascii()
+                and stripped_value.isdecimal()
+            ):
+                result[key] = int(stripped_value)
+            else:
+                result[key] = stripped_value
     return result
 
 
@@ -328,8 +350,8 @@ def _normalize_result(
         "prefill_npz_path": _string_field(parsed, "prefill_npz_path", ""),
         "kernel_count": _int_field(parsed, "kernel_count", 0),
         "transfer_bytes": _int_field(parsed, "transfer_bytes", 0),
-        "block_tokens": _int_field(parsed, "block_tokens", 0),
-        "block_count": _int_field(parsed, "block_count", 0),
+        "block_tokens": parsed.get("block_tokens"),
+        "block_count": parsed.get("block_count"),
         "failure_stage": _string_field(parsed, "failure_stage", ""),
         "exit_status": _int_field(parsed, "exit_status", int(runner_exit_status)),
         "failure_text": _string_field(parsed, "failure_text", ""),
@@ -402,8 +424,11 @@ def _acceptance_problems(
     if int(result["transfer_bytes"]) <= 0:
         problems.append("missing nonzero transfer_bytes hardware evidence")
         metadata_accepts = False
-    reported_block_tokens = _int_field(result, "block_tokens", 0)
-    if reported_block_tokens != expected_block_tokens:
+    reported_block_tokens = result.get("block_tokens")
+    if type(reported_block_tokens) is not int:
+        problems.append("reported block_tokens must be an exact integer")
+        metadata_accepts = False
+    elif reported_block_tokens != expected_block_tokens:
         problems.append(
             f"reported block_tokens={reported_block_tokens} does not match "
             f"requested block_tokens={expected_block_tokens}"
@@ -412,8 +437,11 @@ def _acceptance_problems(
     expected_block_count = (
         expected_n_prefix + expected_block_tokens - 1
     ) // expected_block_tokens
-    reported_block_count = _int_field(result, "block_count", 0)
-    if reported_block_count != expected_block_count:
+    reported_block_count = result.get("block_count")
+    if type(reported_block_count) is not int:
+        problems.append("reported block_count must be an exact integer")
+        metadata_accepts = False
+    elif reported_block_count != expected_block_count:
         problems.append(
             f"reported block_count={reported_block_count} does not match "
             f"expected block_count={expected_block_count}"

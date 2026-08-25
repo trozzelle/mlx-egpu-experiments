@@ -653,6 +653,9 @@ def test_native_worker_rejects_invalid_block_capacity_before_subprocess(
     assert runner_calls == []
 
 
+_MISSING_BLOCK_EVIDENCE = object()
+
+
 def _run_worker_with_block_metadata(
     tmp_path,
     monkeypatch,
@@ -678,11 +681,13 @@ def _run_worker_with_block_metadata(
             "prefill_npz_path": str(out_path),
             "kernel_count": 4,
             "transfer_bytes": 4096,
-            "block_tokens": reported_block_tokens,
-            "block_count": reported_block_count,
             "failure_stage": "",
             "exit_status": 0,
         }
+        if reported_block_tokens is not _MISSING_BLOCK_EVIDENCE:
+            evidence["block_tokens"] = reported_block_tokens
+        if reported_block_count is not _MISSING_BLOCK_EVIDENCE:
+            evidence["block_count"] = reported_block_count
         log_path.write_text("hardware log\n", encoding="utf-8")
         return subprocess.CompletedProcess(
             argv, 0, stdout=json.dumps(evidence), stderr=""
@@ -744,3 +749,96 @@ def test_native_worker_rejects_reported_block_count_that_differs_from_partition(
         in result["failure_text"]
     )
     assert not out_path.exists()
+
+
+@pytest.mark.parametrize(
+    "reported_block_tokens",
+    [True, 1.0, "1", _MISSING_BLOCK_EVIDENCE],
+    ids=("boolean", "fractional", "numeric-string", "missing"),
+)
+def test_native_worker_rejects_non_integer_block_tokens_evidence(
+    tmp_path, monkeypatch, reported_block_tokens
+):
+    result, out_path = _run_worker_with_block_metadata(
+        tmp_path,
+        monkeypatch,
+        token_ids=[1, 2, 3],
+        reported_block_tokens=reported_block_tokens,
+        reported_block_count=3,
+    )
+
+    assert result["native_prefill_acceptance"] == "open"
+    assert result["failure_stage"] == "worker_result_validation"
+    assert "reported block_tokens must be an exact integer" in result["failure_text"]
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize(
+    "reported_block_count",
+    [True, 1.0, "1", _MISSING_BLOCK_EVIDENCE],
+    ids=("boolean", "fractional", "numeric-string", "missing"),
+)
+def test_native_worker_rejects_non_integer_block_count_evidence(
+    tmp_path, monkeypatch, reported_block_count
+):
+    result, out_path = _run_worker_with_block_metadata(
+        tmp_path,
+        monkeypatch,
+        token_ids=[1, 2, 3],
+        reported_block_tokens=8,
+        reported_block_count=reported_block_count,
+        configured_block_tokens=8,
+    )
+
+    assert result["native_prefill_acceptance"] == "open"
+    assert result["failure_stage"] == "worker_result_validation"
+    assert "reported block_count must be an exact integer" in result["failure_text"]
+    assert not out_path.exists()
+
+
+@pytest.mark.parametrize("required_field", ["model", "out", "log"])
+def test_native_worker_does_not_parse_required_values_as_block_option(
+    tmp_path, monkeypatch, required_field
+):
+    from native_r9700 import native_worker
+
+    monkeypatch.chdir(tmp_path)
+    model_dir = "--block-tokens" if required_field == "model" else "synthetic-model"
+    out_path = Path("--block-tokens" if required_field == "out" else "out.npz")
+    log_path = Path("--block-tokens" if required_field == "log" else "run.log")
+
+    def fake_run(argv, capture_output, text, check):
+        _write_native_prefill_npz(out_path, n_prefix=2, model=model_dir)
+        if not out_path.exists():
+            Path(f"{out_path}.npz").replace(out_path)
+        evidence = {
+            "producer_kind": "r9700_native",
+            "native_prefill_acceptance": "pass",
+            "native_prefill_full_layer_loop_status": "pass",
+            "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+            "hardware_log_path": str(log_path),
+            "prefill_npz_path": str(out_path),
+            "kernel_count": 4,
+            "transfer_bytes": 4096,
+            "block_tokens": 1,
+            "block_count": 2,
+            "failure_stage": "",
+            "exit_status": 0,
+        }
+        log_path.write_text("hardware log\n", encoding="utf-8")
+        return subprocess.CompletedProcess(
+            argv, 0, stdout=json.dumps(evidence), stderr=""
+        )
+
+    monkeypatch.setenv(
+        "NATIVE_R9700_PREFILL_RUNNER", "/tmp/fake-native-prefill-runner"
+    )
+    monkeypatch.delenv("NATIVE_R9700_PREFILL_BLOCK_TOKENS", raising=False)
+    monkeypatch.setattr(native_worker.subprocess, "run", fake_run)
+
+    result = native_worker.run_native_prefill(
+        model_dir, [1, 2], out_path, log_path
+    )
+
+    assert result["native_prefill_acceptance"] == "pass", result["failure_text"]
+    assert out_path.is_file()
