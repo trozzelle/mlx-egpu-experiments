@@ -1,5 +1,8 @@
 {
   "descriptor_offset": 1792,
+  "descriptor_rsrc1": 3222208515,
+  "descriptor_rsrc2": 132,
+  "descriptor_rsrc3": 320,
   "elf_admission": {
     "admitted_allocated_sections": [
       ".note",
@@ -132,7 +135,7 @@
   "name": "llama_gate_up_projection_f16",
   "private_segment_bytes": 0,
   "rsrc1": 3222208515,
-  "rsrc2": 132,
+  "rsrc2": 295044,
   "rsrc3": 320,
   "source_path": "native_r9700/kernels/llama_gate_up_projection_f16.cpp",
   "source_sha256": "bdd37d4fc61cc62519b7e541eef73a5bbc0597fc738ecc0a6c3914ced8db7f3b",

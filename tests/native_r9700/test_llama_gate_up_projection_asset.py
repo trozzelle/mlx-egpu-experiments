@@ -68,9 +68,20 @@ def test_gate_up_asset_is_digest_bound_and_uses_exact_compiler_descriptor() -> N
     assert manifest["entry_offset"] == descriptor_offset + struct.unpack_from(
         "<q", image, descriptor_offset + 16
     )[0]
-    for name, offset in (("rsrc3", 44), ("rsrc1", 48), ("rsrc2", 52)):
-        assert manifest[name] == struct.unpack_from("<I", image, descriptor_offset + offset)[0]
-        assert manifest[name] > 0
+    raw_resources = {
+        "descriptor_rsrc3": struct.unpack_from("<I", image, descriptor_offset + 44)[0],
+        "descriptor_rsrc1": struct.unpack_from("<I", image, descriptor_offset + 48)[0],
+        "descriptor_rsrc2": struct.unpack_from("<I", image, descriptor_offset + 52)[0],
+    }
+    for name, value in raw_resources.items():
+        assert manifest[name] == value
+        assert value > 0
+    assert manifest["rsrc1"] == raw_resources["descriptor_rsrc1"]
+    assert manifest["rsrc3"] == raw_resources["descriptor_rsrc3"]
+    lds_size = ((manifest["group_segment_bytes"] + 511) // 512) & 0x1FF
+    assert lds_size == 9
+    assert manifest["rsrc2"] == raw_resources["descriptor_rsrc2"] | (lds_size << 15)
+    assert manifest["rsrc2"] == 0x00048084
 
 
 def test_kernel_asset_manifest_uses_generated_gate_up_digest_and_lds_bytes() -> None:

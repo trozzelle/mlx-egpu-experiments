@@ -1023,9 +1023,9 @@ def _descriptor(
         raise GenerationError("kernel descriptor exceeds the image")
     group, private, kernarg = struct.unpack_from("<IIQ", image, descriptor_offset)
     delta = struct.unpack_from("<q", image, descriptor_offset + 16)[0]
-    rsrc3 = struct.unpack_from("<I", image, descriptor_offset + 44)[0]
-    rsrc1 = struct.unpack_from("<I", image, descriptor_offset + 48)[0]
-    rsrc2 = struct.unpack_from("<I", image, descriptor_offset + 52)[0]
+    descriptor_rsrc3 = struct.unpack_from("<I", image, descriptor_offset + 44)[0]
+    descriptor_rsrc1 = struct.unpack_from("<I", image, descriptor_offset + 48)[0]
+    descriptor_rsrc2 = struct.unpack_from("<I", image, descriptor_offset + 52)[0]
     properties, preload = struct.unpack_from("<HH", image, descriptor_offset + 56)
     if kernarg != compiler_kernarg_bytes:
         raise GenerationError("AMDHSA descriptor kernarg size disagrees with the reviewed ABI")
@@ -1039,19 +1039,29 @@ def _descriptor(
         raise GenerationError("AMDHSA descriptor has unexpected kernel-code properties")
     if descriptor_offset + delta != entry_offset:
         raise GenerationError("AMDHSA descriptor entry delta disagrees with the kernel symbol")
-    if any(value <= 0 for value in (rsrc1, rsrc2, rsrc3)):
+    if any(
+        value <= 0
+        for value in (descriptor_rsrc1, descriptor_rsrc2, descriptor_rsrc3)
+    ):
         raise GenerationError("AMDHSA descriptor resources must be positive")
     if kernarg != kernarg_schema["bytes"]:
         struct.pack_into("<I", image, descriptor_offset + 8, kernarg_schema["bytes"])
+    # Match Tinygrad AMDProgram: PM4 needs the 512-byte LDS allocation count in
+    # COMPUTE_PGM_RSRC2 even though COMGR leaves that field clear in the descriptor.
+    lds_size = ((group + 511) // 512) & 0x1FF
+    dispatch_rsrc2 = descriptor_rsrc2 | (lds_size << 15)
     return {
         "group_segment_bytes": group,
         "private_segment_bytes": private,
         "kernarg_bytes": kernarg_schema["bytes"],
         "kernel_code_properties": properties,
         "kernarg_preload_bytes": preload,
-        "rsrc1": rsrc1,
-        "rsrc2": rsrc2,
-        "rsrc3": rsrc3,
+        "descriptor_rsrc1": descriptor_rsrc1,
+        "descriptor_rsrc2": descriptor_rsrc2,
+        "descriptor_rsrc3": descriptor_rsrc3,
+        "rsrc1": descriptor_rsrc1,
+        "rsrc2": dispatch_rsrc2,
+        "rsrc3": descriptor_rsrc3,
     }
 
 

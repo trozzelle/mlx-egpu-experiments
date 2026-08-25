@@ -507,13 +507,16 @@ def test_fresh_embed_row_source_generates_a_page_layout_preserving_hsa_image(
     assert struct.unpack_from("<H", image, descriptor_offset + 56)[0] == 0x408
     assert struct.unpack_from("<H", image, descriptor_offset + 58)[0] == 0
     descriptor_resources = {
-        "rsrc1": struct.unpack_from("<I", image, descriptor_offset + 48)[0],
-        "rsrc2": struct.unpack_from("<I", image, descriptor_offset + 52)[0],
-        "rsrc3": struct.unpack_from("<I", image, descriptor_offset + 44)[0],
+        "descriptor_rsrc1": struct.unpack_from("<I", image, descriptor_offset + 48)[0],
+        "descriptor_rsrc2": struct.unpack_from("<I", image, descriptor_offset + 52)[0],
+        "descriptor_rsrc3": struct.unpack_from("<I", image, descriptor_offset + 44)[0],
     }
     for resource, value in descriptor_resources.items():
         assert manifest[resource] == value
         assert value > 0
+    assert manifest["rsrc1"] == descriptor_resources["descriptor_rsrc1"]
+    assert manifest["rsrc2"] == descriptor_resources["descriptor_rsrc2"]
+    assert manifest["rsrc3"] == descriptor_resources["descriptor_rsrc3"]
 
 
 @pytest.mark.parametrize(
@@ -674,8 +677,11 @@ def test_descriptor_requires_exact_expected_group_segment_bytes() -> None:
         "kernarg_bytes": 56,
         "kernel_code_properties": 0x408,
         "kernarg_preload_bytes": 0,
+        "descriptor_rsrc1": 0xC00F0002,
+        "descriptor_rsrc2": 0x184,
+        "descriptor_rsrc3": 0x90,
         "rsrc1": 0xC00F0002,
-        "rsrc2": 0x184,
+        "rsrc2": 0x48184,
         "rsrc3": 0x90,
     }
 
