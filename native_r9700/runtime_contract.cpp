@@ -758,7 +758,7 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
     ScopedPhaseUsec timer(&result->phase_timers.dispatch_build_inclusive_usec);
     persistent_dispatch_ok =
         build_llama_persistent_dispatch(weight_table,
-                                        static_cast<uint32_t>(request.token_ids.size()),
+                                        static_cast<uint32_t>(request.token_ids.size()), 1U,
                                         &persistent_dispatch, &detail);
   }
   if (!persistent_dispatch_ok) {
@@ -840,21 +840,22 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
     return true;
   };
 
-  // Layer-major execution: every request token's raw embedding row is uploaded
-  // into its own resident hidden window once, then each layer streams its nine
-  // weight windows exactly once and dispatches all tokens through the nine
-  // stage kernels in causal order. Per-token scratch buffers are fully
-  // rewritten by each token's stage sequence before use; K/V caches accumulate
-  // per layer across tokens in position order.
+  // Layer-major execution: each request block's raw embedding rows are
+  // uploaded into its contiguous hidden window once. Each layer then streams
+  // its nine weight windows once and dispatches blocks in causal order. K/V
+  // caches accumulate per layer across blocks; this runtime cutover keeps
+  // block capacity at one until multi-row embedding upload is available.
   bool embedding_upload_ok = true;
   {
     ScopedPhaseUsec timer(&result->phase_timers.embedding_upload_inclusive_usec);
-    for (uint32_t token = 0; token < request.token_ids.size(); ++token) {
+    for (const LlamaTokenBlock& block : persistent_dispatch.token_blocks) {
       Fp16WeightSpan embedding_row;
-      if (!select_llama_embedding_row(weight_table.embed_tokens, request.token_ids[token],
+      if (!select_llama_embedding_row(weight_table.embed_tokens,
+                                      request.token_ids[block.position],
                                       &embedding_row, &detail) ||
-          !upload_span("token=" + std::to_string(token) + " embedding_row",
-                       persistent_dispatch.hidden_buffers[token], embedding_row)) {
+          !upload_span("block_position=" + std::to_string(block.position) +
+                           " embedding_row",
+                       block.hidden_buffer_index, embedding_row)) {
         embedding_upload_ok = false;
         break;
       }
@@ -897,29 +898,30 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
       return 1;
     }
     int compute_failure = 0;
-    uint32_t failed_token = 0;
+    uint32_t failed_position = 0;
     {
       ScopedPhaseUsec timer(&result->phase_timers.compute_loop_inclusive_usec);
-      for (uint32_t token = 0; token < request.token_ids.size(); ++token) {
-        if (!set_llama_token_stage_scalars(&persistent_dispatch.layer_stages[layer], token,
-                                           &detail) ||
-            !set_llama_token_hidden_buffer(&persistent_dispatch.layer_stages[layer],
-                                           persistent_dispatch.hidden_binding_slots,
-                                           persistent_dispatch.hidden_buffers[token], &detail)) {
+      for (const LlamaTokenBlock& block : persistent_dispatch.token_blocks) {
+        if (!set_llama_block_stage_state(&persistent_dispatch.layer_stages[layer],
+                                         persistent_dispatch.hidden_binding_slots,
+                                         block, persistent_dispatch.block_capacity,
+                                         &detail)) {
           compute_failure = 1;
-          failed_token = token;
+          failed_position = block.position;
           break;
         }
-        log_progress("layer=" + std::to_string(layer) + " token=" + std::to_string(token) +
+        log_progress("layer=" + std::to_string(layer) +
+                     " block_position=" + std::to_string(block.position) +
                      " dispatch_batch_begin stages=" +
                      std::to_string(persistent_dispatch.layer_stages[layer].size()));
         if (!resident.dispatch_batch(persistent_dispatch.layer_stages[layer],
                                      &dispatch_result, &detail)) {
           compute_failure = 2;
-          failed_token = token;
+          failed_position = block.position;
           break;
         }
-        log_progress("layer=" + std::to_string(layer) + " token=" + std::to_string(token) +
+        log_progress("layer=" + std::to_string(layer) +
+                     " block_position=" + std::to_string(block.position) +
                      " dispatch_batch_complete count=" +
                      std::to_string(dispatch_result.pm4_dispatch_count));
       }
@@ -927,15 +929,15 @@ int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult*
     if (compute_failure == 1) {
       std::string close_error;
       close_resident_and_snapshot(&close_error);
-      log_progress("resident_token_stage_scalars failed " + detail);
-      fail(result, "resident_token_stage_scalars", detail, error_text);
+      log_progress("resident_block_stage_state failed " + detail);
+      fail(result, "resident_block_stage_state", detail, error_text);
       return 1;
     }
     if (compute_failure == 2) {
       std::string close_error;
       close_resident_and_snapshot(&close_error);
       const std::string failure = "layer=" + std::to_string(layer) +
-          " token=" + std::to_string(failed_token) +
+          " block_position=" + std::to_string(failed_position) +
           " backend_failure_stage=" + dispatch_result.failure_stage + ": " + detail;
       log_progress("resident_dispatch_batch failed " + failure);
       fail(result, "resident_dispatch_batch", failure, error_text);

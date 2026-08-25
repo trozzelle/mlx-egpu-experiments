@@ -84,18 +84,23 @@ struct LlamaSharedResidentBufferIndices {
 };
 
 
+struct LlamaTokenBlock {
+  uint32_t hidden_buffer_index = 0;
+  uint32_t position = 0;
+  uint32_t token_count = 0;
+};
+
 struct LlamaPersistentDispatch {
   ResidentHsaDispatch request;
   std::vector<HsaCodeImageAsset> images;
   std::vector<LlamaLayerResidentBufferIndices> layer_buffers;
   LlamaLayerWeightTable layer_weight_metadata;
   LlamaSharedResidentBufferIndices shared_buffers;
-  // One 4096-byte raw hidden window per request token ("llama.hidden.t<i>").
-  // Layer-major execution retargets the hidden kernarg binding per token so
-  // layer weights stream exactly once per layer instead of once per token.
-  std::vector<uint32_t> hidden_buffers;
+  uint32_t block_capacity = 1;
+  // Each request block owns one contiguous hidden allocation at its base VA.
+  std::vector<LlamaTokenBlock> token_blocks;
   // (stage index, kernarg binding slot) pairs whose buffer index names the
-  // per-token hidden window: stage 0 slot 0, stage 7 slot 2, stage 9 slot 4.
+  // active block hidden window: stage 0 slot 0, stage 7 slot 2, stage 9 slot 4.
   std::vector<std::pair<uint32_t, uint32_t>> hidden_binding_slots;
   std::vector<uint32_t> k_cache_buffers;
   std::vector<uint32_t> v_cache_buffers;
@@ -103,21 +108,22 @@ struct LlamaPersistentDispatch {
 };
 
 // Builds the layer-major persistent dispatch for one prefill request.
-// token_count must be in [1, kLlamaResidentCacheCapacityTokens]; longer
-// prompts fail closed until the attention kernel assets raise their
-// kMaximumPrefixTokens bound.
+// token_count and block_capacity must be in
+// [1, kLlamaResidentCacheCapacityTokens].
 bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
                                      uint32_t token_count,
+                                     uint32_t block_capacity,
                                      LlamaPersistentDispatch* dispatch,
                                      std::string* error_text);
 
-// Retargets only the hidden-window kernarg bindings of one layer's stage
-// group at the given per-token hidden buffer index. Weight, cache, and
-// scratch bindings are never modified.
-bool set_llama_token_hidden_buffer(
+// Retargets the hidden operands and rewrites every block-dependent scalar and
+// workgroup count. Weight, cache, and scratch bindings are never modified.
+bool set_llama_block_stage_state(
     std::vector<ResidentHsaStage>* stages,
     const std::vector<std::pair<uint32_t, uint32_t>>& hidden_binding_slots,
-    uint32_t hidden_buffer_index, std::string* error_text);
+    const LlamaTokenBlock& block,
+    uint32_t block_capacity,
+    std::string* error_text);
 
 // Selects one 2048-element F16 embedding row by token without decoding it.
 // The returned span remains file-backed and is suitable only for raw upload.
@@ -136,10 +142,6 @@ bool build_llama_layer0_stage_trace_dispatch(const std::string& model_dir, uint3
                                              ResidentHsaDispatch* dispatch,
                                              std::string* error_text);
 
-// Rewrites the dynamic RoPE and attention scalar fields for a single-token
-// stage group. Cache capacity stays at the resident 128-token stride.
-bool set_llama_token_stage_scalars(std::vector<ResidentHsaStage>* stages, uint32_t position,
-                                   std::string* error_text);
 
 // Rejects invalid layer-only evidence, including fixture-sourced intermediates.
 bool validate_layer_execution_evidence(const LayerExecutionEvidence& evidence,

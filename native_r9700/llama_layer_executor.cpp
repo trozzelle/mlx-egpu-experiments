@@ -314,49 +314,84 @@ bool select_llama_embedding_row(const Fp16WeightSpan& embed_tokens, uint32_t tok
 }
 
 
-bool set_llama_token_hidden_buffer(
+bool set_llama_block_stage_state(
     std::vector<ResidentHsaStage>* stages,
     const std::vector<std::pair<uint32_t, uint32_t>>& hidden_binding_slots,
-    uint32_t hidden_buffer_index, std::string* error_text) {
-  if (stages == nullptr) return fail(error_text, "Llama stage group is required");
+    const LlamaTokenBlock& block,
+    uint32_t block_capacity,
+    std::string* error_text) {
+  if (stages == nullptr || stages->size() != kLlamaStageAssetConfigs.size()) {
+    return fail(error_text, "complete Llama block stage group is required");
+  }
+  if (block_capacity == 0 ||
+      block_capacity > kLlamaResidentCacheCapacityTokens) {
+    return fail(error_text, "Llama block capacity is outside the supported range");
+  }
+  if (block.token_count == 0 || block.token_count > block_capacity) {
+    return fail(error_text, "Llama block token count exceeds block capacity");
+  }
+  if (block.position > kLlamaCacheCapacityTokens - block.token_count) {
+    return fail(error_text, "Llama block range exceeds resident cache capacity");
+  }
+
+  struct ScalarOffset {
+    size_t stage_index;
+    size_t byte_offset;
+  };
+  constexpr std::array<ScalarOffset, 9> kSequenceLengthOffsets = {{
+      {1, 24}, {2, 24}, {3, 32}, {4, 32}, {5, 16}, {6, 24},
+      {7, 32}, {8, 48}, {9, 40},
+  }};
+  struct CacheScalarOffsets {
+    size_t stage_index;
+    size_t position;
+    size_t cache_capacity;
+  };
+  constexpr std::array<CacheScalarOffsets, 4> kCacheScalarOffsets = {{
+      {3, 36, 40},
+      {4, 36, 40},
+      {5, 20, 24},
+      {6, 28, 32},
+  }};
+  constexpr std::array<uint32_t, 10> kSingleTokenGlobalX = {{
+      1, 8, 8, 8, 32, 32, 32, 32, 128, 32,
+  }};
+
   for (const auto& slot : hidden_binding_slots) {
     if (slot.first >= stages->size() ||
         slot.second >= (*stages)[slot.first].kernarg_bindings.size()) {
       return fail(error_text, "hidden binding slot is outside the Llama stage group");
     }
-    (*stages)[slot.first].kernarg_bindings[slot.second].buffer_index = hidden_buffer_index;
   }
-  return true;
-}
-
-bool set_llama_token_stage_scalars(std::vector<ResidentHsaStage>* stages, uint32_t position,
-                                   std::string* error_text) {
-  if (stages == nullptr || stages->size() != kLlamaStageAssetConfigs.size()) {
-    return fail(error_text, "complete Llama token stage group is required");
-  }
-  if (position >= kLlamaCacheCapacityTokens) {
-    return fail(error_text, "token position exceeds resident Llama cache capacity");
-  }
-  struct DynamicScalarOffsets {
-    size_t stage_index;
-    size_t sequence_length;
-    size_t position;
-    size_t cache_capacity;
-  };
-  constexpr std::array<DynamicScalarOffsets, 4> kDynamicScalarOffsets = {{
-      {3, 32, 36, 40},
-      {4, 32, 36, 40},
-      {5, 16, 20, 24},
-      {6, 24, 28, 32},
-  }};
-  for (const DynamicScalarOffsets& offsets : kDynamicScalarOffsets) {
-    ResidentHsaStage& stage = (*stages)[offsets.stage_index];
-    if (stage.kernargs.size() < offsets.cache_capacity + sizeof(uint32_t)) {
-      return fail(error_text, "Llama token stage lacks dynamic scalar kernargs");
+  for (const ScalarOffset& offset : kSequenceLengthOffsets) {
+    if ((*stages)[offset.stage_index].kernargs.size() <
+        offset.byte_offset + sizeof(uint32_t)) {
+      return fail(error_text, "Llama block stage lacks sequence-length kernargs");
     }
-    store_u32_le(&stage.kernargs, offsets.sequence_length, 1);
-    store_u32_le(&stage.kernargs, offsets.position, position);
-    store_u32_le(&stage.kernargs, offsets.cache_capacity, kLlamaCacheCapacityTokens);
+  }
+  for (const CacheScalarOffsets& offsets : kCacheScalarOffsets) {
+    const size_t required = offsets.cache_capacity + sizeof(uint32_t);
+    if ((*stages)[offsets.stage_index].kernargs.size() < required) {
+      return fail(error_text, "Llama block stage lacks cache scalar kernargs");
+    }
+  }
+
+  for (const auto& slot : hidden_binding_slots) {
+    (*stages)[slot.first].kernarg_bindings[slot.second].buffer_index =
+        block.hidden_buffer_index;
+  }
+  for (const ScalarOffset& offset : kSequenceLengthOffsets) {
+    store_u32_le(&(*stages)[offset.stage_index].kernargs, offset.byte_offset,
+                 block.token_count);
+  }
+  for (const CacheScalarOffsets& offsets : kCacheScalarOffsets) {
+    ResidentHsaStage& stage = (*stages)[offsets.stage_index];
+    store_u32_le(&stage.kernargs, offsets.position, block.position);
+    store_u32_le(&stage.kernargs, offsets.cache_capacity,
+                 kLlamaCacheCapacityTokens);
+  }
+  for (size_t stage = 0; stage < stages->size(); ++stage) {
+    (*stages)[stage].global_x = kSingleTokenGlobalX[stage] * block.token_count;
   }
   return true;
 }
@@ -432,18 +467,26 @@ bool build_llama_layer0_stage_trace_dispatch(const std::string& model_dir, uint3
 
 bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
                                      uint32_t token_count,
+                                     uint32_t block_capacity,
                                      LlamaPersistentDispatch* dispatch,
                                      std::string* error_text) {
   if (dispatch == nullptr) return fail(error_text, "persistent Llama dispatch is required");
-  if (weights.layers.size() != kLlamaStageLayerCount) {
-    return fail(error_text, "persistent Llama dispatch requires exactly sixteen layer weight sets");
+  if (block_capacity == 0 ||
+      block_capacity > kLlamaResidentCacheCapacityTokens) {
+    return fail(error_text,
+                "persistent Llama dispatch block capacity must be in [1, " +
+                    std::to_string(kLlamaResidentCacheCapacityTokens) + "]");
   }
   if (token_count == 0 || token_count > kLlamaResidentCacheCapacityTokens) {
     return fail(error_text,
                 "persistent Llama dispatch token count must be in [1, " +
                     std::to_string(kLlamaResidentCacheCapacityTokens) + "]");
   }
+  if (weights.layers.size() != kLlamaStageLayerCount) {
+    return fail(error_text, "persistent Llama dispatch requires exactly sixteen layer weight sets");
+  }
   LlamaPersistentDispatch candidate;
+  candidate.block_capacity = block_capacity;
   candidate.layer_weight_metadata = weights;
   const LlamaLayerWeightSpans& window = weights.layers.front();
   const Fp16WeightSpan* spans[] = {
@@ -468,28 +511,37 @@ bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
     candidate.request.buffers.push_back({name, {}, bytes, readback_bytes});
     return index;
   };
-  candidate.hidden_buffers.reserve(token_count);
-  for (uint32_t token = 0; token < token_count; ++token) {
-    const std::string name = "llama.hidden.t" + std::to_string(token);
-    candidate.hidden_buffers.push_back(append_scratch(name.c_str(), 4096));
-    // Each hidden window is replaced once per request by the raw selected
-    // safetensors embedding row for that token; it is not host-computed
-    // activation data. Layer-major execution then retargets the hidden
-    // kernarg binding per token so layer weights stream once per layer.
-    candidate.request.buffers[candidate.hidden_buffers.back()].allow_post_prepare_upload = true;
+  const uint64_t block_rows = block_capacity;
+  const uint64_t hidden_bytes = block_rows * 2048 * sizeof(uint16_t);
+  const uint64_t fresh_kv_bytes = block_rows * 8 * 64 * sizeof(uint16_t);
+  const uint64_t attention_bytes = block_rows * 32 * 128 * sizeof(float);
+  const uint64_t mlp_bytes = block_rows * 8192 * sizeof(uint16_t);
+  candidate.token_blocks.reserve((token_count + block_capacity - 1) / block_capacity);
+  for (uint32_t position = 0; position < token_count; position += block_capacity) {
+    const uint32_t remaining = token_count - position;
+    const uint32_t count = remaining < block_capacity ? remaining : block_capacity;
+    const uint32_t block_index = static_cast<uint32_t>(candidate.token_blocks.size());
+    const std::string name = "llama.hidden.block" + std::to_string(block_index);
+    LlamaTokenBlock block;
+    block.hidden_buffer_index = append_scratch(name.c_str(), hidden_bytes);
+    block.position = position;
+    block.token_count = count;
+    candidate.request.buffers[block.hidden_buffer_index].allow_post_prepare_upload = true;
+    candidate.token_blocks.push_back(block);
   }
   candidate.hidden_binding_slots = {{0, 0}, {7, 2}, {9, 4}};
-  candidate.shared_buffers.normalized = append_scratch("llama.normalized", 4096);
-  candidate.shared_buffers.fresh_k = append_scratch("llama.fresh_k", 1024);
-  candidate.shared_buffers.fresh_v = append_scratch("llama.fresh_v", 1024);
-  candidate.shared_buffers.attention_scores = append_scratch("llama.attention_scores", 16384);
+  candidate.shared_buffers.normalized = append_scratch("llama.normalized", hidden_bytes);
+  candidate.shared_buffers.fresh_k = append_scratch("llama.fresh_k", fresh_kv_bytes);
+  candidate.shared_buffers.fresh_v = append_scratch("llama.fresh_v", fresh_kv_bytes);
+  candidate.shared_buffers.attention_scores =
+      append_scratch("llama.attention_scores", attention_bytes);
   candidate.shared_buffers.attention_probabilities =
-      append_scratch("llama.attention_probabilities", 16384);
-  candidate.shared_buffers.context = append_scratch("llama.context", 4096);
+      append_scratch("llama.attention_probabilities", attention_bytes);
+  candidate.shared_buffers.context = append_scratch("llama.context", hidden_bytes);
   candidate.shared_buffers.post_attention_hidden =
-      append_scratch("llama.post_attention_hidden", 4096);
-  candidate.shared_buffers.gate = append_scratch("llama.gate", 8192 * 2);
-  candidate.shared_buffers.up = append_scratch("llama.up", 8192 * 2);
+      append_scratch("llama.post_attention_hidden", hidden_bytes);
+  candidate.shared_buffers.gate = append_scratch("llama.gate", mlp_bytes);
+  candidate.shared_buffers.up = append_scratch("llama.up", mlp_bytes);
   candidate.k_cache_buffers.reserve(kLlamaStageLayerCount);
   candidate.v_cache_buffers.reserve(kLlamaStageLayerCount);
   for (uint32_t layer = 0; layer < kLlamaStageLayerCount; ++layer) {
@@ -542,7 +594,7 @@ bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
     candidate.request.stages.push_back(std::move(stage));
   };
 
-  const uint32_t hidden0 = candidate.hidden_buffers.front();
+  const uint32_t hidden0 = candidate.token_blocks.front().hidden_buffer_index;
   candidate.layer_stages.reserve(kLlamaStageLayerCount);
   for (uint32_t layer = 0; layer < kLlamaStageLayerCount; ++layer) {
     const LlamaLayerResidentBufferIndices& buffers = candidate.layer_buffers[layer];

@@ -215,7 +215,7 @@ uint32_t load_u32_le(const std::vector<uint8_t>& bytes, size_t offset) {
          (static_cast<uint32_t>(bytes[offset + 3]) << 24U);
 }
 
-int selected_embedding_rows_and_token_scalars() {
+int selected_embedding_rows_and_block_state() {
   native_r9700::Fp16WeightSpan embedding;
   embedding.name = "model.embed_tokens.weight";
   embedding.data_offset = 4096;
@@ -233,12 +233,23 @@ int selected_embedding_rows_and_token_scalars() {
   }
 
   std::vector<native_r9700::ResidentHsaStage> stages(10);
+  stages[1].kernargs.resize(28);
+  stages[2].kernargs.resize(28);
   stages[3].kernargs.resize(48);
   stages[4].kernargs.resize(48);
   stages[5].kernargs.resize(32);
   stages[6].kernargs.resize(40);
-  if (!native_r9700::set_llama_token_stage_scalars(&stages, 2, &error_text) ||
-      native_r9700::set_llama_token_stage_scalars(&stages, 128, &error_text)) {
+  stages[7].kernargs.resize(36);
+  stages[8].kernargs.resize(52);
+  stages[9].kernargs.resize(44);
+  stages[0].kernarg_bindings.resize(1);
+  stages[7].kernarg_bindings.resize(3);
+  stages[9].kernarg_bindings.resize(5);
+  const std::vector<std::pair<uint32_t, uint32_t>> hidden_slots = {
+      {0, 0}, {7, 2}, {9, 4}};
+  const native_r9700::LlamaTokenBlock block{42, 2, 1};
+  if (!native_r9700::set_llama_block_stage_state(&stages, hidden_slots, block, 1,
+                                                 &error_text)) {
     return 2;
   }
   const auto has_scalars = [&](size_t stage_index, size_t sequence_offset,
@@ -251,7 +262,9 @@ int selected_embedding_rows_and_token_scalars() {
       !has_scalars(5, 16, 20, 24) || !has_scalars(6, 24, 28, 32)) {
     return 3;
   }
-
+  for (const auto& slot : hidden_slots) {
+    if (stages[slot.first].kernarg_bindings[slot.second].buffer_index != 42) return 4;
+  }
   return 0;
 }
 
@@ -294,19 +307,28 @@ int persistent_dispatch_layer_major_structure(const char* work_dir) {
 
   std::string error_text;
   native_r9700::LlamaPersistentDispatch rejected;
-  if (native_r9700::build_llama_persistent_dispatch(weights, 0, &rejected, &error_text)) return 1;
-  if (native_r9700::build_llama_persistent_dispatch(weights, 129, &rejected, &error_text)) return 2;
+  if (native_r9700::build_llama_persistent_dispatch(weights, 0, 1, &rejected,
+                                                     &error_text)) {
+    return 1;
+  }
+  if (native_r9700::build_llama_persistent_dispatch(weights, 129, 1, &rejected,
+                                                     &error_text)) {
+    return 2;
+  }
 
   native_r9700::LlamaPersistentDispatch dispatch;
-  if (!native_r9700::build_llama_persistent_dispatch(weights, 3, &dispatch, &error_text)) return 3;
+  if (!native_r9700::build_llama_persistent_dispatch(weights, 3, 1, &dispatch,
+                                                      &error_text)) {
+    return 3;
+  }
 
-  // One opted-in 4096-byte hidden window per request token; no shared hidden.
-  if (dispatch.hidden_buffers.size() != 3) return 4;
+  // Capacity one preserves one opted-in 4096-byte hidden window per block.
+  if (dispatch.block_capacity != 1 || dispatch.token_blocks.size() != 3) return 4;
   uint64_t hidden_seen = 0;
   for (size_t index = 0; index < dispatch.request.buffers.size(); ++index) {
     const native_r9700::ResidentHsaBuffer& buffer = dispatch.request.buffers[index];
     if (buffer.name == "llama.hidden") return 5;
-    if (buffer.name.rfind("llama.hidden.t", 0) == 0) {
+    if (buffer.name.rfind("llama.hidden.block", 0) == 0) {
       if (buffer.allocation_byte_count != 4096 || !buffer.allow_post_prepare_upload) return 6;
       ++hidden_seen;
     }
@@ -326,7 +348,7 @@ int persistent_dispatch_layer_major_structure(const char* work_dir) {
   }
 
   // The hidden operand is bound at stage 0 offset 0, stage 7 offset 16, and
-  // stage 9 offset 32; retargeting swaps only those binding buffer indices.
+  // stage 9 offset 32; block mutation swaps only those binding buffer indices.
   if (dispatch.hidden_binding_slots.size() != 3) return 10;
   std::vector<uint32_t> stage_order;
   for (const auto& slot : dispatch.hidden_binding_slots) stage_order.push_back(slot.first);
@@ -334,28 +356,27 @@ int persistent_dispatch_layer_major_structure(const char* work_dir) {
   if (dispatch.layer_stages.size() != 16 || dispatch.layer_stages[5].size() != 10) return 12;
 
   const std::vector<native_r9700::ResidentHsaStage>& stages = dispatch.layer_stages[5];
-  const uint32_t first_hidden = dispatch.hidden_buffers[0];
+  const uint32_t first_hidden = dispatch.token_blocks[0].hidden_buffer_index;
   for (const auto& slot : dispatch.hidden_binding_slots) {
     const native_r9700::ResidentHsaStage& stage = stages[slot.first];
     if (slot.second >= stage.kernarg_bindings.size()) return 13;
     if (stage.kernarg_bindings[slot.second].buffer_index != first_hidden) return 14;
   }
 
-  if (!native_r9700::set_llama_token_hidden_buffer(
-          &dispatch.layer_stages[5], dispatch.hidden_binding_slots, dispatch.hidden_buffers[2],
-          &error_text)) {
+  if (!native_r9700::set_llama_block_stage_state(
+          &dispatch.layer_stages[5], dispatch.hidden_binding_slots,
+          dispatch.token_blocks[2], dispatch.block_capacity, &error_text)) {
     return 15;
   }
   const std::vector<native_r9700::ResidentHsaStage>& retargeted = dispatch.layer_stages[5];
   for (const auto& slot : dispatch.hidden_binding_slots) {
     if (retargeted[slot.first].kernarg_bindings[slot.second].buffer_index !=
-        dispatch.hidden_buffers[2]) {
+        dispatch.token_blocks[2].hidden_buffer_index) {
       return 16;
     }
   }
   // Non-hidden bindings and other layers remain untouched.
   if (retargeted[3].kernarg_bindings[2].buffer_index != dispatch.k_cache_buffers[5]) return 17;
-
   if (dispatch.layer_stages[6][0].kernarg_bindings[0].buffer_index != first_hidden) return 18;
   return 0;
 }
@@ -374,8 +395,8 @@ int main(int argc, char** argv) {
   if (mode == "non-token-embedding-input") return non_token_embedding_input();
   if (mode == "missing-stage-assets") return missing_stage_assets();
   if (mode == "non-llama-stage-asset") return non_llama_stage_asset();
-  if (mode == "selected-embedding-rows-and-token-scalars") {
-    return selected_embedding_rows_and_token_scalars();
+  if (mode == "selected-embedding-rows-and-block-state") {
+    return selected_embedding_rows_and_block_state();
   }
 
   if (mode == "persistent-dispatch-structure") {
@@ -478,14 +499,14 @@ def test_layer0_rejects_non_llama_assets_before_dispatch(tmp_path: Path) -> None
     run_layer0_probe(compile_layer0_probe(tmp_path), "non-llama-stage-asset", tmp_path)
 
 
-def test_llama_embedding_rows_and_stage_scalars_are_token_specific(tmp_path: Path) -> None:
-    """Rows stay raw and each single-token stage group targets its own cache slot."""
-    run_layer0_probe(compile_layer0_probe(tmp_path), "selected-embedding-rows-and-token-scalars", tmp_path)
+def test_llama_embedding_rows_and_stage_state_are_block_specific(tmp_path: Path) -> None:
+    """Rows stay raw and a capacity-one block targets its own cache slot."""
+    run_layer0_probe(compile_layer0_probe(tmp_path), "selected-embedding-rows-and-block-state", tmp_path)
 
 
 
-def test_persistent_dispatch_is_layer_major_with_per_token_hidden(tmp_path: Path) -> None:
-    """Weights stream once per layer; each request token owns a hidden window."""
+def test_persistent_dispatch_is_layer_major_with_per_block_hidden(tmp_path: Path) -> None:
+    """Weights stream once per layer; each request block owns a hidden window."""
     run_layer0_probe(compile_layer0_probe(tmp_path), "persistent-dispatch-structure", tmp_path)
 
 
