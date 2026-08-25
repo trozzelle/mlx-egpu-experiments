@@ -125,8 +125,15 @@ def run_native_prefill(
         return result
 
     parsed = _parse_worker_result(completed.stdout, completed.stderr, log)
+    expected_block_tokens = _command_block_tokens(command)
     result = _normalize_result(
-        parsed, completed.returncode, out_path, log, len(token_ids), model_dir
+        parsed,
+        completed.returncode,
+        out_path,
+        log,
+        len(token_ids),
+        model_dir,
+        expected_block_tokens,
     )
     if result["native_prefill_acceptance"] != _PASS_ACCEPTANCE:
         _remove_unaccepted_npz(out_path)
@@ -164,6 +171,13 @@ def _build_runner_command(
             )
         command.extend(["--block-tokens", block_tokens])
     return command
+
+
+def _command_block_tokens(command: Sequence[str]) -> int:
+    for index in range(2, len(command) - 1):
+        if command[index] == "--block-tokens":
+            return int(command[index + 1])
+    return 1
 
 def validate_native_prefill_npz(
     path: os.PathLike[str] | str,
@@ -301,6 +315,7 @@ def _normalize_result(
     log_path: Path,
     expected_n_prefix: int,
     expected_model: str,
+    expected_block_tokens: int,
 ) -> dict[str, object]:
     result: dict[str, object] = {
         "producer_kind": _string_field(parsed, "producer_kind", "unknown"),
@@ -313,7 +328,7 @@ def _normalize_result(
         "prefill_npz_path": _string_field(parsed, "prefill_npz_path", ""),
         "kernel_count": _int_field(parsed, "kernel_count", 0),
         "transfer_bytes": _int_field(parsed, "transfer_bytes", 0),
-        "block_tokens": _int_field(parsed, "block_tokens", 1),
+        "block_tokens": _int_field(parsed, "block_tokens", 0),
         "block_count": _int_field(parsed, "block_count", 0),
         "failure_stage": _string_field(parsed, "failure_stage", ""),
         "exit_status": _int_field(parsed, "exit_status", int(runner_exit_status)),
@@ -326,7 +341,13 @@ def _normalize_result(
         result["exit_status"] = int(runner_exit_status)
 
 
-    problems = _acceptance_problems(result, out_npz, expected_n_prefix, expected_model)
+    problems = _acceptance_problems(
+        result,
+        out_npz,
+        expected_n_prefix,
+        expected_model,
+        expected_block_tokens,
+    )
     if problems:
         result["native_prefill_acceptance"] = _OPEN_ACCEPTANCE
         if not result["failure_stage"]:
@@ -349,6 +370,7 @@ def _acceptance_problems(
     out_npz: Path,
     expected_n_prefix: int,
     expected_model: str,
+    expected_block_tokens: int = 1,
 ) -> list[str]:
     problems: list[str] = []
     metadata_accepts = True
@@ -379,6 +401,23 @@ def _acceptance_problems(
         metadata_accepts = False
     if int(result["transfer_bytes"]) <= 0:
         problems.append("missing nonzero transfer_bytes hardware evidence")
+        metadata_accepts = False
+    reported_block_tokens = _int_field(result, "block_tokens", 0)
+    if reported_block_tokens != expected_block_tokens:
+        problems.append(
+            f"reported block_tokens={reported_block_tokens} does not match "
+            f"requested block_tokens={expected_block_tokens}"
+        )
+        metadata_accepts = False
+    expected_block_count = (
+        expected_n_prefix + expected_block_tokens - 1
+    ) // expected_block_tokens
+    reported_block_count = _int_field(result, "block_count", 0)
+    if reported_block_count != expected_block_count:
+        problems.append(
+            f"reported block_count={reported_block_count} does not match "
+            f"expected block_count={expected_block_count}"
+        )
         metadata_accepts = False
 
     prefill_npz_path = str(result["prefill_npz_path"])

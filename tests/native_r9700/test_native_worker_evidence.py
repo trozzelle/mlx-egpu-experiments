@@ -64,8 +64,8 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
                     f"prefill_npz_path: {out_path}",
                     "kernel_count: 4",
                     "transfer_bytes: 4096",
-                    "block_tokens: 8",
-                    "block_count: 1",
+                    "block_tokens: 1",
+                    "block_count: 3",
                     "failure_stage: ",
                     "exit_status: 0",
                 )
@@ -86,8 +86,8 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
                     "prefill_npz_path": str(out_path),
                     "kernel_count": 4,
                     "transfer_bytes": 4096,
-                    "block_tokens": 8,
-                    "block_count": 1,
+                    "block_tokens": 1,
+                    "block_count": 3,
                     "failure_stage": "",
                     "exit_status": 0,
                 }
@@ -106,8 +106,8 @@ def test_native_worker_accepts_only_r9700_native_pass_with_hardware_evidence(
     assert result["prefill_npz_path"] == str(out_path)
     assert result["kernel_count"] == 4
     assert result["transfer_bytes"] == 4096
-    assert result["block_tokens"] == 8
-    assert result["block_count"] == 1
+    assert result["block_tokens"] == 1
+    assert result["block_count"] == 3
     assert result["exit_status"] == 0
 
 def test_native_worker_rejects_pass_without_full_layer_loop_evidence(tmp_path):
@@ -127,6 +127,8 @@ def test_native_worker_rejects_pass_without_full_layer_loop_evidence(tmp_path):
             "prefill_npz_path": str(out_path),
             "kernel_count": 1,
             "transfer_bytes": 1,
+            "block_tokens": 1,
+            "block_count": 2,
             "failure_stage": "",
             "exit_status": 0,
         },
@@ -157,6 +159,8 @@ def test_native_worker_rejects_nonzero_exit_and_removes_partial_output(
                     f"prefill_npz_path: {out_path}",
                     "kernel_count: 4",
                     "transfer_bytes: 4096",
+                    "block_tokens: 1",
+                    "block_count: 2",
                     "failure_stage: ",
                     "exit_status: 0",
                 )
@@ -176,6 +180,8 @@ def test_native_worker_rejects_nonzero_exit_and_removes_partial_output(
                     "prefill_npz_path": str(out_path),
                     "kernel_count": 4,
                     "transfer_bytes": 4096,
+                    "block_tokens": 1,
+                    "block_count": 2,
                     "failure_stage": "",
                     "exit_status": 0,
                 }
@@ -215,6 +221,8 @@ def test_native_worker_accepts_runner_key_value_log_when_json_is_absent(
                     f"prefill_npz_path: {out_path}",
                     "kernel_count: 3",
                     "transfer_bytes: 8192",
+                    "block_tokens: 1",
+                    "block_count: 2",
                     "failure_stage: ",
                     "exit_status: 0",
                 )
@@ -256,6 +264,8 @@ def test_native_worker_rejects_pass_with_malformed_npz_and_removes_output(
                     f"prefill_npz_path: {out_path}",
                     "kernel_count: 2",
                     "transfer_bytes: 2048",
+                    "block_tokens: 1",
+                    "block_count: 2",
                     "failure_stage: ",
                     "exit_status: 0",
                 )
@@ -276,6 +286,8 @@ def test_native_worker_rejects_pass_with_malformed_npz_and_removes_output(
                     "prefill_npz_path": str(out_path),
                     "kernel_count": 2,
                     "transfer_bytes": 2048,
+                    "block_tokens": 1,
+                    "block_count": 2,
                     "failure_stage": "",
                     "exit_status": 0,
                 }
@@ -316,6 +328,8 @@ def test_native_worker_rejects_cpu_reference_masquerade_and_removes_unaccepted_n
                     "prefill_npz_path": str(out_path),
                     "kernel_count": 2,
                     "transfer_bytes": 2048,
+                    "block_tokens": 1,
+                    "block_count": 2,
                     "failure_stage": "",
                     "exit_status": 0,
                 }
@@ -517,6 +531,8 @@ def test_native_worker_rejects_incomplete_full_result_and_removes_output(
             "prefill_npz_path": str(out_path),
             "kernel_count": 4,
             "transfer_bytes": 4096,
+            "block_tokens": 1,
+            "block_count": 3,
             "failure_stage": "",
             "exit_status": 0,
         }
@@ -556,6 +572,8 @@ def test_native_worker_rejects_pass_without_explicit_hardware_log_evidence(
             "prefill_npz_path": str(out_path),
             "kernel_count": 4,
             "transfer_bytes": 4096,
+            "block_tokens": 1,
+            "block_count": 2,
             "failure_stage": "",
             "exit_status": 0,
         }
@@ -633,3 +651,96 @@ def test_native_worker_rejects_invalid_block_capacity_before_subprocess(
         )
 
     assert runner_calls == []
+
+
+def _run_worker_with_block_metadata(
+    tmp_path,
+    monkeypatch,
+    *,
+    token_ids,
+    reported_block_tokens,
+    reported_block_count,
+    configured_block_tokens=None,
+):
+    from native_r9700 import native_worker
+
+    out_path = tmp_path / "native-prefill.npz"
+    log_path = tmp_path / "native-prefill.log"
+
+    def fake_run(argv, capture_output, text, check):
+        _write_native_prefill_npz(out_path, n_prefix=len(token_ids))
+        evidence = {
+            "producer_kind": "r9700_native",
+            "native_prefill_acceptance": "pass",
+            "native_prefill_full_layer_loop_status": "pass",
+            "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+            "hardware_log_path": str(log_path),
+            "prefill_npz_path": str(out_path),
+            "kernel_count": 4,
+            "transfer_bytes": 4096,
+            "block_tokens": reported_block_tokens,
+            "block_count": reported_block_count,
+            "failure_stage": "",
+            "exit_status": 0,
+        }
+        log_path.write_text("hardware log\n", encoding="utf-8")
+        return subprocess.CompletedProcess(
+            argv, 0, stdout=json.dumps(evidence), stderr=""
+        )
+
+    monkeypatch.setenv(
+        "NATIVE_R9700_PREFILL_RUNNER", "/tmp/fake-native-prefill-runner"
+    )
+    if configured_block_tokens is None:
+        monkeypatch.delenv("NATIVE_R9700_PREFILL_BLOCK_TOKENS", raising=False)
+    else:
+        monkeypatch.setenv(
+            "NATIVE_R9700_PREFILL_BLOCK_TOKENS", str(configured_block_tokens)
+        )
+    monkeypatch.setattr(native_worker.subprocess, "run", fake_run)
+
+    result = native_worker.run_native_prefill(
+        "synthetic-model", token_ids, out_path, log_path
+    )
+    return result, out_path
+
+
+def test_native_worker_rejects_reported_block_tokens_that_differ_from_command(
+    tmp_path, monkeypatch
+):
+    result, out_path = _run_worker_with_block_metadata(
+        tmp_path,
+        monkeypatch,
+        token_ids=[1, 2, 3],
+        reported_block_tokens=8,
+        reported_block_count=1,
+    )
+
+    assert result["native_prefill_acceptance"] == "open"
+    assert result["failure_stage"] == "worker_result_validation"
+    assert (
+        "reported block_tokens=8 does not match requested block_tokens=1"
+        in result["failure_text"]
+    )
+    assert not out_path.exists()
+
+
+def test_native_worker_rejects_reported_block_count_that_differs_from_partition(
+    tmp_path, monkeypatch
+):
+    result, out_path = _run_worker_with_block_metadata(
+        tmp_path,
+        monkeypatch,
+        token_ids=[1, 2, 3],
+        reported_block_tokens=8,
+        reported_block_count=2,
+        configured_block_tokens=8,
+    )
+
+    assert result["native_prefill_acceptance"] == "open"
+    assert result["failure_stage"] == "worker_result_validation"
+    assert (
+        "reported block_count=2 does not match expected block_count=1"
+        in result["failure_text"]
+    )
+    assert not out_path.exists()
