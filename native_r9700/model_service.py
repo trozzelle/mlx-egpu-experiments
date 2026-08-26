@@ -1333,22 +1333,40 @@ class ModelRegistry:
                             "failure_stage": "cache_validation",
                         },
                     )
-                cache = self._cache_projection(request_id, body, paths, native, expected_fp)
+                cache_started = time.monotonic()
+                cache = self._cache_projection(
+                    request_id, body, paths, native, expected_fp
+                )
+                cache_emit_elapsed = max(0.0, time.monotonic() - cache_started)
                 elapsed = max(0.0, time.monotonic() - started)
                 token_count = len(body["token_ids"])
+                prefix_token_count = token_count - 1
+                prefill_elapsed = native["prefill_elapsed_usec"] / 1_000_000.0
+                transfer_elapsed = native["transfer_elapsed_usec"] / 1_000_000.0
+                request_metrics = {
+                    "prefill_elapsed_sec": prefill_elapsed,
+                    "kernel_elapsed_usec": native["kernel_elapsed_usec"],
+                    "transfer_elapsed_sec": transfer_elapsed,
+                    "cache_emit_elapsed_sec": cache_emit_elapsed,
+                    "total_elapsed_sec": elapsed,
+                    "tokens_per_sec_prefill": (
+                        prefix_token_count / prefill_elapsed
+                        if prefill_elapsed > 0
+                        else 0.0
+                    ),
+                    "transfer_h2d_bytes": native["transfer_h2d_bytes"],
+                    "transfer_d2h_bytes": native["transfer_d2h_bytes"],
+                }
                 with self._condition:
                     self._metrics["prefill_count"] += 1
-                    self._metrics["prefill_elapsed_sec"] = elapsed
-                    self._metrics["total_elapsed_sec"] = elapsed
-                    self._metrics["tokens_per_sec_prefill"] = token_count / elapsed if elapsed > 0 else 0.0
-                    self._metrics["transfer_h2d_bytes"] = native.get("transfer_bytes", 0)
-                    self._metrics["transfer_d2h_bytes"] = 0
+                    self._metrics.update(request_metrics)
                 result = {
                     "model_handle": body["model_handle"],
                     "request_state": "produced",
                     "prompt_token_count": token_count,
-                    "prefix_token_count": token_count - 1,
+                    "prefix_token_count": prefix_token_count,
                     "cache": cache,
+                    "metrics": request_metrics,
                 }
                 evidence = {
                     key: value

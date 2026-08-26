@@ -77,7 +77,7 @@ struct LlamaKernelAsset {
 };
 
 // Returns the reviewed Llama manifest entry for name, or nullptr if none is
-// available. The manifest remains empty until stage assets are reviewed.
+// available. The manifest order is the stable scalar stage/diagnostic order.
 const LlamaKernelAsset* find_llama_kernel_asset(std::string_view name);
 
 // Returns exact ABI metadata only for assets admitted through the reviewed

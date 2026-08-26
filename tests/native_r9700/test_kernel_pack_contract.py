@@ -6,6 +6,7 @@ and lookup always receives an explicit generated-record span.
 """
 
 from pathlib import Path
+import json
 import re
 import subprocess
 
@@ -21,6 +22,23 @@ RUNTIME_SOURCES = (
     Path("native_r9700/kernel_assets.cpp"),
     Path("native_r9700/kernel_catalog.cpp"),
     Path("native_r9700/hsa_code_image_asset.cpp"),
+)
+SCALAR_PACK_ROOT = Path("native_r9700/kernels")
+SCALAR_GENERATED_SOURCE = Path("native_r9700/kernel_packs_generated.inc")
+SCALAR_PACK_NAMES = (
+    "llama_k_projection_f16",
+    "llama_v_projection_f16",
+    "llama_rmsnorm_f16",
+    "llama_rmsnorm_zero_store_f16",
+    "llama_rmsnorm_epsilon_arithmetic_f16",
+    "llama_rope_kv_f16",
+    "llama_causal_attention_score_f16",
+    "llama_causal_attention_softmax_f32",
+    "llama_causal_attention_context_f16",
+    "llama_o_projection_f16",
+    "llama_gated_mlp_f16",
+    "llama_gate_up_projection_f16",
+    "llama_mlp_down_f16",
 )
 
 
@@ -1952,3 +1970,164 @@ def test_kernel_pack_runtime_has_no_owning_records_or_manifest_parser() -> None:
     }
     for value in kinds | slots:
         assert value in runtime_text, f"EvidenceRef matrix value missing: {value}"
+
+
+def _compile_scalar_selection_probe(tmp_path: Path) -> Path:
+    """Compile the generated scalar span and its evidence-gated selection path."""
+    assert SCALAR_GENERATED_SOURCE.is_file(), "generated scalar pack source is missing"
+    probe_source = tmp_path / "scalar_pack_selection_probe.cpp"
+    probe_source.write_text(
+        r'''
+#include <filesystem>
+#include <string>
+#include <string_view>
+
+#include "kernel_pack.h"
+
+int main() {
+  const native_r9700::KernelPackSpan<native_r9700::KernelPackRecord> records =
+      native_r9700::llama_kernel_pack_records();
+  constexpr const char* kNames[] = {
+      "llama_k_projection_f16",
+      "llama_v_projection_f16",
+      "llama_rmsnorm_f16",
+      "llama_rmsnorm_zero_store_f16",
+      "llama_rmsnorm_epsilon_arithmetic_f16",
+      "llama_rope_kv_f16",
+      "llama_causal_attention_score_f16",
+      "llama_causal_attention_softmax_f32",
+      "llama_causal_attention_context_f16",
+      "llama_o_projection_f16",
+      "llama_gated_mlp_f16",
+      "llama_gate_up_projection_f16",
+      "llama_mlp_down_f16",
+  };
+  if (records.data == nullptr ||
+      records.size != sizeof(kNames) / sizeof(kNames[0])) {
+    return 1;
+  }
+  for (std::size_t index = 0; index < records.size; ++index) {
+    if (records.data[index].identity.name != kNames[index] ||
+        records.data[index].identity.version != "1.0.0" ||
+        records.data[index].entries.size != 1 ||
+        records.data[index].entries.data[0].symbol != kNames[index]) {
+      return 2;
+    }
+  }
+
+  char error[512] = {};
+  for (const char* name : kNames) {
+    error[0] = '\0';
+    if (native_r9700::find_llama_kernel_pack(
+            name, "1.0.0", {error, sizeof(error)}) == nullptr ||
+        error[0] != '\0') {
+      return 3;
+    }
+  }
+  error[0] = '\0';
+  const native_r9700::KernelPackRecord* selected =
+      native_r9700::find_llama_kernel_pack(
+          "llama_k_projection_f16", "1.0.0", {error, sizeof(error)});
+  if (selected == nullptr) return 4;
+
+  const native_r9700::KernelPackShapeFamily& family =
+      selected->compatibility.shape_families.data[0];
+  native_r9700::KernelPackCompatibilityKey key{};
+  key.target = selected->identity.target;
+  key.required_features = selected->identity.required_features;
+  key.input_dtype = selected->compatibility.input_dtype;
+  key.weight_dtype = selected->compatibility.weight_dtype;
+  key.output_dtype = selected->compatibility.output_dtype;
+  key.source_tensor_layout_version =
+      selected->compatibility.source_tensor_layout_version;
+  key.shape_family_name = family.name;
+  key.fixed_dimensions = family.fixed_dimensions;
+  key.runtime_value.present = false;
+  key.weight_packing_version = selected->compatibility.weight_packing_version;
+  key.tolerance_policy = selected->numerics.tolerance_policy;
+
+  native_r9700::KernelDescriptor descriptor{};
+  error[0] = '\0';
+  const std::string asset_root =
+      std::filesystem::current_path().string();
+  if (!native_r9700::admit_llama_kernel_pack(
+          *selected, key, "llama_k_projection_f16", asset_root,
+          &descriptor, {error, sizeof(error)})) {
+    return 5;
+  }
+  return descriptor.name == "llama_k_projection_f16" &&
+                 descriptor.code.size() == 14961 &&
+             descriptor.sha256 ==
+                 "9c2f584f4bd4c918f8c2a95a0a1f29a7102c19e8080b0d538b36f26e6e8fcc9b"
+         ? 0
+         : 6;
+}
+'''.lstrip(),
+        encoding="utf-8",
+    )
+    executable = tmp_path / "scalar_pack_selection_probe"
+    completed = subprocess.run(
+        [
+            "xcrun",
+            "--sdk",
+            "macosx",
+            "clang++",
+            "-std=c++17",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            *(str(path) for path in RUNTIME_SOURCES),
+            str(probe_source),
+            "-I",
+            str(NATIVE_INCLUDE_DIR),
+            "-o",
+            str(executable),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    return executable
+
+
+def test_scalar_pack_manifests_and_generated_span_cover_current_asset_order() -> None:
+    """Each reviewed Llama asset has one canonical pack and bound evidence files."""
+    manifests_by_name = {}
+    for path in SCALAR_PACK_ROOT.glob("*-hsa-assets/*.pack.json"):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        manifests_by_name[payload["name"]] = payload
+        assert payload["schema_version"] == 1
+        assert len(payload["entries"]) == 1
+        assert payload["entries"][0]["symbol"] == payload["name"]
+        assert payload["image"]["image_path"].endswith(
+            f"{path.parent.name}/{payload['image']['image_path'].split('/')[-1]}"
+        )
+        for reference in (
+            payload["numerics"]["retained_reference"],
+            payload["evidence"]["conformance"],
+            payload["evidence"]["source_review"],
+            payload["evidence"]["native_run"],
+            payload["evidence"]["resource_review"],
+            payload["evidence"]["isa_review"],
+        ):
+            assert reference["record_path"]
+            assert Path(reference["record_path"]).is_file()
+    assert set(manifests_by_name) == set(SCALAR_PACK_NAMES)
+    generated = SCALAR_GENERATED_SOURCE.read_text(encoding="utf-8")
+    assert "llama_scalar_pack_records" in generated
+    assert "llama_selectable_scalar_pack_records" in generated
+    assert generated.count("constexpr KernelPackRecord") >= 15
+
+
+def test_scalar_pack_selection_reuses_verified_loader_for_all_native_passes(
+    tmp_path: Path,
+) -> None:
+    """All 13 native-pass scalar packs select through the legacy verifier."""
+    completed = subprocess.run(
+        [str(_compile_scalar_selection_probe(tmp_path))],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr

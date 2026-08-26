@@ -1034,6 +1034,58 @@ def _validate_persistent_metadata(
     _persistent_meta_state(metadata)
 
 
+_PERSISTENT_METRIC_FIELDS = frozenset(
+    {
+        "prefill_elapsed_sec",
+        "kernel_elapsed_usec",
+        "transfer_elapsed_sec",
+        "cache_emit_elapsed_sec",
+        "total_elapsed_sec",
+        "tokens_per_sec_prefill",
+        "transfer_h2d_bytes",
+        "transfer_d2h_bytes",
+    }
+)
+
+
+def _persistent_metrics(value: Any) -> dict[str, float | int]:
+    if not isinstance(value, Mapping) or set(value) != _PERSISTENT_METRIC_FIELDS:
+        raise _PersistentRouteFallback(
+            "producer_failed",
+            "persistent service Prefill metrics are invalid",
+        )
+    normalized: dict[str, float | int] = {}
+    integer_fields = {"kernel_elapsed_usec", "transfer_h2d_bytes", "transfer_d2h_bytes"}
+    for field_name in _PERSISTENT_METRIC_FIELDS:
+        field_value = value[field_name]
+        if field_name in integer_fields:
+            if (
+                not isinstance(field_value, int)
+                or isinstance(field_value, (bool, np.bool_))
+                or field_value < 0
+            ):
+                raise _PersistentRouteFallback(
+                    "producer_failed",
+                    "persistent service Prefill metrics are invalid",
+                )
+            normalized[field_name] = int(field_value)
+            continue
+        try:
+            number = float(field_value)
+        except (TypeError, ValueError) as exc:
+            raise _PersistentRouteFallback(
+                "producer_failed",
+                "persistent service Prefill metrics are invalid",
+            ) from exc
+        if isinstance(field_value, (bool, np.bool_)) or not np.isfinite(number) or number < 0:
+            raise _PersistentRouteFallback(
+                "producer_failed",
+                "persistent service Prefill metrics are invalid",
+            )
+        normalized[field_name] = number
+    return normalized
+
+
 class PersistentPrefillSession:
     """One loaded public prefill-service model shared by warm generations."""
 
@@ -1203,6 +1255,7 @@ class PersistentPrefillSession:
                     "producer_failed",
                     "persistent service Prefill prefix token count is invalid",
                 )
+        metrics = _persistent_metrics(prefill_result.get("metrics"))
 
         cache = prefill_result.get("cache")
         if not isinstance(cache, Mapping):
@@ -1269,6 +1322,7 @@ class PersistentPrefillSession:
             "producer_kind": str(producer_kind),
             "producer_fingerprint": producer_fingerprint,
             "evidence": dict(prefill_evidence),
+            "metrics": metrics,
             "cache": dict(cache),
             "metadata": dict(cache_metadata),
             "cache_path": str(cache_path),
@@ -1418,9 +1472,14 @@ def generate_with_native_prefill(
         result["kv_cache_log_path"] = service_state["cache_log_path"]
         result["producer_commands"] = [{"operation": "Prefill", "returncode": 0}]
         _add_native_prefill_evidence(result, evidence)
+        result.update(service_state["metrics"])
+        cache_import_started = time.time()
         try:
             _validate_persistent_model_fingerprint(service_state["model_fingerprint"])
             cache, metadata = load_prompt_cache_fn(cache_path, return_metadata=True)
+            result["cache_import_elapsed_sec"] = max(
+                0.0, time.time() - cache_import_started
+            )
             _validate_prompt_cache(cache, metadata, len(prompt_tokens) - 1)
             _validate_persistent_metadata(
                 service_state["metadata"],
@@ -1463,6 +1522,7 @@ def generate_with_native_prefill(
         result["model_fingerprint"] = service_state["model_fingerprint"]
         result["model_digest"] = service_state["model_fingerprint"].get("model_digest")
         result["metadata"] = dict(metadata)
+        decode_started = time.time()
         try:
             result["decoded_tokens"] = _collect_generated_tokens(
                 model,
@@ -1472,12 +1532,18 @@ def generate_with_native_prefill(
                 generate_step_fn=generate_step_fn,
                 generate_kwargs=generate_kwargs,
             )
+            result["decode_elapsed_sec"] = max(0.0, time.time() - decode_started)
         except Exception as exc:
             result["status"] = "error"
             result["exit_status"] = 1
             result["error"] = {"type": exc.__class__.__name__, "message": str(exc)}
             finished = _write_result_log(log_path, _finish_result(result, started))
             raise NativePrefillError(str(exc), result=finished) from exc
+        total_elapsed = max(0.0, time.time() - started)
+        result["total_elapsed_sec"] = total_elapsed
+        result["tokens_per_sec_end_to_end"] = (
+            len(prompt_tokens) / total_elapsed if total_elapsed > 0 else 0.0
+        )
         return _write_result_log(log_path, _finish_result(result, started))
 
     if _normalize_producer_kind(native.producer_kind) == _R9700_NATIVE_PRODUCER_KIND:

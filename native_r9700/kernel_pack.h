@@ -250,6 +250,26 @@ bool admit_kernel_pack(const KernelPackRecord& record,
                        std::string_view asset_root,
                        KernelDescriptor* out_descriptor,
                        KernelPackErrorBuffer error_text);
+// Returns the complete generated scalar-record span in legacy manifest order.
+// Records whose native evidence is pending remain visible for audit but are
+// excluded by the production lookup below.
+KernelPackSpan<KernelPackRecord> llama_kernel_pack_records();
+
+// Exact scalar selection over the generated, evidence-admitted subset.  The
+// version is mandatory; there is no implicit upgrade, downgrade, or fallback.
+const KernelPackRecord* find_llama_kernel_pack(std::string_view name,
+                                               std::string_view version,
+                                               KernelPackErrorBuffer error_text);
+
+// Select and admit one generated scalar pack through the same loader used by
+// legacy Llama callers.  asset_root is the repository root for generated
+// records whose image path carries its canonical asset directory.
+bool admit_llama_kernel_pack(const KernelPackRecord& record,
+                             const KernelPackCompatibilityKey& selected_key,
+                             std::string_view entry_symbol,
+                             std::string_view asset_root,
+                             KernelDescriptor* out_descriptor,
+                             KernelPackErrorBuffer error_text);
 
 }  // namespace native_r9700
 

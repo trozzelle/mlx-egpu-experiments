@@ -42,7 +42,7 @@ Make every production-selected executable enter through a concrete Kernel Pack r
 | 1. Kernel Pack schema/API/command freeze | Done | P3Contract | Frozen in `.superpowers/swarm/reports/p3-contract-freeze.md`; final review closed allocation-free runtime views, the five-kind/nine-slot EvidenceRef matrix, canonical nonrecursive `pack_sha256`, migration dependencies, and active-ledger reconciliation.
 | 2. Runtime Kernel Pack identity/compatibility | Done | P3Runtime | Allocation-free record/views, exact lookup/admission, asset-owned K/V attestations, runtime/offline provenance/numerical/path/license parity, and fail-closed span/ABI/geometry/evidence checks. Focused gate: 22 passed. |
 | 3. Offline manifest/ISA/resource validator | Done | P3Manifest | Canonical manifest, RFC 8785 safe integers, complete evidence/layout proof, deterministic generation, and runtime-admissible field closure. Focused gate: 115 passed. |
-| 4. Scalar-control migration | Ready | Unassigned | Task sets 2–3 implementation gates are closed; scalar migration is the next implementation slice. |
+| 4. Scalar-control migration | Done | P3ScalarMigration | Task sets 2–3 | All 13 schema-v1 scalar packs are generated in manifest order and selectable through the existing verifier. Fresh R9700 RMSNorm and epsilon-arithmetic traces pass, are request/image/runner bound, and reseal the two former pending records with trace-declared versus validated output contracts kept distinct. Focused gate: 27 passed. |
 | 5. G0 WMMA migration | Blocked | Unassigned | Waits for accepted task sets 2–3 and G0. |
 | 6. Selection/refresh/review and promotion | Blocked | Unassigned | Waits for migrations. |
 

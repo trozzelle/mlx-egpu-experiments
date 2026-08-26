@@ -241,6 +241,11 @@ struct FakeBackend final : native_r9700::NativeResourceBackend {
     result->prefill_npz_path = request.prefill_npz_path;
     result->kernel_count = 16;
     result->transfer_bytes = 128;
+    result->prefill_elapsed_usec = 12500;
+    result->kernel_elapsed_usec = 8000;
+    result->transfer_elapsed_usec = 2500;
+    result->transfer_h2d_bytes = 96;
+    result->transfer_d2h_bytes = 32;
     result->block_tokens = accept_boundary_prefill ? request.token_ids.size() : 4;
     result->block_count = 1;
     result->failure_stage = "none";
@@ -749,6 +754,11 @@ def test_private_worker_prepare_commit_and_repeated_prefill_reuse_one_generation
             "prefill_npz_path",
             "kernel_count",
             "transfer_bytes",
+            "prefill_elapsed_usec",
+            "kernel_elapsed_usec",
+            "transfer_elapsed_usec",
+            "transfer_h2d_bytes",
+            "transfer_d2h_bytes",
             "block_tokens",
             "block_count",
             "failure_stage",

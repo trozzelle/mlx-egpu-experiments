@@ -1641,6 +1641,16 @@ class _LiveServiceDispatcher:
                     "prompt_token_count": len(token_ids),
                     "prefix_token_count": n_prefix,
                     "cache": cache,
+                    "metrics": {
+                        "prefill_elapsed_sec": 0.0125,
+                        "kernel_elapsed_usec": 8000,
+                        "transfer_elapsed_sec": 0.0025,
+                        "cache_emit_elapsed_sec": 0.001,
+                        "total_elapsed_sec": 0.014,
+                        "tokens_per_sec_prefill": (len(token_ids) - 1) / 0.0125,
+                        "transfer_h2d_bytes": 3072,
+                        "transfer_d2h_bytes": 1024,
+                    },
                 },
                 evidence=evidence,
             )
@@ -2142,6 +2152,15 @@ def test_persistent_prefill_session_reuses_one_loaded_model_for_two_generations(
         "native_producer",
     ]
     assert [result["decoded_tokens"] for result in results] == [[900], [901]]
+    assert all(result["prefill_elapsed_sec"] == 0.0125 for result in results)
+    assert all(result["kernel_elapsed_usec"] == 8000 for result in results)
+    assert all(result["transfer_elapsed_sec"] == 0.0025 for result in results)
+    assert all(result["cache_emit_elapsed_sec"] == 0.001 for result in results)
+    assert all(result["cache_import_elapsed_sec"] >= 0.0 for result in results)
+    assert all(result["decode_elapsed_sec"] >= 0.0 for result in results)
+    assert all(result["total_elapsed_sec"] > 0.0 for result in results)
+    assert all(result["transfer_h2d_bytes"] == 3072 for result in results)
+    assert all(result["transfer_d2h_bytes"] == 1024 for result in results)
     assert [entry[0] for entry in decode_inputs] == [[103], [202]]
     assert all(entry[1] is not None for entry in decode_inputs)
     assert service.launch_count == 1

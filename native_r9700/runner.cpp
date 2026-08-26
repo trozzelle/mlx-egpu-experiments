@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <array>
+#include <chrono>
 #include <cctype>
 #include <cerrno>
 #include <cstdio>
@@ -655,6 +656,12 @@ class NativePersistentExecution final {
       return fail(error_text, "prefill result is required");
     }
     *result = native_r9700::NativeResourcePrefillResult{};
+    const auto prefill_started = std::chrono::steady_clock::now();
+    const auto elapsed_usec = [](const auto& started, const auto& ended) {
+      return static_cast<uint64_t>(
+          std::chrono::duration_cast<std::chrono::microseconds>(ended - started)
+              .count());
+    };
     result->hardware_log_path = request.hardware_log_path;
     result->prefill_npz_path = request.prefill_npz_path;
     result->block_tokens = block_capacity_;
@@ -750,6 +757,7 @@ class NativePersistentExecution final {
         (prefix_tokens + block_capacity_ - 1U) / block_capacity_;
     std::string detail;
 
+    const auto upload_started = std::chrono::steady_clock::now();
     for (uint32_t block_index = 0; block_index < active_blocks; ++block_index) {
       native_r9700::LlamaTokenBlock block = dispatch_.token_blocks[block_index];
       const uint32_t remaining = prefix_tokens - block.position;
@@ -783,6 +791,9 @@ class NativePersistentExecution final {
         return fail(error_text, detail);
       }
     }
+    const uint64_t upload_elapsed_usec =
+        elapsed_usec(upload_started, std::chrono::steady_clock::now());
+    const auto kernel_started = std::chrono::steady_clock::now();
 
     for (uint32_t layer = 0; layer < dispatch_.layer_stages.size(); ++layer) {
       for (uint32_t block_index = 0; block_index < active_blocks; ++block_index) {
@@ -802,7 +813,10 @@ class NativePersistentExecution final {
         }
       }
     }
+    const uint64_t kernel_elapsed_usec =
+        elapsed_usec(kernel_started, std::chrono::steady_clock::now());
 
+    const auto readback_started = std::chrono::steady_clock::now();
     std::vector<std::string> kv_names;
     kv_names.reserve(dispatch_.k_cache_buffers.size() * 2U);
     for (uint32_t layer = 0; layer < dispatch_.k_cache_buffers.size(); ++layer) {
@@ -813,6 +827,8 @@ class NativePersistentExecution final {
       remember_fault(detail);
       return fail(error_text, detail);
     }
+    const uint64_t readback_elapsed_usec =
+        elapsed_usec(readback_started, std::chrono::steady_clock::now());
 
     native_r9700::NativePrefillNpzPayload payload;
     payload.model = model_uri_;
@@ -824,6 +840,8 @@ class NativePersistentExecution final {
             payload, request.prefill_npz_path, &detail)) {
       return fail(error_text, detail);
     }
+    const uint64_t prefill_elapsed_usec =
+        elapsed_usec(prefill_started, std::chrono::steady_clock::now());
 
     native_r9700::NativePrefillResult runtime_result;
     runtime_result.prefill_npz_path = request.prefill_npz_path;
@@ -836,6 +854,9 @@ class NativePersistentExecution final {
     runtime_result.transfer_bytes =
         (dispatch_result_.sdma_upload_bytes - upload_before) +
         (dispatch_result_.sdma_download_bytes - download_before);
+    runtime_result.wall_usec = prefill_elapsed_usec;
+    runtime_result.phase_timers.compute_loop_inclusive_usec =
+        kernel_elapsed_usec;
     runtime_result.native_prefill_acceptance = "pass";
     runtime_result.native_prefill_full_layer_loop_status = "pass";
     runtime_result.native_prefill_blocker_source = "none";
@@ -861,6 +882,14 @@ class NativePersistentExecution final {
     result->prefill_npz_path = request.prefill_npz_path;
     result->kernel_count = runtime_result.kernel_count;
     result->transfer_bytes = runtime_result.transfer_bytes;
+    result->prefill_elapsed_usec = prefill_elapsed_usec;
+    result->kernel_elapsed_usec = kernel_elapsed_usec;
+    result->transfer_elapsed_usec =
+        upload_elapsed_usec + readback_elapsed_usec;
+    result->transfer_h2d_bytes =
+        dispatch_result_.sdma_upload_bytes - upload_before;
+    result->transfer_d2h_bytes =
+        dispatch_result_.sdma_download_bytes - download_before;
     result->block_tokens = runtime_result.block_tokens;
     result->block_count = runtime_result.block_count;
     result->failure_stage = runtime_result.failure_stage;

@@ -116,6 +116,11 @@ _EVIDENCE_STRING_FIELDS = {
 _EVIDENCE_INTEGER_FIELDS = {
     "kernel_count",
     "transfer_bytes",
+    "prefill_elapsed_usec",
+    "kernel_elapsed_usec",
+    "transfer_elapsed_usec",
+    "transfer_h2d_bytes",
+    "transfer_d2h_bytes",
     "block_tokens",
     "block_count",
     "exit_status",

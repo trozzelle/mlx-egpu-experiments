@@ -8,6 +8,7 @@ import os
 import shlex
 import sys
 import tempfile
+import time
 import numpy as np
 import subprocess
 from pathlib import Path
@@ -1598,6 +1599,7 @@ def _write_worker_artifacts(
 
 
 def _run_worker_mode(args: argparse.Namespace, *, mode: str) -> int:
+    worker_started = time.monotonic()
     if args.producer_kind != R9700_NATIVE_PRODUCER_KIND:
         raise ValueError("worker modes require producer_kind r9700_native")
     if not isinstance(args.model, str) or not args.model:
@@ -1658,6 +1660,8 @@ def _run_worker_mode(args: argparse.Namespace, *, mode: str) -> int:
         "load_preparation_count": 0,
         "warm_prefill_weight_reload_count": 0,
         "prefill_count": 0,
+        "cold_process_sample_count": 0,
+        "cold_process_elapsed_sec": 0.0,
     }
     sessions: list[Any] = []
     closed_sessions: set[int] = set()
@@ -1671,6 +1675,11 @@ def _run_worker_mode(args: argparse.Namespace, *, mode: str) -> int:
         sessions.append(session)
         operations.append("LoadModel")
         metrics["load_preparation_count"] += 1
+        if metrics["cold_process_sample_count"] == 0:
+            metrics["cold_process_sample_count"] = 1
+            metrics["cold_process_elapsed_sec"] = max(
+                0.0, time.monotonic() - worker_started
+            )
         return session
 
     def close_session(session: Any) -> None:

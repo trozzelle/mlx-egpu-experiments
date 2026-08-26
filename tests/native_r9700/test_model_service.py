@@ -293,6 +293,11 @@ class FakeResourceClient:
             "prefill_npz_path": prefill_npz_path,
             "kernel_count": 1,
             "transfer_bytes": 4096,
+            "prefill_elapsed_usec": 12500,
+            "kernel_elapsed_usec": 8000,
+            "transfer_elapsed_usec": 2500,
+            "transfer_h2d_bytes": 3072,
+            "transfer_d2h_bytes": 1024,
             "block_tokens": len(token_ids),
             "block_count": 1,
             "failure_stage": "",
@@ -1089,8 +1094,8 @@ def test_metrics_expose_only_the_declared_transfer_counters(
     assert metrics["status"] == "pass"
     metric_values = metrics["result"]["metrics"]
     assert "transfer_bytes" not in metric_values
-    assert metric_values["transfer_h2d_bytes"] == 4096
-    assert metric_values["transfer_d2h_bytes"] == 0
+    assert metric_values["transfer_h2d_bytes"] == 3072
+    assert metric_values["transfer_d2h_bytes"] == 1024
 
     trace = registry.dispatch(_request("transfer-metrics-trace", "CaptureTrace", {}))
     assert trace["status"] == "pass"
@@ -1562,6 +1567,14 @@ def test_prefill_s1_accepts_public_token_and_sends_empty_native_prefix(
     assert produced["status"] == "pass"
     assert produced["result"]["prompt_token_count"] == 1
     assert produced["result"]["prefix_token_count"] == 0
+    metrics = produced["result"]["metrics"]
+    assert metrics["prefill_elapsed_sec"] == pytest.approx(0.0125)
+    assert metrics["tokens_per_sec_prefill"] == 0.0
+    assert metrics["kernel_elapsed_usec"] == 8000
+    assert metrics["transfer_elapsed_sec"] == pytest.approx(0.0025)
+    assert metrics["transfer_h2d_bytes"] == 3072
+    assert metrics["transfer_d2h_bytes"] == 1024
+    assert metrics["cache_emit_elapsed_sec"] >= 0.0
     prefill_call = next(
         payload for name, payload in client.calls if name == "Prefill"
     )

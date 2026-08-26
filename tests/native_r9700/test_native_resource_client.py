@@ -381,6 +381,11 @@ for raw in sys.stdin.buffer:
                 "prefill_npz_path": body.get("prefill_npz_path", ""),
                 "kernel_count": 1,
                 "transfer_bytes": 4096,
+                "prefill_elapsed_usec": 12500,
+                "kernel_elapsed_usec": 8000,
+                "transfer_elapsed_usec": 2500,
+                "transfer_h2d_bytes": 3072,
+                "transfer_d2h_bytes": 1024,
                 "block_tokens": len(body.get("token_ids", [])),
                 "block_count": 1,
                 "failure_stage": "",
@@ -561,6 +566,9 @@ def test_private_prefill_has_one_in_flight_correlation_and_no_model_path(
     )
     assert result["resource_generation"] == _GENERATION
     assert result["producer_fingerprint"] == _FINGERPRINT
+    assert result["prefill_elapsed_usec"] == 12500
+    assert result["kernel_elapsed_usec"] == 8000
+    assert result["transfer_h2d_bytes"] + result["transfer_d2h_bytes"] == 4096
     events = _events(log_path)
     prefill = [event for event in events if event.get("operation") == "Prefill"][-1]
     assert "model_uri" not in json.dumps(prefill)

@@ -43,7 +43,7 @@ Deliver a local long-lived R9700 Prefill Service that loads a verified model onc
 | 2. Local protocol, model registry, and private resource client | Done | F1Protocol | Final current-source review zero findings; combined task-set-2/3 focused command 107 passed.
 | 3. Native runner/resource lifetime and private worker | Done | F1Native | Persistent all-layer/embedding generation, injected budgets, N=0 cache, actual runner/pack identities, clean JSONL diagnostics, and teardown contracts accepted.
 | 4. Worker/consumer integration | Done | F1Integration | One production registry/session lifecycle, strict request-bound NPZ-to-mlx-lm cache conversion, `1.*` identity metadata, reconstructed cache validation, S=1/N=0, model/evidence binding, exact worker modes, and no native one-shot route. Task-set gate: 313 passed. |
-| 5. Repeated warm smoke and benchmark promotion | In progress | Supervisor | Real R9700 process smoke passes: one child, ten prompt-128 Prefills on the first generation, unload/reload/unload, no weight reload, request-bound accepted caches, `exit_status=0`. Multi-PDB1/small-BAR full-VRAM prerequisite gate passes 125 tests. Warm serving/benchmark promotion is next. |
+| 5. Repeated warm smoke and benchmark promotion | Done | Supervisor | Real R9700 process smoke and ten-sample warm execution pass. The benchmark emits 13 full native records with exact scoped counts, request identities, N-based throughput, and no lifecycle contradiction. Complete F1 acceptance suite: 288 passed; final review: PASS. Report: `.superpowers/swarm/reports/f1-promotion.md`. |
 
 Agents update only their row and append evidence/notes as work completes.
 

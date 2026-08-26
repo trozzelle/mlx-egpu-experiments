@@ -6,6 +6,9 @@
 #include <utility>
 
 namespace native_r9700 {
+
+KernelPackSpan<KernelPackRecord> llama_selectable_kernel_pack_records();
+
 namespace {
 
 constexpr char kTarget[] = "gfx1201";
@@ -81,6 +84,11 @@ bool is_safe_path(std::string_view path) {
     component_start = component_end + 1;
   }
   return path.back() != '/';
+}
+
+std::string_view filename_view(std::string_view path) {
+  const std::size_t separator = path.find_last_of('/');
+  return separator == std::string_view::npos ? path : path.substr(separator + 1);
 }
 bool is_unresolved_spdx(std::string_view expression) {
   std::size_t begin = 0;
@@ -1412,9 +1420,15 @@ bool admit_kernel_pack(const KernelPackRecord& record,
     return fail(error_text, "kernel asset lacks reviewed pack attestation");
   }
   KernelDescriptor loaded{};
-  const std::filesystem::path root(asset_root.begin(), asset_root.end());
+  const std::filesystem::path repository_root(asset_root.begin(), asset_root.end());
+  const std::filesystem::path declared_image(record.image.image_path.begin(),
+                                              record.image.image_path.end());
+  const std::filesystem::path image_root =
+      declared_image.has_parent_path()
+          ? repository_root / declared_image.parent_path()
+          : repository_root;
   if (!load_verified_kernel_code(
-          *asset, root, attestation->kernarg_schema, &loaded, nullptr)) {
+          *asset, image_root, attestation->kernarg_schema, &loaded, nullptr)) {
     return fail(error_text, "existing kernel asset/HSA admission rejected the image");
   }
   if (asset->descriptor.name != entry->symbol ||
@@ -1423,7 +1437,7 @@ bool admit_kernel_pack(const KernelPackRecord& record,
       std::string_view(asset->location.code_path) != attestation->image_path ||
       std::string_view(asset->location.sha256) != attestation->image_sha256 ||
       record.identity.target != attestation->target ||
-      record.image.image_path != attestation->image_path ||
+      filename_view(record.image.image_path) != attestation->image_path ||
       record.image.image_sha256 != attestation->image_sha256 ||
       record.image.image_size != attestation->image_size ||
       record.image.code_object_version != attestation->code_object_version ||
@@ -1484,6 +1498,32 @@ bool admit_kernel_pack(const KernelPackRecord& record,
   }
   *out_descriptor = std::move(loaded);
   return true;
+}
+
+const KernelPackRecord* find_llama_kernel_pack(std::string_view name,
+                                               std::string_view version,
+                                               KernelPackErrorBuffer error_text) {
+  return find_kernel_pack(llama_selectable_kernel_pack_records(), name, version, error_text);
+}
+
+bool admit_llama_kernel_pack(const KernelPackRecord& record,
+                             const KernelPackCompatibilityKey& selected_key,
+                             std::string_view entry_symbol,
+                             std::string_view asset_root,
+                             KernelDescriptor* out_descriptor,
+                             KernelPackErrorBuffer error_text) {
+  const KernelPackRecord* selected =
+      find_kernel_pack_for_key(llama_selectable_kernel_pack_records(), selected_key, error_text);
+  if (selected == nullptr) return false;
+  if (selected->identity.name != record.identity.name ||
+      selected->identity.version != record.identity.version ||
+      record.entries.data == nullptr || record.entries.size != selected->entries.size ||
+      selected->entries.data == nullptr ||
+      selected->entries.data[0].symbol != record.entries.data[0].symbol) {
+    return fail(error_text, "scalar pack is not the exact selected generated record");
+  }
+  return admit_kernel_pack(record, selected_key, entry_symbol, asset_root, out_descriptor,
+                           error_text);
 }
 
 }  // namespace native_r9700

@@ -87,6 +87,11 @@ struct NativeResourcePrefillResult {
   std::string prefill_npz_path;
   uint64_t kernel_count = 0;
   uint64_t transfer_bytes = 0;
+  uint64_t prefill_elapsed_usec = 0;
+  uint64_t kernel_elapsed_usec = 0;
+  uint64_t transfer_elapsed_usec = 0;
+  uint64_t transfer_h2d_bytes = 0;
+  uint64_t transfer_d2h_bytes = 0;
   uint64_t block_tokens = 0;
   uint64_t block_count = 0;
   std::string failure_stage;

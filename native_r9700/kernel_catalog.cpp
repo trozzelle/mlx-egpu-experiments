@@ -1,4 +1,6 @@
 #include "kernel_catalog.h"
+#include "kernel_pack.h"
+#include "kernel_packs_generated.inc"
 
 #include <array>
 #include <cstddef>
@@ -175,6 +177,17 @@ const KernelDescriptor* find_kernel(std::string_view name) {
     if (descriptor.name == name) return &descriptor;
   }
   return nullptr;
+}
+
+KernelPackSpan<KernelPackRecord> llama_kernel_pack_records() {
+  return generated::llama_scalar_pack_records();
+}
+
+// The selectable view is intentionally kept private to the pack selection
+// wrappers.  Pending native evidence remains observable through the complete
+// audit span but cannot become a production match.
+KernelPackSpan<KernelPackRecord> llama_selectable_kernel_pack_records() {
+  return generated::llama_selectable_scalar_pack_records();
 }
 
 }  // namespace native_r9700

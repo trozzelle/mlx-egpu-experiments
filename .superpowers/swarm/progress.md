@@ -23,14 +23,14 @@
   completion-timeline reset (`8f2f0ca`), launch geometry + o-proj/gated-MLP width
   (`c8f5770`), missing query RoPE (`36bf94a`), fused gated-MLP PCIe blowup
   (`6036802`), and the 64-key attention span (`c26f801`).
-- B0 remains a scalar/native correctness baseline, not the target performance architecture. No F1 persistent worker, F2 WMMA foundation, production Inference HAL/Kernel Pack integration, or native Qwen acceptance has promoted yet.
+- B0 remains a scalar/native correctness baseline, not the target performance architecture. F1 persistent worker is promoted; F2 WMMA foundation, production Inference HAL/Kernel Pack integration, and native Qwen acceptance have not promoted.
 
 ## Current follow-up ledger
 
 | Phase | Status | Evidence | Next gate |
 |---|---|---|---|
 | B0 native Llama producer/serving baseline | Complete | C0 hardware proof; C1R prompt-0/16/64/128 exact; C2R no-fallback | Preserve as regression control. |
-| F1 persistent warm worker | Ready | Accepted producer/serving path; resident memory and worker foundations | Repeated warm requests with no weight reload and first authoritative warm baseline. |
+| F1 persistent warm worker | Complete | Accepted producer/serving path; multi-PDB1 resident allocation; persistent private worker | Preserve the first authoritative cold/warm/GPU-compute baseline and no-reload service contract. |
 | F2 gfx1201 WMMA foundation | Ready | Scalar control, code-image admission, pinned WMMA/ISA sources | Lane-map proof plus admitted standalone WMMA GEMM and shared G0 record. |
 | P1 TinyGPU Device Owner hardening | Ready | ADR 0007; accepted TinyGPU/AMDev path; pinned lifecycle/DriverKit sources | Cold lifecycle, safe user-client ABI, reset/fault conformance, and G0 consumption. |
 | P3 first-class Kernel Packs | Ready | Existing HSA asset/catalog validation and upstream manifest | Concrete provenance/numerical/evidence records; migrate G0 WMMA artifact. |
@@ -86,10 +86,10 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 | Task | Status | Owner | Dependencies | Report | Evidence | Blocker |
 |---|---|---|---|---|---|---|
 | Shared baseline verification | Done | Supervisor | Task packets committed | `baseline-runtime-repair.md`, `baseline-raw-hip-repair.md` | Initial: 715 passed/26 failed. Focused repairs reviewed; final `tests/native_r9700 -v`: 744 passed, 2 dependency warnings in 662.69s (`artifact://276`). | — |
-| Wave A / F1 persistent warm worker | In progress | Supervisor integration | B0 | F1 contract/integration/multi-PDB1 reports | Task sets 1–4 and multi-PDB1 prerequisite complete. Real R9700 process smoke passes ten prompt-128 Prefills, unload/reload, accepted caches, no reload, and `exit_status=0`; focused acceptance gate passes 125 tests. | Warm serving/benchmark promotion command remains. |
+| Wave A / F1 persistent warm worker | Done | Supervisor integration | B0 | `f1-promotion.md`; F1 contract/integration/multi-PDB1 reports | One private child serves ten token-exact prompt-128 requests with accepted caches, zero warm reloads, and no fallback. Benchmark emits 10 identified raw rows plus 3 full native aggregate records with exact scoped counts and N-based throughput. Complete suite: 288 passed; final review: PASS. | — |
 | Wave A / F2 gfx1201 WMMA foundation | In progress | Supervisor / F2 admission | B0 | `f2-contract-freeze.md`, lane/admission reports | Task set 1 Done; task set 2 lane proof 22 tests passed and fresh hardware/comparator evidence is exact on `1002:7551`/gfx1201 with exit 0. Task set 3 offline contracts are implemented/tested synthetically. | Task set 3 real physical-layout/ISA/resource proof lacks the pinned upstream checkouts and selected linear image/reports; G0/task 4+ remain blocked. |
 | Wave A / P1 TinyGPU Device Owner | Blocked | P1ABI | B0, ADR 0007 | `p1-abi-freeze.md` | Task set 1 Done; final security re-review has zero Critical/Important findings. | Full Xcode/selected DriverKit SDK is not installed; distribution signing remains a separate promotion gate. |
-| Wave A / P3 Kernel Packs | In progress | P3 runtime/offline integration | B0; G0 for final migration | `p3-contract-freeze.md`; P3 RED/GREEN reports | Task sets 1–3 implemented. Runtime focused gate passes 22 tests; offline manifest focused gate passes 115 tests. Generic admission uses asset-owned K/V attestations and one canonical manifest/digest/evidence contract. | Task set 4 scalar migration is ready. Task set 5 and P3 promotion remain blocked on G0 and are deferred to their gates. |
+| Wave A / P3 Kernel Packs | Blocked | P3 runtime/offline integration | B0; G0 for final migration | `p3-contract-freeze.md`; `p3-scalar-migration.md`; P3 RED/GREEN reports | Task sets 1–4 complete. All 13 scalar packs are allocation-free, evidence-sealed, selectable through existing admission, and pass the 27-test gate; both fresh R9700 RMSNorm traces exit 0. | Task set 5 and final P3 promotion require the blocked F2/G0 WMMA artifact. |
 | Wave A / Q1 Qwen contract/oracle | Blocked | Q1Acceptance | B0 | Q1 identity/tensor/hybrid/oracle/shape/acceptance reports | Task sets 1–6 implemented. Pinned mlx-lm 0.32.0 / MLX 0.32.1 regeneration and model-bound parity pass; package gate passes 259 tests with oracle-only evidence. | Hard provenance blocker: `base_model_revision=unavailable_in_pinned_conversion_metadata` and applicable base license provenance. No native/performance claim. |
 | Wave B / G0 conformance record | Blocked | Unassigned | F2 | integration-g0.md | — | Waiting for F2 accepted WMMA artifact. |
 | Wave B / F3 projection graph | Blocked | Unassigned | F1, F2 | phase F3 reports | — | Waiting for model-handle/prepacking and admitted WMMA contracts. |

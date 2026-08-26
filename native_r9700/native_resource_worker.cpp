@@ -759,6 +759,11 @@ std::string prefill_result_json(const NativeResourcePrefillResult& result) {
          ",\"prefill_npz_path\":" + jcs_escape(result.prefill_npz_path) +
          ",\"kernel_count\":" + std::to_string(result.kernel_count) +
          ",\"transfer_bytes\":" + std::to_string(result.transfer_bytes) +
+         ",\"prefill_elapsed_usec\":" + std::to_string(result.prefill_elapsed_usec) +
+         ",\"kernel_elapsed_usec\":" + std::to_string(result.kernel_elapsed_usec) +
+         ",\"transfer_elapsed_usec\":" + std::to_string(result.transfer_elapsed_usec) +
+         ",\"transfer_h2d_bytes\":" + std::to_string(result.transfer_h2d_bytes) +
+         ",\"transfer_d2h_bytes\":" + std::to_string(result.transfer_d2h_bytes) +
          ",\"block_tokens\":" + std::to_string(result.block_tokens) +
          ",\"block_count\":" + std::to_string(result.block_count) +
          ",\"failure_stage\":" + jcs_escape(result.failure_stage) +

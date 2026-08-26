@@ -2076,6 +2076,16 @@ class _WorkerModeRegistry:
                         "payload_digest": _F1_CLI_PACK_DIGEST,
                         "payload_length_bytes": npz_path.stat().st_size,
                     },
+                    "metrics": {
+                        "prefill_elapsed_sec": 0.0125,
+                        "kernel_elapsed_usec": 8000,
+                        "transfer_elapsed_sec": 0.0025,
+                        "cache_emit_elapsed_sec": 0.001,
+                        "total_elapsed_sec": 0.014,
+                        "tokens_per_sec_prefill": (len(token_ids) - 1) / 0.0125,
+                        "transfer_h2d_bytes": 6144,
+                        "transfer_d2h_bytes": 2048,
+                    },
                 },
                 evidence={
                     "producer_kind": "r9700_native",
@@ -2371,6 +2381,8 @@ def test_worker_warm_mode_reuses_one_handle_and_generation_for_ten_prefills(
     assert result["metrics"]["load_preparation_count"] == 1
     assert result["metrics"]["warm_prefill_weight_reload_count"] == 0
     assert result["metrics"]["prefill_count"] == 10
+    assert result["metrics"]["cold_process_sample_count"] == 1
+    assert result["metrics"]["cold_process_elapsed_sec"] > 0.0
 
     samples = result.get("samples")
     assert isinstance(samples, list)
