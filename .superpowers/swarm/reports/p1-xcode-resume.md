@@ -86,4 +86,11 @@
 - Task-set-3 native controls: 62 passed.
 - Code/architecture and security review/fix/re-review: zero remaining Critical/Important findings.
 - Nonblocking residual: recovery/diagnostic role behavior is intentionally narrower than the frozen final authority until later task sets; every denial is structured and cannot broaden access.
-- Task set 3 remains In progress: device-local VRAM, descriptor import, and real AMD private-VM PTE map/unmap are absent and remain fail-closed.
+- Task set 3 is now Blocked after all reachable reviewed source work: the frozen 48-byte request plus distinct descriptor sideband is infeasible through `IOConnectCall*`, and device-local/private-VM PTE work waits for task-set-2 cold ownership. See `p1-remaining-blockers.md`.
+
+## Stop gate
+
+- P1 has zero actionable unblocked rows.
+- Task set 2 resumes only with approved provenance-bound PSP/SOS/TMR and cold-transition inputs plus install/hardware prerequisites.
+- Task set 3 import resumes only after reopening the frozen import transport. Private-VM mapping resumes after task-set-2 cold ownership.
+- Tasks 4–6 remain dependency-blocked; no executor may bypass these gates with raw mappings, metadata-only mappings, proxy transport, or pre-warmed state.
