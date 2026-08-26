@@ -51,6 +51,10 @@ constexpr uint64_t kLeafPhysical = 0x04000000ULL;
 constexpr uint64_t kSecondLeafPhysical = kLeafPhysical + kPageBytes;
 constexpr uint64_t kTailReservedBytes = 64ULL << 20;
 constexpr uint64_t kResidentVaLimit = kCrossPtbVa + kPtbBytes;
+constexpr uint64_t kOneGib = 1ULL << 30;
+constexpr uint64_t kBasePdb1Va = kResidentVaBase & ~(kOneGib - 1);
+constexpr uint64_t kCrossPdb1Va = kBasePdb1Va + kOneGib - kPageBytes;
+constexpr uint64_t kSecondPdb1Va = kBasePdb1Va + 2 * kOneGib;
 constexpr uint64_t kPdb2AliasedVa = kResidentVaBase + (512ULL << 39);
 
 
@@ -132,10 +136,14 @@ class FakeBarBackend final : public native_r9700::DynamicPageTableBackend {
                  std::string* error_text) override {
     operations.push_back({OperationKind::kWrite, table_page, entry_index, pte});
     ptes[{table_page, entry_index}] = pte;
-    const FailurePoint point = table_page == kFixedPdb0Page
-                                   ? FailurePoint::kParentWrite
-                                   : FailurePoint::kLeafWrite;
-    return !fails(point, error_text);
+    const bool parent_page =
+        table_page == kFixedPdb0Page || table_page == kFixedPdb1Page ||
+        parent_pages.find(table_page) != parent_pages.end() ||
+        (pte != 0 && (pte & (1ULL << 63)) == 0);
+    if (parent_page && pte != 0) parent_pages[table_page] = true;
+    return !fails(parent_page ? FailurePoint::kParentWrite
+                              : FailurePoint::kLeafWrite,
+                  error_text);
   }
 
   bool read_pte(uint64_t table_page, uint16_t entry_index, uint64_t* pte,
@@ -143,10 +151,14 @@ class FakeBarBackend final : public native_r9700::DynamicPageTableBackend {
     const auto found = ptes.find({table_page, entry_index});
     *pte = found == ptes.end() ? 0 : found->second;
     operations.push_back({OperationKind::kRead, table_page, entry_index, *pte});
-    const FailurePoint point = table_page == kFixedPdb0Page
-                                   ? FailurePoint::kParentRead
-                                   : FailurePoint::kLeafRead;
-    return !fails(point, error_text);
+    const bool parent_page =
+        table_page == kFixedPdb0Page || table_page == kFixedPdb1Page ||
+        parent_pages.find(table_page) != parent_pages.end() ||
+        (*pte != 0 && (*pte & (1ULL << 63)) == 0);
+    if (parent_page && *pte != 0) parent_pages[table_page] = true;
+    return !fails(parent_page ? FailurePoint::kParentRead
+                              : FailurePoint::kLeafRead,
+                  error_text);
   }
 
   bool flush_mmhub(std::string* error_text) override {
@@ -181,6 +193,7 @@ class FakeBarBackend final : public native_r9700::DynamicPageTableBackend {
   }
 
   std::map<PteSlot, uint64_t> ptes;
+  std::map<uint64_t, bool> parent_pages;
 };
 
 native_r9700::DynamicPageTable dynamic_page_table(
@@ -574,6 +587,338 @@ bool failed_unmap_retains_an_owned_dynamic_ptb_until_retry(FailurePoint failure)
                  "a retried owned unmap must release the quarantined PTB");
 }
 
+bool maps_across_pdb1_boundary_and_releases_hierarchy() {
+  native_r9700::VramLayout layout = dynamic_table_layout(8);
+  layout.resident_gpu_va_limit = kCrossPdb1Va + 2 * kPageBytes;
+  native_r9700::VramAllocator allocator(layout);
+  FakeBarBackend backend;
+  backend.allocator = &allocator;
+  native_r9700::DynamicPageTable table =
+      dynamic_page_table(layout, &allocator, &backend);
+  std::string error_text;
+
+  if (!require(table.map_range(kCrossPdb1Va, kLeafPhysical, 2 * kPageBytes,
+                               &error_text),
+               "a range crossing 1 GiB must map across two PDB1 slots")) {
+    return false;
+  }
+  if (!require(table.dynamic_pdb0_count() == 1,
+               "crossing 1 GiB must own one dynamic PDB0 page") ||
+      !require(table.dynamic_ptb_count() == 2,
+               "crossing 1 GiB must own one PTB per PDB0 pair") ||
+      !require(table.first_dynamic_pdb0_physical_offset() ==
+                   kFirstDynamicPage + kPageBytes,
+               "the later PDB1 slot must own its PDB0 page") ||
+      !require(backend.zeroed_pages.size() == 3,
+               "crossing 1 GiB must zero the two PTBs and one PDB0 page")) {
+    return false;
+  }
+  for (const uint64_t page : backend.zeroed_pages) {
+    if (!require(page != kFixedRootPage && page != kFixedPdb1Page &&
+                     page != kFixedPdb0Page && page != kFixedPtb0Page,
+                 "fixed C0 pages must never be zeroed")) {
+      return false;
+    }
+  }
+
+  if (!require(table.unmap_range(kCrossPdb1Va, 2 * kPageBytes, &error_text),
+               "a cross-PDB1 range must unmap")) {
+    return false;
+  }
+  native_r9700::VramAllocation released{};
+  return require(table.dynamic_pdb0_count() == 0 &&
+                     table.dynamic_ptb_count() == 0,
+                 "cross-PDB1 unmap must release all dynamic table ownership") &&
+         require(allocator.allocate("released", kPageBytes, kPageBytes,
+                                    &released, &error_text),
+                 "released hierarchy pages must become reusable") &&
+         require(released.physical_offset == kFirstDynamicPage,
+                 "released hierarchy pages must return to the first dynamic page");
+}
+
+bool maps_multiple_ptbs_under_one_dynamic_pdb0() {
+  const uint64_t start = kResidentVaBase + kOneGib;
+  const uint64_t size = kPtbBytes + kPageBytes;
+  native_r9700::VramLayout layout = dynamic_table_layout(8);
+  layout.resident_gpu_va_limit = start + size;
+  native_r9700::VramAllocator allocator(layout);
+  FakeBarBackend backend;
+  backend.allocator = &allocator;
+  native_r9700::DynamicPageTable table =
+      dynamic_page_table(layout, &allocator, &backend);
+  std::string error_text;
+
+  if (!require(table.map_range(start, kLeafPhysical, size, &error_text),
+               "one dynamic PDB0 must support multiple PTB children")) {
+    return false;
+  }
+  if (!require(table.dynamic_pdb0_count() == 1,
+               "two PTBs in one PDB1 slot must share one PDB0") ||
+      !require(table.dynamic_ptb_count() == 2,
+               "crossing a PDB0 boundary must allocate a second PTB")) {
+    return false;
+  }
+  if (!require(table.unmap_range(start, size, &error_text),
+               "multiple PTBs beneath one PDB0 must unmap")) {
+    return false;
+  }
+  native_r9700::VramAllocation released{};
+  return require(table.dynamic_pdb0_count() == 0 &&
+                     table.dynamic_ptb_count() == 0,
+                 "unmapping multiple PTBs must release the PDB0 after children") &&
+         require(allocator.allocate("released", kPageBytes, kPageBytes,
+                                    &released, &error_text),
+                 "all PTBs and their PDB0 must be reusable") &&
+         require(released.physical_offset == kFirstDynamicPage,
+                 "hierarchy release must restore the first dynamic page");
+}
+
+bool maps_two_later_pdb1_slots() {
+  const uint64_t first = kResidentVaBase + kOneGib;
+  native_r9700::VramLayout layout = dynamic_table_layout(8);
+  layout.resident_gpu_va_limit = kSecondPdb1Va + kPageBytes;
+  native_r9700::VramAllocator allocator(layout);
+  FakeBarBackend backend;
+  backend.allocator = &allocator;
+  native_r9700::DynamicPageTable table =
+      dynamic_page_table(layout, &allocator, &backend);
+  std::string error_text;
+
+  if (!require(table.map_range(first, kLeafPhysical, kPageBytes, &error_text),
+               "the first later PDB1 slot must map") ||
+      !require(table.map_range(kSecondPdb1Va, kSecondLeafPhysical, kPageBytes,
+                               &error_text),
+               "the second later PDB1 slot must map")) {
+    return false;
+  }
+  if (!require(table.dynamic_pdb0_count() == 2,
+               "two later PDB1 slots must own two PDB0 pages") ||
+      !require(table.dynamic_ptb_count() == 2,
+               "two later PDB1 slots must own two PTBs")) {
+    return false;
+  }
+  if (!require(table.unmap_range(first, kPageBytes, &error_text),
+               "the first later PDB1 slot must unmap") ||
+      !require(table.unmap_range(kSecondPdb1Va, kPageBytes, &error_text),
+               "the second later PDB1 slot must unmap")) {
+    return false;
+  }
+  native_r9700::VramAllocation released{};
+  return require(table.dynamic_pdb0_count() == 0 &&
+                     table.dynamic_ptb_count() == 0,
+                 "both later PDB1 slots must release their hierarchy") &&
+         require(allocator.allocate("released", kPageBytes, kPageBytes,
+                                    &released, &error_text),
+                 "two later PDB1 cleanups must release every owned page") &&
+         require(released.physical_offset == kFirstDynamicPage,
+                 "two later PDB1 cleanups must restore allocation order");
+}
+
+bool failed_dynamic_pdb0_setup_retains_ownership(FailurePoint failure) {
+  const uint64_t start = kResidentVaBase + kOneGib;
+  native_r9700::VramLayout layout = dynamic_table_layout(4);
+  layout.resident_gpu_va_limit = start + kPageBytes;
+  native_r9700::VramAllocator allocator(layout);
+  FakeBarBackend backend;
+  backend.allocator = &allocator;
+  backend.failure = failure;
+  native_r9700::DynamicPageTable table =
+      dynamic_page_table(layout, &allocator, &backend);
+  std::string error_text;
+
+  if (!require(!table.map_range(start, kLeafPhysical, kPageBytes, &error_text) &&
+                   !error_text.empty(),
+               "a dynamic PDB0 parent failure must fail map_range") ||
+      !require(table.dynamic_pdb0_count() == 1,
+               "a failed PDB0 parent link must quarantine its allocation")) {
+    return false;
+  }
+
+  native_r9700::VramAllocation still_owned{};
+  if (!require(allocator.allocate("still-owned", kPageBytes, kPageBytes,
+                                  &still_owned, &error_text),
+               "a failed PDB0 parent link must leave a liveness probe page") ||
+      !require(still_owned.physical_offset == kFirstDynamicPage + kPageBytes,
+               "a failed PDB0 parent link must retain its owned page")) {
+    return false;
+  }
+  if (!require(table.unmap_range(start, kPageBytes, &error_text),
+               "a failed PDB0 parent link must be explicitly cleanable")) {
+    return false;
+  }
+
+  native_r9700::VramAllocation released{};
+  return require(table.dynamic_pdb0_count() == 0,
+                 "PDB0 cleanup must remove the quarantine record") &&
+         require(allocator.allocate("released", kPageBytes, kPageBytes,
+                                    &released, &error_text),
+                 "PDB0 cleanup must release its physical page") &&
+         require(released.physical_offset == kFirstDynamicPage,
+                 "PDB0 cleanup must restore the first dynamic page");
+}
+
+bool failed_dynamic_leaf_map_retains_hierarchy_until_cleanup(FailurePoint failure) {
+  const uint64_t start = kResidentVaBase + kOneGib;
+  native_r9700::VramLayout layout = dynamic_table_layout(5);
+  layout.resident_gpu_va_limit = start + kPageBytes;
+  native_r9700::VramAllocator allocator(layout);
+  FakeBarBackend backend;
+  backend.allocator = &allocator;
+  backend.failure = failure;
+  native_r9700::DynamicPageTable table =
+      dynamic_page_table(layout, &allocator, &backend);
+  std::string error_text;
+
+  if (!require(!table.map_range(start, kLeafPhysical, kPageBytes, &error_text) &&
+                   !error_text.empty(),
+               "a failed dynamic leaf operation must fail map_range") ||
+      !require(table.dynamic_pdb0_count() == 1 &&
+                   table.dynamic_ptb_count() == 1,
+               "a failed dynamic leaf operation must retain PDB0 and PTB")) {
+    return false;
+  }
+  native_r9700::VramAllocation still_owned{};
+  if (!require(allocator.allocate("still-owned", kPageBytes, kPageBytes,
+                                  &still_owned, &error_text),
+               "a failed dynamic leaf operation must leave a liveness probe") ||
+      !require(still_owned.physical_offset == kFirstDynamicPage + 2 * kPageBytes,
+               "a failed dynamic leaf operation must retain both table pages")) {
+    return false;
+  }
+  if (!require(table.unmap_range(start, kPageBytes, &error_text),
+               "a failed dynamic leaf operation must be explicitly cleanable")) {
+    return false;
+  }
+  native_r9700::VramAllocation released{};
+  return require(table.dynamic_pdb0_count() == 0 &&
+                     table.dynamic_ptb_count() == 0,
+                 "leaf cleanup must release PDB0 and PTB ownership") &&
+         require(allocator.allocate("released", kPageBytes, kPageBytes,
+                                    &released, &error_text),
+                 "leaf cleanup must release all hierarchy pages") &&
+         require(released.physical_offset == kFirstDynamicPage,
+                 "leaf cleanup must restore the first dynamic page");
+}
+
+bool collision_prescan_crosses_pdb1_without_mutation() {
+  native_r9700::VramLayout layout = dynamic_table_layout(8);
+  layout.resident_gpu_va_limit = kCrossPdb1Va + 2 * kPageBytes;
+  native_r9700::VramAllocator allocator(layout);
+  FakeBarBackend backend;
+  backend.allocator = &allocator;
+  native_r9700::DynamicPageTable table =
+      dynamic_page_table(layout, &allocator, &backend);
+  std::string error_text;
+
+  if (!require(table.map_range(kCrossPdb1Va, kLeafPhysical, kPageBytes,
+                               &error_text),
+               "the collision fixture must map its first cross-PDB1 leaf")) {
+    return false;
+  }
+  backend.clear_operations();
+  if (!require(!table.map_range(kCrossPdb1Va - kPageBytes, kSecondLeafPhysical,
+                                3 * kPageBytes, &error_text) &&
+                   !error_text.empty(),
+               "a cross-PDB1 collision must fail")) {
+    return false;
+  }
+  native_r9700::VramAllocation first_free{};
+  return require(backend.operations.empty(),
+                 "a cross-PDB1 collision must not mutate the fake BAR") &&
+         require(allocator.allocate("first-free", kPageBytes, kPageBytes,
+                                    &first_free, &error_text),
+                 "a cross-PDB1 collision must leave allocator capacity intact") &&
+         require(first_free.physical_offset == kFirstDynamicPage + kPageBytes,
+                 "a cross-PDB1 collision must not reserve another table page");
+}
+
+bool failed_hierarchical_unmap_flush_retries() {
+  const uint64_t start = kResidentVaBase + kOneGib;
+  native_r9700::VramLayout layout = dynamic_table_layout(4);
+  layout.resident_gpu_va_limit = start + kPageBytes;
+  native_r9700::VramAllocator allocator(layout);
+  FakeBarBackend backend;
+  backend.allocator = &allocator;
+  native_r9700::DynamicPageTable table =
+      dynamic_page_table(layout, &allocator, &backend);
+  std::string error_text;
+  if (!require(table.map_range(start, kLeafPhysical, kPageBytes, &error_text),
+               "the hierarchical unmap retry fixture must map")) {
+    return false;
+  }
+  backend.clear_operations();
+  backend.failure = FailurePoint::kFlushMmhub;
+  if (!require(!table.unmap_range(start, kPageBytes, &error_text) &&
+                   !error_text.empty(),
+               "a hierarchical MMHUB flush failure must fail unmap") ||
+      !require(table.dynamic_pdb0_count() == 1 &&
+                   table.dynamic_ptb_count() == 1,
+               "a failed hierarchical flush must retain exact ownership")) {
+    return false;
+  }
+  if (!require(table.unmap_range(start, kPageBytes, &error_text),
+               "a hierarchical unmap must retry after flush failure")) {
+    return false;
+  }
+  native_r9700::VramAllocation released{};
+  return require(table.dynamic_pdb0_count() == 0 &&
+                     table.dynamic_ptb_count() == 0,
+                 "a retried hierarchical unmap must release all pages") &&
+         require(allocator.allocate("released", kPageBytes, kPageBytes,
+                                    &released, &error_text),
+                 "a retried hierarchical unmap must restore allocator capacity") &&
+         require(released.physical_offset == kFirstDynamicPage,
+                 "a retried hierarchical unmap must release PDB0 before reuse");
+}
+
+bool hierarchical_unmap_is_child_before_parent() {
+  const uint64_t start = kResidentVaBase + kOneGib;
+  native_r9700::VramLayout layout = dynamic_table_layout(4);
+  layout.resident_gpu_va_limit = start + kPageBytes;
+  native_r9700::VramAllocator allocator(layout);
+  FakeBarBackend backend;
+  backend.allocator = &allocator;
+  native_r9700::DynamicPageTable table =
+      dynamic_page_table(layout, &allocator, &backend);
+  std::string error_text;
+  if (!require(table.map_range(start, kLeafPhysical, kPageBytes, &error_text),
+               "the hierarchy ordering fixture must map")) {
+    return false;
+  }
+  const uint64_t pdb0_page = table.first_dynamic_pdb0_physical_offset();
+  const uint64_t ptb_page = kFirstDynamicPage + kPageBytes;
+  backend.clear_operations();
+  if (!require(table.unmap_range(start, kPageBytes, &error_text),
+               "the hierarchy ordering fixture must unmap")) {
+    return false;
+  }
+
+  return require(backend.operations.size() == 10,
+                 "hierarchical cleanup must flush each ownership level") &&
+         require(is_operation(backend.operations[0], OperationKind::kWrite,
+                              ptb_page, 17) &&
+                     backend.operations[0].pte == 0 &&
+                     is_operation(backend.operations[1], OperationKind::kRead,
+                                  ptb_page, 17) &&
+                     is_operation(backend.operations[2], OperationKind::kWrite,
+                                  pdb0_page, 0) &&
+                     backend.operations[2].pte == 0 &&
+                     is_operation(backend.operations[3], OperationKind::kRead,
+                                  pdb0_page, 0) &&
+                     is_operation(backend.operations[4],
+                                  OperationKind::kFlushMmhub) &&
+                     is_operation(backend.operations[5], OperationKind::kFlushGc) &&
+                     is_operation(backend.operations[6], OperationKind::kWrite,
+                                  kFixedPdb1Page, 1) &&
+                     backend.operations[6].pte == 0 &&
+                     is_operation(backend.operations[7], OperationKind::kRead,
+                                  kFixedPdb1Page, 1) &&
+                     is_operation(backend.operations[8],
+                                  OperationKind::kFlushMmhub) &&
+                     is_operation(backend.operations[9], OperationKind::kFlushGc),
+                 "hierarchical cleanup must clear child parents before PDB1");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -642,6 +987,37 @@ int main(int argc, char** argv) {
     return maps_full_resident_window_ending_at_exclusive_limit() ? 0 : 17;
   if (mode == "cross-ptb-zero-cleanup")
     return cross_ptb_zero_failure_retains_prior_leaf_for_explicit_cleanup() ? 0 : 18;
+
+  if (mode == "crosses-pdb1")
+    return maps_across_pdb1_boundary_and_releases_hierarchy() ? 0 : 20;
+  if (mode == "multiple-ptbs-one-pdb0")
+    return maps_multiple_ptbs_under_one_dynamic_pdb0() ? 0 : 21;
+  if (mode == "two-later-pdb1")
+    return maps_two_later_pdb1_slots() ? 0 : 22;
+  if (mode == "pdb0-parent-write")
+    return failed_dynamic_pdb0_setup_retains_ownership(FailurePoint::kParentWrite)
+               ? 0
+               : 23;
+  if (mode == "pdb0-parent-read")
+    return failed_dynamic_pdb0_setup_retains_ownership(FailurePoint::kParentRead)
+               ? 0
+               : 24;
+  if (mode == "pdb0-leaf-write")
+    return failed_dynamic_leaf_map_retains_hierarchy_until_cleanup(
+               FailurePoint::kLeafWrite)
+               ? 0
+               : 25;
+  if (mode == "pdb0-leaf-read")
+    return failed_dynamic_leaf_map_retains_hierarchy_until_cleanup(
+               FailurePoint::kLeafRead)
+               ? 0
+               : 26;
+  if (mode == "cross-pdb1-collision")
+    return collision_prescan_crosses_pdb1_without_mutation() ? 0 : 27;
+  if (mode == "hierarchical-unmap-retry")
+    return failed_hierarchical_unmap_flush_retries() ? 0 : 28;
+  if (mode == "hierarchical-unmap-order")
+    return hierarchical_unmap_is_child_before_parent() ? 0 : 29;
 
   return 19;
 }
@@ -793,3 +1169,69 @@ def test_dynamic_page_table_quarantines_gc_flush_unmap_failure_until_retry(
 ) -> None:
     """A GC flush failure preserves the owned mapping for an explicit unmap retry."""
     run_dynamic_page_table_probe(tmp_path, "unmap-flush-gc")
+
+
+def test_dynamic_page_table_maps_across_pdb1_boundary_and_releases_hierarchy(
+    tmp_path: Path,
+) -> None:
+    """A single mapping may cross 1 GiB and own the later PDB0/PTB chain."""
+    run_dynamic_page_table_probe(tmp_path, "crosses-pdb1")
+
+
+def test_dynamic_page_table_supports_multiple_ptbs_under_one_dynamic_pdb0(
+    tmp_path: Path,
+) -> None:
+    """A dynamic PDB0 owns one PTB for each selected 2 MiB region."""
+    run_dynamic_page_table_probe(tmp_path, "multiple-ptbs-one-pdb0")
+
+
+def test_dynamic_page_table_supports_two_later_pdb1_slots(tmp_path: Path) -> None:
+    """Mappings in distinct later 1 GiB slots own distinct PDB0 pages."""
+    run_dynamic_page_table_probe(tmp_path, "two-later-pdb1")
+
+
+def test_dynamic_page_table_quarantines_dynamic_pdb0_parent_write_failure(
+    tmp_path: Path,
+) -> None:
+    """An uncertain PDB1 parent write retains the dynamic PDB0 for cleanup."""
+    run_dynamic_page_table_probe(tmp_path, "pdb0-parent-write")
+
+
+def test_dynamic_page_table_quarantines_dynamic_pdb0_parent_readback_failure(
+    tmp_path: Path,
+) -> None:
+    """An uncertain PDB1 parent readback retains the dynamic PDB0 for cleanup."""
+    run_dynamic_page_table_probe(tmp_path, "pdb0-parent-read")
+
+
+def test_dynamic_page_table_quarantines_dynamic_pdb0_leaf_write_failure(
+    tmp_path: Path,
+) -> None:
+    """A leaf failure below a dynamic PDB0 retains both owned table pages."""
+    run_dynamic_page_table_probe(tmp_path, "pdb0-leaf-write")
+
+
+def test_dynamic_page_table_quarantines_dynamic_pdb0_leaf_readback_failure(
+    tmp_path: Path,
+) -> None:
+    """A leaf readback failure below a dynamic PDB0 is explicitly cleanable."""
+    run_dynamic_page_table_probe(tmp_path, "pdb0-leaf-read")
+
+
+def test_dynamic_page_table_prescans_cross_pdb1_collisions_before_mutation(
+    tmp_path: Path,
+) -> None:
+    """Cross-PDB1 collision rejection must leave BAR and allocator untouched."""
+    run_dynamic_page_table_probe(tmp_path, "cross-pdb1-collision")
+
+
+def test_dynamic_page_table_retries_hierarchical_unmap_after_flush_failure(
+    tmp_path: Path,
+) -> None:
+    """A failed flush retains exact PDB0/PTB ownership for the retry."""
+    run_dynamic_page_table_probe(tmp_path, "hierarchical-unmap-retry")
+
+
+def test_dynamic_page_table_unmaps_hierarchy_child_before_parent(tmp_path: Path) -> None:
+    """PTB and PDB0 parents clear before the PDB1 parent and release."""
+    run_dynamic_page_table_probe(tmp_path, "hierarchical-unmap-order")
