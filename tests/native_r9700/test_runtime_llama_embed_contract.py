@@ -9,6 +9,8 @@ from pathlib import Path
 import subprocess
 
 
+HARDWARE_LOCK_SOURCE = Path("native_r9700/hardware_lock.cpp")
+
 RUNNER_SOURCES = (
     Path("native_r9700/amdev_packets.cpp"),
     Path("native_r9700/runtime_contract.cpp"),
@@ -26,6 +28,7 @@ RUNNER_SOURCES = (
     Path("native_r9700/amdev_session.cpp"),
     Path("native_r9700/kernel_catalog.cpp"),
     Path("native_r9700/device_memory.cpp"),
+    HARDWARE_LOCK_SOURCE,
     Path("native_r9700/runtime.cpp"),
     Path("native_r9700/runner.cpp"),
 )
@@ -73,6 +76,7 @@ LLAMA_EMBED_SMOKE_RESULT_FIELDS = frozenset(
 
 def compile_runner(tmp_path: Path) -> Path:
     """Compile the complete runner closure without invoking a device mode."""
+    assert HARDWARE_LOCK_SOURCE in RUNNER_SOURCES, "runner closure must link HardwareLock"
     assert all(source.exists() for source in RUNNER_SOURCES), (
         "native_r9700 Llama embedding smoke runner sources missing"
     )

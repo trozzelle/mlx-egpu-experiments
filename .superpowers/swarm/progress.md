@@ -69,6 +69,7 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 - Checkout: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a`
 - Branch: `feature/r9700-products-wave-a`
 - Boundary kind: fallback linked worktree created from `main`; every executor/reviewer uses this checkout and branch.
+- Cross-repository P1 boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on TinyGPU branch `feature/r9700-device-owner`; only P1 executors may edit it, after task set 1 review.
 - Agents never run git. The supervisor validates, reviews, updates ledgers/reports, and makes local checkpoint commits. Push and PR work remain user-owned unless separately requested.
 
 ### Orchestration map
@@ -84,11 +85,12 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 
 | Task | Status | Owner | Dependencies | Report | Evidence | Blocker |
 |---|---|---|---|---|---|---|
-| Wave A / F1 persistent warm worker | Not started | Unassigned | B0 | phase F1 reports | — | — |
-| Wave A / F2 gfx1201 WMMA foundation | Not started | Unassigned | B0 | phase F2 reports | — | — |
-| Wave A / P1 TinyGPU Device Owner | Not started | Unassigned | B0, ADR 0007 | phase P1 reports | — | Distribution signing remains a human gate; local engineering may proceed. |
-| Wave A / P3 Kernel Packs | Not started | Unassigned | B0; G0 for final migration | phase P3 reports | — | Task set 5 waits for G0. |
-| Wave A / Q1 Qwen contract/oracle | Not started | Unassigned | B0 | phase Q1 reports | — | Native execution remains downstream of F6. |
+| Shared baseline verification | Done | Supervisor | Task packets committed | `baseline-runtime-repair.md`, `baseline-raw-hip-repair.md` | Initial: 715 passed/26 failed. Focused repairs reviewed; final `tests/native_r9700 -v`: 744 passed, 2 dependency warnings in 662.69s (`artifact://276`). | — |
+| Wave A / F1 persistent warm worker | In progress | F1Contract | B0 | phase F1 reports | Task set 1 dispatched. | — |
+| Wave A / F2 gfx1201 WMMA foundation | In progress | F2Contract | B0 | phase F2 reports | Task set 1 dispatched. | — |
+| Wave A / P1 TinyGPU Device Owner | In progress | P1ABI | B0, ADR 0007 | phase P1 reports | Task set 1 dispatched. | Distribution signing remains a human gate; local engineering may proceed. |
+| Wave A / P3 Kernel Packs | In progress | P3Contract | B0; G0 for final migration | phase P3 reports | Task set 1 dispatched. | Task set 5 waits for G0. |
+| Wave A / Q1 Qwen contract/oracle | In progress | Q1Identity | B0 | phase Q1 reports | Task set 1 dispatched. | Native execution remains downstream of F6. |
 | Wave B / G0 conformance record | Blocked | Unassigned | F2 | integration-g0.md | — | Waiting for F2 accepted WMMA artifact. |
 | Wave B / F3 projection graph | Blocked | Unassigned | F1, F2 | phase F3 reports | — | Waiting for model-handle/prepacking and admitted WMMA contracts. |
 | Wave B / P2 Inference HAL | Blocked | Unassigned | P1 ABI; G0 for promotion | phase P2 reports | — | Waiting for P1 ABI freeze. |

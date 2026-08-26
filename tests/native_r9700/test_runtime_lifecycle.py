@@ -7,6 +7,8 @@ from pathlib import Path
 import subprocess
 
 
+HARDWARE_LOCK_SOURCE = Path("native_r9700/hardware_lock.cpp")
+
 VRAM_CLOSURE_SOURCES = (
     Path("native_r9700/vram_layout.cpp"),
     Path("native_r9700/vram_allocator.cpp"),
@@ -25,6 +27,7 @@ RUNNER_SOURCES = [
     Path("native_r9700/amdev_session.cpp"),
     Path("native_r9700/kernel_catalog.cpp"),
     Path("native_r9700/device_memory.cpp"),
+    HARDWARE_LOCK_SOURCE,
     Path("native_r9700/llama_stage_layout.cpp"),
     Path("native_r9700/llama_layer_executor.cpp"),
     Path("native_r9700/kernel_assets.cpp"),
@@ -87,6 +90,7 @@ DISPATCH_LOCAL_SIZE_X = "8"
 C1R4_LAYER_SLICE_BYTES = "20480"  # prompt-0 prefix activation: 5 * 2048 * fp16.
 
 def compile_runner(tmp_path):
+    assert HARDWARE_LOCK_SOURCE in RUNNER_SOURCES, "runner closure must link HardwareLock"
     assert all(s.exists() for s in RUNNER_SOURCES), (
         "native_r9700 runner sources missing"
     )

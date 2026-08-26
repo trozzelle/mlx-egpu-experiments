@@ -7,6 +7,7 @@ import subprocess
 AMDEV_SESSION_SOURCE = Path("native_r9700/amdev_session.cpp")
 KERNEL_CATALOG_SOURCE = Path("native_r9700/kernel_catalog.cpp")
 PACKET_SOURCE = Path("native_r9700/amdev_packets.cpp")
+HARDWARE_LOCK_SOURCE = Path("native_r9700/hardware_lock.cpp")
 VRAM_CLOSURE_SOURCES = (
     Path("native_r9700/vram_layout.cpp"),
     Path("native_r9700/vram_allocator.cpp"),
@@ -19,6 +20,7 @@ NATIVE_INCLUDE_DIR = Path("native_r9700")
 
 def compile_dispatch_probe(tmp_path: Path) -> Path:
     """Compile the public preflight boundary without opening a TinyGPU socket."""
+    assert HARDWARE_LOCK_SOURCE.is_file(), "native_r9700 hardware-lock source is missing"
     probe_source = tmp_path / "resident_dispatch_probe.cpp"
     probe_source.write_text(
         r'''
@@ -156,6 +158,7 @@ int main(int argc, char** argv) {
             str(AMDEV_SESSION_SOURCE),
             str(KERNEL_CATALOG_SOURCE),
             str(PACKET_SOURCE),
+            str(HARDWARE_LOCK_SOURCE),
             *map(str, VRAM_CLOSURE_SOURCES),
             str(probe_source),
             "-I",
@@ -281,10 +284,9 @@ def test_native_queue_diagnostics_identify_post_doorbell_receipt_and_fetch_state
         "log_compute_queue_post_doorbell_diagnostics(client, *log)"
     )
 
-    # Definition plus four call sites: kernel proof, embed smoke, legacy
-    # primitive chain, and the resident HSA dispatch path.
-    assert source.count("submit_compute_dispatch_with_post_doorbell_diagnostics(") == 5
-
+    # Definition plus three single-dispatch call sites. The resident batch path
+    # submits one combined stream directly and intentionally bypasses this helper.
+    assert source.count("submit_compute_dispatch_with_post_doorbell_diagnostics(") == 4
     assert "(value >> 31U) & 1U" in source
     assert r'std::printf("%s: 0x%08x\n", key, value)' in source
     assert r'std::printf("%s: unavailable (%s)\n", key, error.c_str())' in source

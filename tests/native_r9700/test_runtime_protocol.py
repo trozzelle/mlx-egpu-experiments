@@ -9,6 +9,7 @@ import subprocess
 import pytest
 
 
+HARDWARE_LOCK_SOURCE = Path("native_r9700/hardware_lock.cpp")
 VRAM_CLOSURE_SOURCES = (
     Path("native_r9700/vram_layout.cpp"),
     Path("native_r9700/vram_allocator.cpp"),
@@ -27,7 +28,7 @@ RUNNER_SOURCES = [
     Path("native_r9700/amdev_session.cpp"),
     Path("native_r9700/kernel_catalog.cpp"),
     Path("native_r9700/device_memory.cpp"),
-    Path("native_r9700/hardware_lock.cpp"),
+    HARDWARE_LOCK_SOURCE,
     Path("native_r9700/llama_stage_layout.cpp"),
     Path("native_r9700/llama_layer_executor.cpp"),
     Path("native_r9700/kernel_assets.cpp"),
@@ -40,6 +41,7 @@ C1R4_LAYER_SLICE_BYTES = "20480"  # prompt-0 prefix activation: 5 * 2048 * fp16.
 
 
 def compile_runner(tmp_path):
+    assert HARDWARE_LOCK_SOURCE in RUNNER_SOURCES, "runner closure must link HardwareLock"
     assert all(s.exists() for s in RUNNER_SOURCES), (
         "native_r9700 runner sources missing"
     )
@@ -89,6 +91,7 @@ def test_default_transfer_bridge_build_links_all_amdev_modules(tmp_path: Path) -
         Path("native_r9700/c1_transfer_bridge.cpp"),
         Path("native_r9700/amdev_session.cpp"),
         Path("native_r9700/amdev_packets.cpp"),
+        HARDWARE_LOCK_SOURCE,
         Path("native_r9700/kernel_catalog.cpp"),
         *VRAM_CLOSURE_SOURCES,
     }
@@ -135,6 +138,7 @@ def compile_runtime_api_probe(tmp_path, source_text):
             "native_r9700/model_weight_binder.cpp",
             "native_r9700/amdev_session.cpp",
             "native_r9700/kernel_catalog.cpp",
+            HARDWARE_LOCK_SOURCE,
             "native_r9700/runtime.cpp",
             str(source),
             "-I",

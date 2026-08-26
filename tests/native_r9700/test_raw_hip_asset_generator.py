@@ -57,6 +57,70 @@ def _single_output(output_dir: Path, suffix: str) -> Path:
     return paths[0]
 
 
+def _complete_admitted_envelope(generator: ModuleType) -> list[object]:
+    """Build the reviewed allocated COMGR envelope for direct admission tests."""
+    sections = [
+        generator.ElfSection(
+            1, ".note", generator.SHT_NOTE, generator.SHF_ALLOC, 0x1000, b"note", 0, 0
+        ),
+        generator.ElfSection(
+            2, ".dynsym", generator.SHT_DYNSYM, generator.SHF_ALLOC, 0x2000, b"symbols", 0, 24
+        ),
+        generator.ElfSection(
+            3, ".gnu.hash", generator.SHT_GNU_HASH, generator.SHF_ALLOC, 0x3000, b"gnu-hash", 0, 0
+        ),
+        generator.ElfSection(
+            4, ".hash", generator.SHT_HASH, generator.SHF_ALLOC, 0x4000, b"hash", 0, 0
+        ),
+        generator.ElfSection(
+            5, ".dynstr", generator.SHT_STRTAB, generator.SHF_ALLOC, 0x5000, b"\0", 0, 0
+        ),
+        generator.ElfSection(
+            6, ".rodata", generator.SHT_PROGBITS, generator.SHF_ALLOC, 0x6000, b"descriptor", 0, 0
+        ),
+        generator.ElfSection(
+            7, ".text", generator.SHT_PROGBITS, generator.SHF_ALLOC | generator.SHF_EXECINSTR,
+            0x7000, b"text", 0, 0
+        ),
+        generator.ElfSection(
+            8, ".dynamic", generator.SHT_DYNAMIC, generator.SHF_ALLOC | generator.SHF_WRITE,
+            0x8000, b"", 0, generator.ELF_DYNAMIC_ENTRY_SIZE, generator.COMGR_DYNAMIC_SIZE
+        ),
+        generator.ElfSection(
+            9, ".relro_padding", generator.SHT_NOBITS, generator.SHF_ALLOC | generator.SHF_WRITE,
+            0x9000, b"", 0, 0, 8
+        ),
+        generator.ElfSection(
+            10, ".bss", generator.SHT_NOBITS, generator.SHF_ALLOC | generator.SHF_WRITE,
+            0xA000, b"", 0, 0, generator.COMGR_BSS_SENTINEL_SIZE
+        ),
+    ]
+    addresses = {section.name: section.address for section in sections}
+    entries = (
+        (generator.DT_SYMTAB, addresses[".dynsym"]),
+        (generator.DT_SYMENT, 24),
+        (generator.DT_STRTAB, addresses[".dynstr"]),
+        (generator.DT_STRSZ, 1),
+        (generator.DT_GNU_HASH, addresses[".gnu.hash"]),
+        (generator.DT_HASH, addresses[".hash"]),
+        (generator.DT_NULL, 0),
+    )
+    dynamic = sections[7]
+    dynamic_content = b"".join(struct.pack("<QQ", tag, value) for tag, value in entries)
+    sections[7] = generator.ElfSection(
+        dynamic.index,
+        dynamic.name,
+        dynamic.section_type,
+        dynamic.flags,
+        dynamic.address,
+        dynamic_content,
+        dynamic.link,
+        dynamic.entry_size,
+        dynamic.size,
+    )
+    return sections
+
+
 def test_fresh_embed_row_source_generates_admitted_raw_code_and_manifest(
     tmp_path: Path,
 ) -> None:
@@ -274,6 +338,64 @@ def test_elf_admission_rejects_every_unrecognized_allocated_section(
     ]
 
     with pytest.raises(generator.GenerationError, match="allocated|loadable"):
+        generator._admit_sections(sections)
+
+
+
+def test_elf_admission_rejects_missing_reviewed_envelope_member() -> None:
+    """The raw envelope must include every reviewed allocated section."""
+    generator = _load_generator_module()
+    sections = [
+        section for section in _complete_admitted_envelope(generator) if section.name != ".dynamic"
+    ]
+
+    with pytest.raises(
+        generator.GenerationError,
+        match=r"allocated section set mismatch: .*missing=\['\.dynamic'\]",
+    ):
+        generator._admit_sections(sections)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("reordered", "early-null"),
+    ids=("reordered-tags", "early-null"),
+)
+def test_elf_admission_rejects_reordered_or_early_null_dynamic_entries(
+    mutation: str,
+) -> None:
+    """The reviewed dynamic tags must remain ordered with DT_NULL last."""
+    generator = _load_generator_module()
+    sections = _complete_admitted_envelope(generator)
+    dynamic_index = next(index for index, section in enumerate(sections) if section.name == ".dynamic")
+    dynamic = sections[dynamic_index]
+    entries = [
+        struct.unpack_from("<QQ", dynamic.content, offset)
+        for offset in range(0, generator.COMGR_DYNAMIC_SIZE, generator.ELF_DYNAMIC_ENTRY_SIZE)
+    ]
+    if mutation == "reordered":
+        malformed_entries = [entries[1], entries[0], *entries[2:]]
+    else:
+        malformed_entries = [entries[-1], *entries[:-1]]
+    malformed_content = b"".join(
+        struct.pack("<QQ", tag, value) for tag, value in malformed_entries
+    )
+    sections[dynamic_index] = generator.ElfSection(
+        dynamic.index,
+        dynamic.name,
+        dynamic.section_type,
+        dynamic.flags,
+        dynamic.address,
+        malformed_content,
+        dynamic.link,
+        dynamic.entry_size,
+        dynamic.size,
+    )
+
+    with pytest.raises(
+        generator.GenerationError,
+        match="unexpected dependency or relocation tag",
+    ):
         generator._admit_sections(sections)
 
 
