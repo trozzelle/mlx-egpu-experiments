@@ -125,6 +125,7 @@ DEV=AMD JITBEAM=2 HF_HOME=${HOME}/Development/ml/models \
 - `docs/DESIGN.md` — TinyGPU/HAL/Kernel Pack/service/cache/numerical/security contracts.
 - `docs/ROADMAP.md` — current F1–F6, P1–P5, Q1 capability ordering and G0–G3 integration gates.
 - `docs/IMPLEMENTATION_PLAN.md` — current two-track high-level implementation plan.
+- `docs/tasks/r9700-products/README.md` — current supervisor/swarm task packet index and concurrency map.
 - `docs/REFERENCES.md` and `docs/upstream-reference-manifest.yaml` — source-reuse roles and immutable upstream pins.
 - `docs/adr/0006-two-products-independent-tracks.md` — co-equal product and independent-track decision.
 - `docs/adr/0007-tinygpu-owner-portable-hal.md` — TinyGPU ownership and portable HAL decision.

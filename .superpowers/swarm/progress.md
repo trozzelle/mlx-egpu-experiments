@@ -4,6 +4,7 @@
 
 - Current implementation plan: `docs/IMPLEMENTATION_PLAN.md`.
 - Current capability gates: `docs/ROADMAP.md`.
+- Current supervisor/swarm packets: `docs/tasks/r9700-products/README.md`.
 - Active command ledger: `docs/tasks/native-r9700-producer/validation-commands.md`.
 - Completed producer packets, plans, handoffs, and diagnostic task sets: `docs/archive/README.md`.
 
@@ -60,3 +61,36 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 | T4 Batched SDMA upload | Dropped | — | — | opt-t4-sdma-upload.md | contract pass, but HW: SDMA fence timeout | reverted — SDMA ring uses fixed offset 0 + reset-per-chunk; needs cumulative wptr + wrap |
 | T5 Wire prefill loop | Dropped | — | T3 | opt-t5-wire-prefill.md | — | reverted with T3 |
 | T6 Verify + measure | Dropped | — | T1–T5 | — | — | blocked by T3/T4 reverted; baseline 104.6s unchanged |
+
+## R9700 Products Swarm Execution (2026-08-25)
+
+### Shared work boundary
+
+- Checkout: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a`
+- Branch: `feature/r9700-products-wave-a`
+- Boundary kind: fallback linked worktree created from `main`; every executor/reviewer uses this checkout and branch.
+- Agents never run git. The supervisor validates, reviews, updates ledgers/reports, and makes local checkpoint commits. Push and PR work remain user-owned unless separately requested.
+
+### Orchestration map
+
+- Wave A: F1, F2, P1, P3, and Q1 start independently. Each phase follows its internal task-set dependencies.
+- Wave B: G0 consumes F2's exact WMMA record; F3 waits for accepted F1/F2 contracts; P2 waits for P1 ABI freeze and consumes G0 before promotion.
+- Wave C: F4 waits for F3. P4 waits for F1, P2, P3, and the selected admitted graph.
+- Shared integration ownership: F2 owns WMMA-specific source/images; P3 owns generic Kernel Pack records/tooling; one supervisor-selected integration owner serializes `kernel_assets.cpp`, `kernel_catalog.cpp`, and generated catalogs.
+- Service ownership: F1 owns `model_service.py`, `service_protocol.py`, `native_worker.py`, and persistent service semantics. Q1 owns `qwen_*` modules and must not edit those service files.
+- Device ownership: P1 owns TinyGPU DEXT/user-client ABI plus local conformance clients; it must not change model/kernel code.
+- Verification: executors record focused commands but run no tests, hardware commands, formatters, package managers, or git. The supervisor runs RED/GREEN checks, phase commands, serialized hardware evidence, broad suites, and review gates.
+- Quality gate: correctness, maintainability, existing-architecture fit, and the simplest adequate design are all required; unnecessary abstraction blocks promotion.
+
+| Task | Status | Owner | Dependencies | Report | Evidence | Blocker |
+|---|---|---|---|---|---|---|
+| Wave A / F1 persistent warm worker | Not started | Unassigned | B0 | phase F1 reports | — | — |
+| Wave A / F2 gfx1201 WMMA foundation | Not started | Unassigned | B0 | phase F2 reports | — | — |
+| Wave A / P1 TinyGPU Device Owner | Not started | Unassigned | B0, ADR 0007 | phase P1 reports | — | Distribution signing remains a human gate; local engineering may proceed. |
+| Wave A / P3 Kernel Packs | Not started | Unassigned | B0; G0 for final migration | phase P3 reports | — | Task set 5 waits for G0. |
+| Wave A / Q1 Qwen contract/oracle | Not started | Unassigned | B0 | phase Q1 reports | — | Native execution remains downstream of F6. |
+| Wave B / G0 conformance record | Blocked | Unassigned | F2 | integration-g0.md | — | Waiting for F2 accepted WMMA artifact. |
+| Wave B / F3 projection graph | Blocked | Unassigned | F1, F2 | phase F3 reports | — | Waiting for model-handle/prepacking and admitted WMMA contracts. |
+| Wave B / P2 Inference HAL | Blocked | Unassigned | P1 ABI; G0 for promotion | phase P2 reports | — | Waiting for P1 ABI freeze. |
+| Wave C / F4 tiled attention | Blocked | Unassigned | F3 | phase F4 reports | — | Waiting for F3. |
+| Wave C / P4 service platform adoption | Blocked | Unassigned | F1, P2, P3, selected graph | phase P4 reports | — | Waiting for Wave A/B contracts. |

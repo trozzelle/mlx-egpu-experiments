@@ -1,6 +1,6 @@
 # R9700 Products High-Level Implementation Plan
 
-> This is the approved program-level implementation plan. It defines workstreams, change surfaces, dependencies, integration gates, and validation ownership. It is not an executable task packet; create phase-specific task documents with `plan-to-agent-task-docs` when a phase is ready.
+> This is the approved program-level plan. Executable supervisor/swarm packets now live in [`docs/tasks/r9700-products/`](tasks/r9700-products/README.md); they preserve this plan's workstreams, dependencies, gates, validation ownership, and source references.
 
 **Goal:** Deliver a persistent, high-performance R9700 Prefill Service and a reusable Portable Inference Device Platform without regressing the accepted native Llama producer/cache path.
 

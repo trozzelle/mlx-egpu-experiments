@@ -470,7 +470,7 @@ For Llama 3.2 1B prompt-128 warm prefill, 100, 500, 1,000, and 2,000 tok/s are d
 
 ## Handoff to task docs
 
-When a phase is ready, use `plan-to-agent-task-docs` to create executable task packets from:
+Current executable task packets are indexed at [`docs/tasks/r9700-products/README.md`](tasks/r9700-products/README.md). When a phase contract changes or a new phase is added, update/regenerate its packet with `plan-to-agent-task-docs` from:
 
 - this phase outcome and promotion gate;
 - `DESIGN.md` contracts;
