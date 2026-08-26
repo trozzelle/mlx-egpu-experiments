@@ -16,7 +16,7 @@ Make every production-selected executable enter through a concrete Kernel Pack r
 ## Dependencies
 
 - B0 is Done.
-- P3 schema/tool work may start in parallel with F2.
+- P3 schema/tool work may start only after task set 1 receives final re-review acceptance and its active validation-ledger insertion is present. Task sets 2 and 3 may then run in parallel.
 - G0 is required for P3 promotion and must be migrated exactly, not regenerated.
 - P2 executable semantics are preferred for P4 integration but do not block P3 start.
 
@@ -30,7 +30,7 @@ Make every production-selected executable enter through a concrete Kernel Pack r
 
 ## Orchestration map
 
-- Sequential blockers: task set 1 freezes schema/API/ownership/commands. Task sets 2 and 3 may run concurrently. Task set 4 waits for task set 2; task set 5 waits for tasks 2–3 and G0. Task set 6 waits for migrations/review.
+- Sequential blockers: task set 1 freezes schema/API/ownership/commands and must pass final re-review with its active validation-ledger insertion before task sets 2–3 start. Task sets 2 and 3 may then run concurrently; task set 4 waits for accepted task sets 2–3; task set 5 waits for accepted task sets 2–3 and G0. Task set 6 waits for migrations/review.
 - Parallelizable task sets: task set 2 owns C++ runtime pack types; task set 3 owns offline Python validation/tool records. They share only the task-set-1 schema.
 - Shared contracts/artifacts: schema version, pack/entry identity, source/image digests, target/features, kernargs/resources, shapes/dtypes/packing, numerical policy, conformance/benchmark record IDs, license state.
 - Coordination risks: existing `kernel_assets.cpp`/`kernel_catalog.cpp` have one migration owner for tasks 4–5; F2/F3/F4 agents must not edit them concurrently; no runtime YAML parser.
@@ -39,11 +39,11 @@ Make every production-selected executable enter through a concrete Kernel Pack r
 
 | Task set | Status | Owner | Notes |
 |---|---|---|---|
-| 1. Kernel Pack schema/API/command freeze | Not started | Unassigned | Blocks implementation lanes. |
-| 2. Runtime Kernel Pack identity/compatibility | Blocked | Unassigned | Waits for task set 1; parallel with task set 3. |
-| 3. Offline manifest/ISA/resource validator | Blocked | Unassigned | Waits for task set 1; parallel with task set 2. |
-| 4. Scalar-control migration | Blocked | Unassigned | Waits for task set 2. |
-| 5. G0 WMMA migration | Blocked | Unassigned | Waits for tasks 2–3 and G0. |
+| 1. Kernel Pack schema/API/command freeze | Done | P3Contract | Frozen in `.superpowers/swarm/reports/p3-contract-freeze.md`; final review closed allocation-free runtime views, the five-kind/nine-slot EvidenceRef matrix, canonical nonrecursive `pack_sha256`, migration dependencies, and active-ledger reconciliation.
+| 2. Runtime Kernel Pack identity/compatibility | In progress | P3RuntimeRed | RED contract lane dispatched in parallel with task set 3.
+| 3. Offline manifest/ISA/resource validator | In progress | P3ManifestRed | RED contract lane dispatched in parallel with task set 2.
+| 4. Scalar-control migration | Blocked | Unassigned | Waits for accepted task sets 2–3. |
+| 5. G0 WMMA migration | Blocked | Unassigned | Waits for accepted task sets 2–3 and G0. |
 | 6. Selection/refresh/review and promotion | Blocked | Unassigned | Waits for migrations. |
 
 Agents update only their row and append evidence/notes as work completes.
@@ -60,13 +60,13 @@ Agents update only their row and append evidence/notes as work completes.
 ### Target
 
 - Inspect existing asset/catalog types/tests and manifest/reference policy.
-- Update this ledger and active validation ledger.
+- Record the exact ready-to-insert sections for the shared validation ledger; do not edit the shared ledger in this task set.
 - Write `.superpowers/swarm/reports/p3-contract-freeze.md`.
 - Non-goals: implement C++/Python tooling, edit/migrate existing assets, parse docs manifest at runtime.
 
 ### Change
 
-1. Freeze schema/API fields: schema/pack version, name/target/features, source revision/paths/license/modifications, image path/SHA/code-object/build identity, entry symbols/kernargs/resources/geometry, dtypes/shapes/packing, numerics/reference, evidence record IDs.
+1. Freeze schema/API fields: schema/pack version, name/target/features, source revision/paths/license/modifications, image path/SHA/code-object/build identity, entry symbols/kernargs/resources/geometry, dtypes/shapes/packing, numerics/reference, the exact five-kind/evidence-slot `EvidenceRef` matrix, and canonical `pack_sha256` preimage.
 2. Freeze C++ identity/compatibility interfaces and offline manifest format; name exact files/symbols.
 3. Freeze rejection and selection precedence, upstream refresh process, file ownership, and runtime/offline boundary.
 4. Record exact compile, schema validation, malformed-pack, scalar migration, G0 migration, and real-hardware load/dispatch commands in active ledger.
@@ -74,9 +74,16 @@ Agents update only their row and append evidence/notes as work completes.
 
 ### Acceptance
 
-- Schema contains concrete required types/semantics and no extension/plugin registry.
+- Schema contains concrete required types/semantics, the exact shared `EvidenceRef` fields, five-kind/evidence-slot matrix, unconditional field emptiness/requirements, canonical `pack_sha256` preimage, and no extension/plugin registry; runtime C++ declarations are allocation-free views/spans and owning representations are confined to offline tooling.
 - Runtime consumes generated/concrete records but never parses `docs/upstream-reference-manifest.yaml`.
-- Active ledger has `P3 schema`, `P3 scalar migration`, and `P3 G0 migration` exact commands.
+- Active ledger has the required headings `P3 schema`, `P3 malformed-pack rejection (focused observation)`, `P3 scalar migration`, and `P3 G0 migration` with exact commands.
+
+### Task set 1 evidence/notes
+
+- Shared `EvidenceRef` v1 is byte-identical with the F2/P3 report contract. `record_kind` is exactly `offline_oracle`, `offline_review`, `target_conformance`, `native_run`, or `benchmark`; `evidence_slot` is exactly `numpy_oracle`, `source_review`, `isa_review`, `resource_review`, `layout_proof`, `scalar_native_projection`, `conformance`, `native_run`, or `benchmark`. Every other kind/slot combination rejects.
+- `offline_oracle/numpy_oracle` requires path/ID/record digest, `producer_kind: cpu_reference`, and input/output digests, with target/image/pack/tool exactly empty. `offline_review/{source_review,isa_review,resource_review,layout_proof}` requires path/ID/record digest plus target/image/pack/tool/input/output digests and exactly empty producer; `tool_digest` identifies the exact review script/tool plus version or signed manual-review record digest and is never optional.
+- `target_conformance/{scalar_native_projection,conformance}` and `native_run/native_run` require path/ID/digest plus target/image/pack/producer/input/output digests, exactly `producer_kind: r9700_native`, and exactly empty `tool_digest`; `native_run` remains a distinct request-bound kind/slot. `benchmark/benchmark` requires path/ID/digest plus target/image/pack/producer/input/output/tool digests; promoted performance uses `producer_kind: r9700_native`, while correctness controls omit the benchmark reference and use a nonempty `benchmark_not_applicable_reason`.
+- `pack_sha256` is exactly SHA-256 of UTF-8 RFC8785 JCS for `{ "domain":"r9700-kernel-pack-identity-v1", "pack": <the normalized complete pack record with the top-level `evidence` object and every `pack_sha256` field removed> }`; all identity/provenance/license/image/build/entry/kernarg/resource/geometry/compatibility/numerical fields and declared paths/digests are included, non-finite numbers reject, and evidence references bind to this result without a recursive digest.
 
 ### Validation
 
@@ -90,7 +97,7 @@ git diff --check docs/tasks/r9700-products/phase-p3-kernel-packs.md \
 
 ### Source refs
 
-- Task set 1 frozen C++ interfaces.
+- Accepted task-set-1 final re-review and active validation-ledger insertion.
 - Existing `hsa_code_image_asset.*`, catalog/asset types.
 - `docs/DESIGN.md` Executable lifecycle.
 
@@ -102,14 +109,14 @@ git diff --check docs/tasks/r9700-products/phase-p3-kernel-packs.md \
 
 ### Change
 
-1. Add RED compile/runtime tests for concrete identity, entry points, compatibility keys, numerical/evidence references, lifecycle, and every rejection field.
-2. Implement immutable pack/entry records and deterministic compatibility/selection helpers.
+1. Add RED compile/runtime tests for concrete identity, entry points, compatibility keys, explicit generated-record-span lookup, zero/multiple rejection, numerical/evidence references, lifecycle, and every rejection field.
+2. Implement immutable allocation-free pack/entry view records: `std::string_view`, POD scalars, explicit `{pointer,size}` spans, and `{present,value}` optionals only; no owning runtime strings/vectors/JSON and no hidden global catalog.
 3. Reuse HSA image admission; do not duplicate ELF/descriptor parsing.
-4. Reject missing/contradictory target/features/dtypes/shapes/packing/numerics/evidence before load.
+4. Reject missing/contradictory target/features/dtypes/shapes/packing/numerics/evidence before load; validate every `EvidenceRef` against the exact five-kind/evidence-slot matrix and bind every nonempty `pack_sha256` to the canonical preimage.
 
 ### Acceptance
 
-Pack identity is immutable, exact, and sufficient for later model/HAL evidence; invalid states cannot represent a production-selected pack.
+Pack identity is immutable, exact, and sufficient for later model/HAL evidence; lookup consumes an explicit allocation-free generated-record span rather than hidden global state; generated runtime records are allocation-free views; `native_run/native_run` remains a distinct request-bound `EvidenceRef`; and invalid states cannot represent a production-selected pack.
 
 ### Validation
 
@@ -123,7 +130,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 
 ### Source refs
 
-- Task set 1 offline schema.
+- Accepted task-set-1 final re-review and active validation-ledger insertion.
 - LLVM/IsaDecoder/RGA references and immutable pins.
 - Existing kernel toolchain/generator tests.
 
@@ -136,14 +143,14 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 
 ### Change
 
-1. Add RED validation for exact revision/path/license/modifications, source/image hashes, target/code-object/descriptor/kernarg/resources, ISA categories, shapes/packing/numerics, and evidence paths.
-2. Implement deterministic offline validation and normalized concrete record generation for task set 2 types/build pipeline.
-3. Link IsaDecoder/RGA reports by tool version/input digest/output digest; absence is rejection where task set 1 requires the tool.
-4. Ensure updates require explicit pin/license/evidence changes.
+1. Add RED validation for exact revision/path/license/modifications, source/image hashes, target/code-object/descriptor/kernarg/resources, ISA categories, shapes/packing/numerics, and the five-kind/evidence-slot matrix.
+2. Implement deterministic offline validation over owning Python/JSON parser values and generate reproducible concrete C++ view initializers for task-set-2; no owning representation crosses into runtime headers.
+3. Link every IsaDecoder/RGA report by exact tool/version digest, input digest, and output digest; missing or contradictory review evidence rejects.
+4. Compute and verify `pack_sha256` as the exact UTF-8 RFC8785 JCS preimage digest, reject non-finite numbers, and ensure updates require explicit pin/license/evidence changes.
 
 ### Acceptance
 
-Malformed, unpinned, unlicensed, wrong-target/resource/ISA/numerical/evidence records fail before runtime; valid output is reproducible and concrete.
+Malformed, unpinned, unlicensed, wrong-target/resource/ISA/numerical/evidence records fail before runtime; every offline review has the required target/image/pack/tool/input/output digests and exact-empty producer, every native run uses `native_run/native_run` with `r9700_native`, every other kind/slot combination rejects, and valid output is reproducible with only allocation-free runtime views.
 
 ### Validation
 
@@ -159,6 +166,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 ### Source refs
 
 - Accepted task set 2.
+- Accepted task set 3.
 - B0 scalar/native controls.
 - `docs/IMPLEMENTATION_PLAN.md` P3 work package 2.
 

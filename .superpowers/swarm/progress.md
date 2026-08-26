@@ -86,11 +86,11 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 | Task | Status | Owner | Dependencies | Report | Evidence | Blocker |
 |---|---|---|---|---|---|---|
 | Shared baseline verification | Done | Supervisor | Task packets committed | `baseline-runtime-repair.md`, `baseline-raw-hip-repair.md` | Initial: 715 passed/26 failed. Focused repairs reviewed; final `tests/native_r9700 -v`: 744 passed, 2 dependency warnings in 662.69s (`artifact://276`). | — |
-| Wave A / F1 persistent warm worker | In progress | F1Contract | B0 | phase F1 reports | Task set 1 dispatched. | — |
-| Wave A / F2 gfx1201 WMMA foundation | In progress | F2Contract | B0 | phase F2 reports | Task set 1 dispatched. | — |
-| Wave A / P1 TinyGPU Device Owner | In progress | P1ABI | B0, ADR 0007 | phase P1 reports | Task set 1 dispatched. | Distribution signing remains a human gate; local engineering may proceed. |
-| Wave A / P3 Kernel Packs | In progress | P3Contract | B0; G0 for final migration | phase P3 reports | Task set 1 dispatched. | Task set 5 waits for G0. |
-| Wave A / Q1 Qwen contract/oracle | In progress | Q1Identity | B0 | phase Q1 reports | Task set 1 dispatched. | Native execution remains downstream of F6. |
+| Wave A / F1 persistent warm worker | In progress | F1ProtocolRed / F1NativeRed | B0 | `f1-contract-freeze.md`; task-set reports | Task set 1 Done after zero-finding final review; task sets 2–3 in RED contract wave. | — |
+| Wave A / F2 gfx1201 WMMA foundation | In progress | F2LaneRed / F2AdmissionRed | B0 | `f2-contract-freeze.md`; task-set reports | Task set 1 Done; task sets 2–3 in RED contract wave. | Hardware lane-map and later G0 runs remain supervisor-serialized. |
+| Wave A / P1 TinyGPU Device Owner | Blocked | P1ABI | B0, ADR 0007 | `p1-abi-freeze.md` | Task set 1 Done; final security re-review has zero Critical/Important findings. | Full Xcode/selected DriverKit SDK is not installed; distribution signing remains a separate promotion gate. |
+| Wave A / P3 Kernel Packs | In progress | P3RuntimeGreen / P3ManifestGreen | B0; G0 for final migration | `p3-contract-freeze.md`; RED/GREEN reports | Task set 1 Done; runtime RED 6 failed and manifest RED 27 failed for missing owners; GREEN implementation in progress. | Task set 5 waits for G0. |
+| Wave A / Q1 Qwen contract/oracle | In progress | Q1TensorGreen / Q1HybridGreen | B0 | `q1-identity-freeze.md`; RED/GREEN reports | Task set 1 Done; tensor RED 14 failed/19 passed and hybrid RED 13 failed/13 passed for missing contracts; GREEN implementation in progress. | Q1 promotion remains blocked by unavailable immutable base-model revision; native execution remains downstream of F6. |
 | Wave B / G0 conformance record | Blocked | Unassigned | F2 | integration-g0.md | — | Waiting for F2 accepted WMMA artifact. |
 | Wave B / F3 projection graph | Blocked | Unassigned | F1, F2 | phase F3 reports | — | Waiting for model-handle/prepacking and admitted WMMA contracts. |
 | Wave B / P2 Inference HAL | Blocked | Unassigned | P1 ABI; G0 for promotion | phase P2 reports | — | Waiting for P1 ABI freeze. |
