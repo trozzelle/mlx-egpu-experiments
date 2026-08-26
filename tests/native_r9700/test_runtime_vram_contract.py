@@ -34,6 +34,7 @@ RUNNER_SOURCES = (
     Path("native_r9700/amdev_session.cpp"),
     Path("native_r9700/kernel_catalog.cpp"),
     Path("native_r9700/runtime.cpp"),
+    Path("native_r9700/native_resource_worker.cpp"),
     Path("native_r9700/runner.cpp"),
 )
 

@@ -108,7 +108,7 @@ The private schemas are exact and contain no additional fields. `ResourceSpec` i
 
 | Operation | Exact body | Exact `pass` result |
 |---|---|---|
-| `Prepare` | `{"resource_spec":<ResourceSpec>}` | `{"resource_generation":<uint64>,"state":"prepared","producer_fingerprint":"sha256:<64 lowercase hex>"}` |
+| `Prepare` | `{"resource_spec":<ResourceSpec>}` | `{"resource_generation":<uint64>,"state":"prepared","producer_fingerprint":"sha256:<64 lowercase hex>","runner_binary_sha256":"sha256:<64 lowercase hex>"}` |
 | `Commit` | `{"resource_generation":<uint64>}` | `{"resource_generation":<uint64>,"state":"resident-ready","producer_fingerprint":"sha256:<64 lowercase hex>"}` |
 | `Rollback` | `{"resource_generation":<uint64>}` | `{"resource_generation":<uint64>,"state":"released","already_released":<bool>}` |
 | `Release` | `{"resource_generation":<uint64>}` | `{"resource_generation":<uint64>,"state":"released","already_released":<bool>}` |
@@ -117,6 +117,9 @@ The private schemas are exact and contain no additional fields. `ResourceSpec` i
 | `Shutdown` | `{}` | `{"state":"shutdown"}` |
 
 The `<accepted native evidence fields>` in a successful `Prefill` result are exactly `native_prefill_acceptance`, `native_prefill_full_layer_loop_status`, `runtime_substrate`, `hardware_log_path`, `compute_completion_policy`, `compute_barrier_policy`, `prefill_npz_path`, `kernel_count`, `transfer_bytes`, `block_tokens`, `block_count`, `failure_stage`, `exit_status`, and `failure_text`; no public-only field or second evidence schema is introduced. The child requires `resource_generation` to be the committed generation, uses the caller-supplied exclusive service artifact paths, and never receives a model path on Prefill. `Prepare`/`Commit`/`Prefill` identity fields are immutable for the generation. `Shutdown` is sent only after the public registry has completed teardown; after its response is flushed the child exits normally.
+
+Private `Prefill.token_ids` contains only the producer-owned prefix and has length `N=0..128`; the public registry removes the final prompt token before the private call. The consumer-owned final token never crosses this boundary or appears in the native prompt-cache artifact.
+
 `hardware_log_path` in the private body/result is the same service-owned artifact path exposed as `prefill_log_path` in the public cache projection; `request_id` in the body is the public request ID, while the private envelope ID remains the private correlation ID. The client passes only canonical service-created exclusive paths and the child never derives an artifact path from an unvalidated value.
 
 ### Identifier rules

@@ -10,6 +10,8 @@
 // wraps the C1R-4 streaming memory-transfer bridge for fixture/layer-sized byte
 // round trips. Hardware modes are gated and skipped by hardware-free focused tests.
 
+#include <algorithm>
+#include <cstdint>
 #include <array>
 #include <cctype>
 #include <cerrno>
@@ -18,13 +20,24 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
+#include <iterator>
 #include <limits>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 #include <sys/time.h>
 
 #include "runtime.h"
+#include "native_resource_worker.h"
 #include "llama_layer_executor.h"
+#include "model_weight_binder.h"
+#include "prefill_npz.h"
+#include "hsa_code_image_asset.h"
 namespace {
 constexpr std::array<const char*, 14> kRpcOperationNames = {
     "probe",      "map_bar",     "map_sysmem_fd", "cfg_read",    "cfg_write",
@@ -43,6 +56,7 @@ constexpr std::array<const char*, 10> kGpuStageNames = {
 void print_help(const char* argv0) {
   std::printf("usage: %s <mode> [options]\n", argv0);
   std::printf("modes:\n");
+  std::printf("  --model-service-worker private persistent native-resource JSONL child\n");
   std::printf("  --lifecycle-dry-run   exercise lifecycle contract without hardware\n");
   std::printf("                         (ordering, kernarg layout, packet encodings, log)\n");
   std::printf("  --kernel-proof        build/run the frozen C0A25 TinyGPU hardware proof\n");
@@ -458,6 +472,744 @@ void print_llama_stage_trace_result(const native_r9700::LlamaStageTraceResult& r
               result.exit_status);
 }
 
+void set_error(native_r9700::NativeResourceError* error, const char* domain,
+               const std::string& message, const char* stage) {
+  if (error == nullptr) return;
+  error->domain = domain;
+  error->message = message;
+  error->failure_stage = stage;
+}
+
+bool sha256_executable_file(const std::string& executable_path,
+                            std::string* digest,
+                            std::string* error_text) {
+  if (digest == nullptr || executable_path.empty()) {
+    if (error_text != nullptr) *error_text = "runner executable path is required";
+    return false;
+  }
+  std::error_code filesystem_error;
+  const std::filesystem::path canonical =
+      std::filesystem::canonical(std::filesystem::path(executable_path), filesystem_error);
+  if (filesystem_error || !std::filesystem::is_regular_file(canonical, filesystem_error) ||
+      filesystem_error) {
+    if (error_text != nullptr) *error_text = "running executable cannot be canonicalized";
+    return false;
+  }
+  std::ifstream executable(canonical, std::ios::binary);
+  if (!executable) {
+    if (error_text != nullptr) *error_text = "running executable cannot be opened";
+    return false;
+  }
+  std::vector<std::uint8_t> bytes(
+      (std::istreambuf_iterator<char>(executable)), std::istreambuf_iterator<char>());
+  if (!executable.eof() && executable.fail()) {
+    if (error_text != nullptr) *error_text = "running executable could not be read";
+    return false;
+  }
+  if (bytes.empty()) {
+    if (error_text != nullptr) *error_text = "running executable is empty";
+    return false;
+  }
+  *digest = "sha256:" + native_r9700::sha256_hex(bytes);
+  return true;
+}
+
+std::string running_executable_path(const std::string& fallback) {
+#if defined(__APPLE__)
+  uint32_t capacity = 1024U;
+  for (;;) {
+    std::vector<char> buffer(capacity);
+    if (_NSGetExecutablePath(buffer.data(), &capacity) == 0) {
+      return std::string(buffer.data());
+    }
+    if (capacity == 0U) break;
+  }
+#endif
+  return fallback;
+}
+
+class NativePersistentExecution final {
+ public:
+  NativePersistentExecution() = default;
+
+  ~NativePersistentExecution() {
+    if (resident_open_) {
+      std::string ignored;
+      resident_.close(&ignored);
+    }
+  }
+
+  bool prepare(const native_r9700::NativeResourceSpec& spec,
+               std::string* error_text) {
+    spec_ = spec;
+    model_uri_ = spec.model_uri;
+    if (!binder_.open(spec.model_uri, error_text)) return false;
+    if (!native_r9700::bind_llama_layer_weight_table(
+            binder_, &weight_table_, error_text)) {
+      return false;
+    }
+    if (!native_r9700::build_llama_persistent_dispatch(
+            weight_table_, native_r9700::kLlamaResidentCacheCapacityTokens,
+            block_capacity_, &dispatch_, error_text)) {
+      return false;
+    }
+    if (!read_span_bytes(weight_table_.embed_tokens, &embedding_tensor_,
+                         error_text)) {
+      return false;
+    }
+    if (embedding_tensor_.size() < kEmbeddingRowBytes_ ||
+        embedding_tensor_.size() % kEmbeddingRowBytes_ != 0U) {
+      if (error_text != nullptr) {
+        *error_text = "full embedding tensor has an invalid F16 byte size";
+      }
+      return false;
+    }
+    return true;
+  }
+
+  const native_r9700::LlamaPersistentDispatch& dispatch() const {
+    return dispatch_;
+  }
+
+  bool prepare_resident(std::string* error_text) {
+    if (resident_open_) {
+      if (error_text != nullptr) *error_text = "persistent resident session is already open";
+      return false;
+    }
+    native_r9700::ResidentHsaDispatchResult dispatch_result;
+    if (!resident_.prepare(dispatch_.request, &dispatch_result, error_text)) {
+      return false;
+    }
+    dispatch_result_ = std::move(dispatch_result);
+    resident_open_ = true;
+    return true;
+  }
+
+  bool commit(std::string* error_text) {
+    if (!resident_open_) {
+      if (error_text != nullptr) *error_text = "persistent resident session is not prepared";
+      return false;
+    }
+    committed_ = true;
+    if (error_text != nullptr) error_text->clear();
+    return true;
+  }
+
+  bool close(std::string* error_text) {
+    if (!resident_open_) {
+      committed_ = false;
+      if (error_text != nullptr) error_text->clear();
+      return true;
+    }
+    if (!resident_.close(error_text)) return false;
+    resident_open_ = false;
+    committed_ = false;
+    faulted_ = false;
+    fault_text_.clear();
+    return true;
+  }
+
+  bool faulted() const { return faulted_; }
+
+  const std::string& fault_text() const { return fault_text_; }
+
+  bool prefill(const native_r9700::NativeResourcePrefillRequest& request,
+               native_r9700::NativeResourcePrefillResult* result,
+               std::string* error_text) {
+    if (result == nullptr) {
+      return fail(error_text, "prefill result is required");
+    }
+    *result = native_r9700::NativeResourcePrefillResult{};
+    result->hardware_log_path = request.hardware_log_path;
+    result->prefill_npz_path = request.prefill_npz_path;
+    result->block_tokens = block_capacity_;
+    if (!resident_open_ || !committed_) {
+      return fail(error_text, "persistent resident execution is not committed");
+    }
+    if (faulted_) {
+      return fail(error_text, fault_text_.empty()
+                                  ? "persistent resident execution is faulted"
+                                  : fault_text_);
+    }
+    if (request.prefill_npz_path.empty() || request.hardware_log_path.empty()) {
+      return fail(error_text, "prefill output and hardware log paths are required");
+    }
+    std::error_code path_error;
+    const std::filesystem::path output_path =
+        std::filesystem::weakly_canonical(
+            std::filesystem::path(request.prefill_npz_path), path_error);
+    const std::filesystem::path log_path =
+        std::filesystem::weakly_canonical(
+            std::filesystem::path(request.hardware_log_path), path_error);
+    if (!path_error && output_path == log_path) {
+      return fail(error_text, "prefill output path must differ from hardware log path");
+    }
+    if (request.token_ids.empty()) {
+      result->block_tokens = 0;
+      const std::string zero_hardware_log_path = request.hardware_log_path;
+      native_r9700::NativePrefillNpzPayload payload;
+      payload.model = model_uri_;
+      payload.n_prefix = 0;
+      payload.cache_capacity_tokens =
+          native_r9700::kLlamaResidentCacheCapacityTokens;
+      payload.kv_readback_bytes.assign(
+          32U,
+          std::vector<uint8_t>(
+              static_cast<std::size_t>(
+                  native_r9700::kLlamaResidentCacheCapacityTokens) *
+                  8U * 64U * sizeof(uint16_t),
+              0U));
+      std::string detail;
+      const bool npz_written = native_r9700::write_native_prefill_npz(
+          payload, request.prefill_npz_path, &detail);
+      if (!npz_written) return fail(error_text, detail);
+      native_r9700::NativePrefillResult runtime_result;
+      runtime_result.prefill_npz_path = request.prefill_npz_path;
+      runtime_result.hardware_log_path = zero_hardware_log_path;
+      runtime_result.n_prefix = 0;
+      runtime_result.block_tokens = 0;
+      runtime_result.block_count = 0;
+      runtime_result.kernel_count = 0;
+      runtime_result.transfer_bytes = 0;
+      runtime_result.native_prefill_acceptance = "pass";
+      runtime_result.native_prefill_full_layer_loop_status = "pass";
+      runtime_result.native_prefill_blocker_source = "none";
+      runtime_result.failure_stage = "none";
+      runtime_result.failure_text = "none";
+      runtime_result.exit_status = 0;
+      if (!write_native_prefill_log(zero_hardware_log_path, runtime_result)) {
+        return fail(error_text, "native prefill hardware log could not be written");
+      }
+      result->native_prefill_acceptance =
+          runtime_result.native_prefill_acceptance;
+      result->native_prefill_full_layer_loop_status =
+          runtime_result.native_prefill_full_layer_loop_status;
+      result->runtime_substrate = native_r9700::kRuntimeSubstrate;
+      result->hardware_log_path = zero_hardware_log_path;
+      result->compute_completion_policy =
+          native_r9700::compute_completion_policy_name(
+              runtime_result.compute_completion_policy);
+      result->compute_barrier_policy =
+          native_r9700::compute_barrier_policy_name(
+              runtime_result.compute_barrier_policy);
+      result->prefill_npz_path = request.prefill_npz_path;
+      result->kernel_count = 0;
+      result->transfer_bytes = 0;
+      result->block_tokens = 0;
+      result->block_count = 0;
+      result->failure_stage = "none";
+      result->exit_status = 0;
+      result->failure_text = "none";
+      if (error_text != nullptr) error_text->clear();
+      return true;
+    }
+    if (request.token_ids.size() > native_r9700::kLlamaResidentCacheCapacityTokens) {
+      return fail(error_text, "native prefix exceeds resident cache capacity");
+    }
+
+    const uint64_t upload_before = dispatch_result_.sdma_upload_bytes;
+    const uint64_t download_before = dispatch_result_.sdma_download_bytes;
+    const uint64_t kernel_before = dispatch_result_.pm4_dispatch_count;
+    const uint32_t prefix_tokens = static_cast<uint32_t>(request.token_ids.size());
+    const uint32_t active_blocks =
+        (prefix_tokens + block_capacity_ - 1U) / block_capacity_;
+    std::string detail;
+
+    for (uint32_t block_index = 0; block_index < active_blocks; ++block_index) {
+      native_r9700::LlamaTokenBlock block = dispatch_.token_blocks[block_index];
+      const uint32_t remaining = prefix_tokens - block.position;
+      block.token_count = std::min(remaining, block_capacity_);
+      std::vector<uint8_t> embedding_bytes(
+          static_cast<std::size_t>(block_capacity_) * kEmbeddingRowBytes_, 0U);
+      for (uint32_t offset = 0; offset < block.token_count; ++offset) {
+        const uint32_t token_id = request.token_ids[block.position + offset];
+        const uint64_t row_offset_u64 =
+            static_cast<uint64_t>(token_id) * kEmbeddingRowBytes_;
+        if (embedding_tensor_.size() < kEmbeddingRowBytes_ ||
+            row_offset_u64 >
+                static_cast<uint64_t>(embedding_tensor_.size() -
+                                      kEmbeddingRowBytes_)) {
+          return fail(error_text, "token-selected embedding row is outside the resident tensor");
+        }
+        const std::size_t row_offset =
+            static_cast<std::size_t>(row_offset_u64);
+        std::copy(
+            embedding_tensor_.begin() + row_offset,
+            embedding_tensor_.begin() + row_offset + kEmbeddingRowBytes_,
+            embedding_bytes.begin() +
+                static_cast<std::size_t>(offset) * kEmbeddingRowBytes_);
+      }
+      const std::string& buffer_name =
+          dispatch_.request.buffers[block.hidden_buffer_index].name;
+      if (!resident_.upload_named(buffer_name, embedding_bytes.data(),
+                                  embedding_bytes.size(), &dispatch_result_,
+                                  &detail)) {
+        remember_fault(detail);
+        return fail(error_text, detail);
+      }
+    }
+
+    for (uint32_t layer = 0; layer < dispatch_.layer_stages.size(); ++layer) {
+      for (uint32_t block_index = 0; block_index < active_blocks; ++block_index) {
+        native_r9700::LlamaTokenBlock block = dispatch_.token_blocks[block_index];
+        const uint32_t remaining = prefix_tokens - block.position;
+        block.token_count = std::min(remaining, block_capacity_);
+        if (!native_r9700::set_llama_block_stage_state(
+                &dispatch_.layer_stages[layer], dispatch_.hidden_binding_slots,
+                block, block_capacity_, &detail)) {
+          remember_fault(detail);
+          return fail(error_text, detail);
+        }
+        if (!resident_.dispatch_batch(dispatch_.layer_stages[layer],
+                                      &dispatch_result_, &detail)) {
+          remember_fault(detail);
+          return fail(error_text, detail);
+        }
+      }
+    }
+
+    std::vector<std::string> kv_names;
+    kv_names.reserve(dispatch_.k_cache_buffers.size() * 2U);
+    for (uint32_t layer = 0; layer < dispatch_.k_cache_buffers.size(); ++layer) {
+      kv_names.push_back("llama.layer" + std::to_string(layer) + ".k_cache");
+      kv_names.push_back("llama.layer" + std::to_string(layer) + ".v_cache");
+    }
+    if (!resident_.readback(kv_names, &dispatch_result_, &detail)) {
+      remember_fault(detail);
+      return fail(error_text, detail);
+    }
+
+    native_r9700::NativePrefillNpzPayload payload;
+    payload.model = model_uri_;
+    payload.n_prefix = prefix_tokens;
+    payload.cache_capacity_tokens =
+        native_r9700::kLlamaResidentCacheCapacityTokens;
+    payload.kv_readback_bytes = dispatch_result_.readback_bytes;
+    if (!native_r9700::write_native_prefill_npz(
+            payload, request.prefill_npz_path, &detail)) {
+      return fail(error_text, detail);
+    }
+
+    native_r9700::NativePrefillResult runtime_result;
+    runtime_result.prefill_npz_path = request.prefill_npz_path;
+    runtime_result.hardware_log_path = request.hardware_log_path;
+    runtime_result.n_prefix = prefix_tokens;
+    runtime_result.block_tokens = block_capacity_;
+    runtime_result.block_count = active_blocks;
+    runtime_result.kernel_count =
+        dispatch_result_.pm4_dispatch_count - kernel_before;
+    runtime_result.transfer_bytes =
+        (dispatch_result_.sdma_upload_bytes - upload_before) +
+        (dispatch_result_.sdma_download_bytes - download_before);
+    runtime_result.native_prefill_acceptance = "pass";
+    runtime_result.native_prefill_full_layer_loop_status = "pass";
+    runtime_result.native_prefill_blocker_source = "none";
+    runtime_result.failure_stage = "none";
+    runtime_result.failure_text = "none";
+    runtime_result.exit_status = 0;
+    if (!write_native_prefill_log(request.hardware_log_path, runtime_result)) {
+      return fail(error_text, "native prefill hardware log could not be written");
+    }
+
+    result->native_prefill_acceptance =
+        runtime_result.native_prefill_acceptance;
+    result->native_prefill_full_layer_loop_status =
+        runtime_result.native_prefill_full_layer_loop_status;
+    result->runtime_substrate = native_r9700::kRuntimeSubstrate;
+    result->hardware_log_path = request.hardware_log_path;
+    result->compute_completion_policy =
+        native_r9700::compute_completion_policy_name(
+            runtime_result.compute_completion_policy);
+    result->compute_barrier_policy =
+        native_r9700::compute_barrier_policy_name(
+            runtime_result.compute_barrier_policy);
+    result->prefill_npz_path = request.prefill_npz_path;
+    result->kernel_count = runtime_result.kernel_count;
+    result->transfer_bytes = runtime_result.transfer_bytes;
+    result->block_tokens = runtime_result.block_tokens;
+    result->block_count = runtime_result.block_count;
+    result->failure_stage = runtime_result.failure_stage;
+    result->exit_status = runtime_result.exit_status;
+    result->failure_text = runtime_result.failure_text;
+    if (error_text != nullptr) error_text->clear();
+    return true;
+  }
+
+ private:
+  static constexpr uint64_t kEmbeddingRowBytes_ = 2048ULL * sizeof(uint16_t);
+
+  static bool read_span_bytes(const native_r9700::Fp16WeightSpan& span,
+                              std::vector<uint8_t>* bytes,
+                              std::string* error_text) {
+    if (bytes == nullptr || span.byte_length == 0 ||
+        span.byte_length > std::numeric_limits<std::size_t>::max()) {
+      if (error_text != nullptr) *error_text = "invalid F16 weight span";
+      return false;
+    }
+    std::ifstream input(span.shard_path, std::ios::binary);
+    if (!input) {
+      if (error_text != nullptr) {
+        *error_text = "cannot open F16 weight span " + span.name;
+      }
+      return false;
+    }
+    input.seekg(static_cast<std::streamoff>(span.data_offset));
+    if (!input) {
+      if (error_text != nullptr) {
+        *error_text = "cannot seek F16 weight span " + span.name;
+      }
+      return false;
+    }
+    bytes->resize(static_cast<std::size_t>(span.byte_length));
+    input.read(reinterpret_cast<char*>(bytes->data()),
+               static_cast<std::streamsize>(bytes->size()));
+    if (input.gcount() != static_cast<std::streamsize>(bytes->size())) {
+      if (error_text != nullptr) {
+        *error_text = "cannot read complete F16 weight span " + span.name;
+      }
+      return false;
+    }
+    return true;
+  }
+
+  bool fail(std::string* error_text, const std::string& message) {
+    if (error_text != nullptr) *error_text = message;
+    return false;
+  }
+
+  void remember_fault(const std::string& message) {
+    faulted_ = true;
+    fault_text_ = message.empty() ? "resident execution failed" : message;
+  }
+
+  native_r9700::NativeResourceSpec spec_;
+  std::string model_uri_;
+  std::vector<uint8_t> embedding_tensor_;
+  native_r9700::ModelWeightBinder binder_;
+  native_r9700::LlamaLayerWeightTable weight_table_;
+  native_r9700::LlamaPersistentDispatch dispatch_;
+  native_r9700::ResidentHsaSession resident_;
+  native_r9700::ResidentHsaDispatchResult dispatch_result_;
+  const uint32_t block_capacity_ = 32U;
+  bool resident_open_ = false;
+  bool committed_ = false;
+  bool faulted_ = false;
+  std::string fault_text_;
+};
+
+class RunnerNativeResourceBackend final : public native_r9700::NativeResourceBackend {
+ public:
+  explicit RunnerNativeResourceBackend(const std::string& executable_path) {
+    if (!sha256_executable_file(running_executable_path(executable_path),
+                                &runner_binary_sha256_, &runner_hash_error_)) {
+      runner_binary_sha256_.clear();
+    }
+  }
+
+  bool prepare(const native_r9700::NativeResourceSpec& spec,
+               native_r9700::NativePrepareResult* result,
+               native_r9700::NativeResourceError* error) override {
+    if (result == nullptr) {
+      set_error(error, "invalid_request", "prepare result is required",
+                "prepare_result");
+      return false;
+    }
+    if (runner_binary_sha256_.empty()) {
+      set_error(error, "executable_rejection",
+                runner_hash_error_.empty() ? "runner executable hash is unavailable"
+                                           : runner_hash_error_,
+                "runner_hash");
+      return false;
+    }
+    if (spec.resource_budget.resident_bytes_max == 0 ||
+        spec.resource_budget.scratch_bytes_max == 0) {
+      set_error(error, "resource_exhaustion",
+                "resource budget must reserve resident and scratch bytes",
+                "prepare_budget");
+      return false;
+    }
+
+    execution_ = std::make_unique<NativePersistentExecution>();
+    std::string detail;
+    if (!execution_->prepare(spec, &detail)) {
+      execution_.reset();
+      set_error(error, "resource_exhaustion", detail, "prepare_execution");
+      return false;
+    }
+
+    std::vector<std::string> selected_kernel_digests;
+    selected_kernel_digests.reserve(execution_->dispatch().images.size());
+    for (const native_r9700::HsaCodeImageAsset& image :
+         execution_->dispatch().images) {
+      if (image.image_sha256.empty()) {
+        execution_->close(&detail);
+        execution_.reset();
+        set_error(error, "resource_exhaustion",
+                  "selected kernel asset has no image_sha256", "prepare_kernel_pack");
+        return false;
+      }
+      selected_kernel_digests.push_back("sha256:" + image.image_sha256);
+    }
+    if (selected_kernel_digests != spec.kernel_pack.digests) {
+      execution_->close(&detail);
+      execution_.reset();
+      set_error(error, "invalid_request",
+                "declared kernel pack digests do not match selected assets",
+                "prepare_kernel_pack");
+      return false;
+    }
+    for (const std::string& digest : selected_kernel_digests) {
+      if (digest == "sha256:" + std::string(64U, '0')) {
+        execution_->close(&detail);
+        execution_.reset();
+        set_error(error, "invalid_request",
+                  "zero kernel pack identity is not accepted",
+                  "prepare_kernel_pack");
+        return false;
+      }
+    }
+    uint64_t planned_resident_bytes = 0;
+    uint64_t planned_scratch_bytes = 0;
+    bool planned_bytes_overflow = false;
+    for (const native_r9700::ResidentHsaBuffer& buffer :
+         execution_->dispatch().request.buffers) {
+      const uint64_t bytes = buffer.allocation_byte_count;
+      uint64_t* bucket =
+          buffer.upload_bytes.empty() ? &planned_scratch_bytes
+                                      : &planned_resident_bytes;
+      if (bytes > std::numeric_limits<uint64_t>::max() - *bucket) {
+        planned_bytes_overflow = true;
+        break;
+      }
+      *bucket += bytes;
+    }
+    if (!planned_bytes_overflow) {
+      for (const native_r9700::HsaCodeImageAsset& image :
+           execution_->dispatch().images) {
+        const uint64_t bytes = static_cast<uint64_t>(image.image.size());
+        if (bytes > std::numeric_limits<uint64_t>::max() -
+                        planned_resident_bytes) {
+          planned_bytes_overflow = true;
+          break;
+        }
+        planned_resident_bytes += bytes;
+      }
+    }
+    uint64_t planned_total_bytes = 0;
+    if (!planned_bytes_overflow &&
+        planned_resident_bytes <=
+            std::numeric_limits<uint64_t>::max() - planned_scratch_bytes) {
+      planned_total_bytes = planned_resident_bytes + planned_scratch_bytes;
+    } else {
+      planned_bytes_overflow = true;
+    }
+    if (planned_bytes_overflow ||
+        planned_resident_bytes > spec.resource_budget.resident_bytes_max ||
+        planned_scratch_bytes > spec.resource_budget.scratch_bytes_max ||
+        planned_total_bytes > spec.resource_budget.total_bytes_max) {
+      execution_->close(&detail);
+      execution_.reset();
+      set_error(error, "resource_exhaustion",
+                "planned resident/scratch/total bytes exceed ResourceSpec budget",
+                "prepare_budget");
+      return false;
+    }
+    if (!execution_->prepare_resident(&detail)) {
+      execution_.reset();
+      set_error(error, "resource_exhaustion", detail, "prepare_resident");
+      return false;
+    }
+
+    spec_ = spec;
+    generation_ = next_generation_++;
+    prepared_ = true;
+    resident_ = false;
+    has_released_generation_ = false;
+    released_generation_ = 0;
+    released_operation_.clear();
+    native_r9700::NativeProducerIdentity identity;
+    identity.runner_binary_sha256 = runner_binary_sha256_;
+    identity.ordered_kernel_pack_sha256 = selected_kernel_digests;
+    fingerprint_ = native_r9700::compute_native_producer_fingerprint(identity);
+    result->resource_generation = generation_;
+    result->state = "prepared";
+    result->producer_fingerprint = fingerprint_;
+    result->runner_binary_sha256 = runner_binary_sha256_;
+    return true;
+  }
+
+  bool commit(uint64_t generation, native_r9700::NativeCommitResult* result,
+              native_r9700::NativeResourceError* error) override {
+    if (!execution_ || !prepared_ || generation != generation_ ||
+        result == nullptr) {
+      set_error(error, "invalid_request", "prepared generation is unavailable",
+                "commit_generation");
+      return false;
+    }
+    std::string detail;
+    if (!execution_->commit(&detail)) {
+      set_error(error, "device_lost_or_faulted", detail, "commit_execution");
+      return false;
+    }
+    prepared_ = false;
+    resident_ = true;
+    result->resource_generation = generation_;
+    result->state = "resident-ready";
+    result->producer_fingerprint = fingerprint_;
+    return true;
+  }
+
+  bool rollback(uint64_t generation, native_r9700::NativeCleanupResult* result,
+                native_r9700::NativeResourceError* error) override {
+    if (result == nullptr) {
+      set_error(error, "invalid_request", "rollback result is required",
+                "rollback_result");
+      return false;
+    }
+    if (!execution_) {
+      if (has_released_generation_ && generation == released_generation_ &&
+          released_operation_ == "Rollback") {
+        result->resource_generation = generation;
+        result->state = "released";
+        result->already_released = true;
+        return true;
+      }
+      set_error(error, "invalid_request", "rollback generation is unavailable",
+                "rollback_generation");
+      return false;
+    }
+    if (generation != generation_) {
+      set_error(error, "invalid_request", "rollback generation is unavailable",
+                "rollback_generation");
+      return false;
+    }
+    std::string detail;
+    if (!execution_->close(&detail)) {
+      set_error(error, "device_lost_or_faulted", detail, "rollback_execution");
+      return false;
+    }
+    execution_.reset();
+    prepared_ = false;
+    resident_ = false;
+    has_released_generation_ = true;
+    released_generation_ = generation;
+    released_operation_ = "Rollback";
+    result->resource_generation = generation_;
+    result->state = "released";
+    result->already_released = false;
+    return true;
+  }
+  bool release(uint64_t generation, native_r9700::NativeCleanupResult* result,
+               native_r9700::NativeResourceError* error) override {
+    if (result == nullptr) {
+      set_error(error, "invalid_request", "release result is required",
+                "release_result");
+      return false;
+    }
+    if (!execution_) {
+      if (has_released_generation_ && generation == released_generation_ &&
+          released_operation_ == "Release") {
+        result->resource_generation = generation;
+        result->state = "released";
+        result->already_released = true;
+        return true;
+      }
+      set_error(error, "invalid_request", "release generation is unavailable",
+                "release_generation");
+      return false;
+    }
+    if (generation != generation_) {
+      set_error(error, "invalid_request", "release generation is unavailable",
+                "release_generation");
+      return false;
+    }
+    std::string detail;
+    if (!execution_->close(&detail)) {
+      set_error(error, "device_lost_or_faulted", detail, "release_execution");
+      return false;
+    }
+    execution_.reset();
+    prepared_ = false;
+    resident_ = false;
+    has_released_generation_ = true;
+    released_generation_ = generation;
+    released_operation_ = "Release";
+    result->resource_generation = generation_;
+    result->state = "released";
+    result->already_released = false;
+    return true;
+  }
+
+  bool prefill(const native_r9700::NativeResourcePrefillRequest& request,
+               native_r9700::NativeResourcePrefillResult* result,
+               native_r9700::NativeResourceError* error) override {
+    if (!execution_ || !resident_ || request.resource_generation != generation_) {
+      set_error(error, "invalid_request", "resident generation is unavailable",
+                "prefill_generation");
+      return false;
+    }
+    std::string detail;
+    if (!execution_->prefill(request, result, &detail)) {
+      set_error(error, execution_->faulted() ? "device_lost_or_faulted"
+                                             : "invalid_request",
+                detail, "prefill_execution");
+      return false;
+    }
+    result->resource_generation = request.resource_generation;
+    result->producer_fingerprint = fingerprint_;
+    return true;
+  }
+
+  bool health(native_r9700::NativeHealthResult* result,
+              native_r9700::NativeResourceError* error) override {
+    if (result == nullptr) {
+      set_error(error, "invalid_request", "health result is required",
+                "health_result");
+      return false;
+    }
+    *result = native_r9700::NativeHealthResult{};
+    result->child_state =
+        execution_ && execution_->faulted() ? "faulted" : "ready";
+    result->resource_state =
+        resident_ ? "resident-ready" : (prepared_ ? "prepared" : "none");
+    result->has_resource_generation = prepared_ || resident_;
+    result->resource_generation = generation_;
+    result->producer_fingerprint =
+        prepared_ || resident_ ? fingerprint_ : std::string();
+    if (execution_ && execution_->faulted()) {
+      result->has_error_summary = true;
+      result->error_summary.domain = "device_lost_or_faulted";
+      result->error_summary.message = execution_->fault_text();
+      result->error_summary.failure_stage = "prefill_execution";
+    }
+    return true;
+  }
+
+  bool shutdown(native_r9700::NativeShutdownResult* result,
+                native_r9700::NativeResourceError* error) override {
+    if (result == nullptr) {
+      set_error(error, "invalid_request", "shutdown result is required",
+                "shutdown_result");
+      return false;
+    }
+    result->state = "shutdown";
+    return true;
+  }
+
+ private:
+  std::unique_ptr<NativePersistentExecution> execution_;
+  native_r9700::NativeResourceSpec spec_;
+  std::string runner_binary_sha256_;
+  std::string runner_hash_error_;
+  uint64_t next_generation_ = 1;
+  uint64_t generation_ = 0;
+  bool prepared_ = false;
+  bool resident_ = false;
+  bool has_released_generation_ = false;
+  uint64_t released_generation_ = 0;
+  std::string released_operation_;
+  std::string fingerprint_;
+};
 }  // namespace
 bool parse_u64(const char* text, uint64_t* out) {
   if (text == nullptr || text[0] == '\0') return false;
@@ -507,6 +1259,14 @@ int main(int argc, char** argv) {
   if (std::strcmp(argv[1], "--help") == 0 || std::strcmp(argv[1], "-h") == 0) {
     print_help(argv[0]);
     return 0;
+  }
+  if (std::strcmp(argv[1], "--model-service-worker") == 0) {
+    if (argc != 2) {
+      std::fprintf(stderr, "error: --model-service-worker accepts no options\n");
+      return 2;
+    }
+    RunnerNativeResourceBackend backend(argv[0]);
+    return native_r9700::run_native_resource_worker(std::cin, std::cout, backend);
   }
   if (std::strcmp(argv[1], "--lifecycle-dry-run") == 0) {
     native_r9700::RuntimeSession session;

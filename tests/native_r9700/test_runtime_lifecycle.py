@@ -32,6 +32,7 @@ RUNNER_SOURCES = [
     Path("native_r9700/llama_layer_executor.cpp"),
     Path("native_r9700/kernel_assets.cpp"),
     Path("native_r9700/runtime.cpp"),
+    Path("native_r9700/native_resource_worker.cpp"),
     Path("native_r9700/runner.cpp"),
 ]
 REQUIRED_LOG_FIELDS = (

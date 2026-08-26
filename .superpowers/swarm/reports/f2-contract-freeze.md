@@ -232,7 +232,7 @@ The task-set-3 physical-layout record is `record_kind: offline_review` with `evi
 
 ### Canonical `pack_sha256` preimage
 
-`pack_sha256` is exactly the SHA-256 of the UTF-8 RFC8785 JCS for `{ "domain":"r9700-kernel-pack-identity-v1", "pack": <the normalized complete pack record with the top-level `evidence` object and every `pack_sha256` field removed> }`. The normalized complete pack record includes all identity, provenance, license, image, build, entry, kernarg, resource, geometry, compatibility, and numerical fields, including their declared paths and digests. Remove the top-level `evidence` object and recursively remove every field named `pack_sha256` before RFC8785 JCS serialization. Non-finite numbers reject. Evidence references bind to this result; there is no recursive digest.
+`pack_sha256` is exactly the SHA-256 of the UTF-8 RFC8785 JCS for `{ "domain":"r9700-kernel-pack-identity-v1", "pack": <the normalized complete pack record with the top-level `evidence` object and every `pack_sha256` and `record_sha256` field removed> }`. The normalized complete pack record includes all identity, provenance, license, image, build, entry, kernarg, resource, geometry, compatibility, and numerical fields, including declared paths and semantic evidence IDs/input/output digests. Remove the top-level `evidence` object and recursively remove every field named `pack_sha256` or `record_sha256` before RFC8785 JCS serialization. Non-finite numbers reject. Evidence references bind to this result without a recursive file-digest cycle.
 
 ### 3.7 Resource and descriptor limits
 

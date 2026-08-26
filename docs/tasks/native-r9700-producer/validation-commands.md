@@ -46,6 +46,7 @@ xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   native_r9700/device_memory.cpp native_r9700/hardware_lock.cpp \
   native_r9700/llama_stage_layout.cpp native_r9700/llama_layer_executor.cpp \
   native_r9700/kernel_assets.cpp native_r9700/runtime.cpp \
+  native_r9700/native_resource_worker.cpp \
   native_r9700/runner.cpp -I native_r9700 \
   -o build/native-r9700-runtime/native_r9700_runner
 build/native-r9700-runtime/native_r9700_runner --lifecycle-dry-run
@@ -211,9 +212,33 @@ The required output is a concrete `EvidenceRef` with `record_kind: offline_revie
 ```sh
 /bin/bash -o pipefail -c '
   set -u
-  mkdir -p build/f2-wmma logs/f2
+  mkdir -p build/f2-wmma logs/f2 \
+    build/upstream/amd-matrix-instruction-calculator build/upstream/python
   PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
-  CALC=${HOME}/Development/ml/tools/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py
+  CALC=build/upstream/amd-matrix-instruction-calculator/matrix_calculator.py
+  CALC_URL=https://raw.githubusercontent.com/ROCm/amd_matrix_instruction_calculator/2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py
+  CALC_SHA=53b027855ca44120401eeff69f41961821d1a393b163e112f7aa4d2a313e185d
+  if [ ! -f "$CALC" ]; then
+    "$PY" -c "import pathlib,sys,urllib.request; pathlib.Path(sys.argv[2]).write_bytes(urllib.request.urlopen(sys.argv[1]).read())" "$CALC_URL" "$CALC"
+  fi
+  actual_calc_sha=$("$PY" -c "import hashlib,pathlib,sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())" "$CALC")
+  [ "$actual_calc_sha" = "$CALC_SHA" ] || { printf "calculator digest mismatch\n" >&2; exit 2; }
+  if ! PYTHONPATH=build/upstream/python "$PY" -c "import tabulate" 2>/dev/null; then
+    "$PY" -m pip install --quiet --target build/upstream/python tabulate==0.9.0
+  fi
+  export PYTHONPATH=build/upstream/python
+  xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
+    native_r9700/amdev_packets.cpp native_r9700/runtime_contract.cpp \
+    native_r9700/prefill_npz.cpp native_r9700/vram_layout.cpp \
+    native_r9700/vram_allocator.cpp native_r9700/dynamic_page_table.cpp \
+    native_r9700/resident_memory.cpp native_r9700/vram_smoke_asset.cpp \
+    native_r9700/hsa_code_image_asset.cpp native_r9700/model_weight_binder.cpp \
+    native_r9700/llama_stage_layout.cpp native_r9700/llama_layer_executor.cpp \
+    native_r9700/kernel_assets.cpp native_r9700/amdev_session.cpp \
+    native_r9700/kernel_catalog.cpp native_r9700/device_memory.cpp \
+    native_r9700/hardware_lock.cpp native_r9700/runtime.cpp \
+    native_r9700/native_resource_worker.cpp native_r9700/wmma_lane_map_runner.cpp \
+    -I native_r9700 -o build/f2-wmma/wmma_lane_map_gfx1201
   detail=logs/f2/wmma-calculator-detail.txt
   a_map=logs/f2/wmma-calculator-a.csv
   b_map=logs/f2/wmma-calculator-b.csv
@@ -472,7 +497,8 @@ xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   native_r9700/kernel_catalog.cpp native_r9700/device_memory.cpp \
   native_r9700/hardware_lock.cpp native_r9700/llama_stage_layout.cpp \
   native_r9700/llama_layer_executor.cpp native_r9700/kernel_assets.cpp \
-  native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 \
+  native_r9700/runtime.cpp native_r9700/native_resource_worker.cpp \
+  native_r9700/runner.cpp -I native_r9700 \
   -o build/native-r9700-runtime/native_r9700_runner
 build/native-r9700-runtime/native_r9700_runner --lifecycle-dry-run
 "$PY" -m pytest \
@@ -519,7 +545,8 @@ xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   native_r9700/kernel_catalog.cpp native_r9700/device_memory.cpp \
   native_r9700/hardware_lock.cpp native_r9700/llama_stage_layout.cpp \
   native_r9700/llama_layer_executor.cpp native_r9700/kernel_assets.cpp \
-  native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 \
+  native_r9700/runtime.cpp native_r9700/native_resource_worker.cpp \
+  native_r9700/runner.cpp -I native_r9700 \
   -o build/native-r9700-runtime/native_r9700_runner
 /bin/bash -o pipefail -c 'mkdir -p logs; log=logs/p3-scalar-migration-native-prefill.log; { printf "%s\\n" "command: tools/native-r9700-hardware-run env APL_REMOTE_SOCK=${TMPDIR}/tinygpu.sock build/native-r9700-runtime/native_r9700_runner --native-prefill-proof --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --token-ids-json [128000,128001] --out logs/p3-scalar-migration.npz --log logs/p3-scalar-migration-runner.log"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; tools/native-r9700-hardware-run env APL_REMOTE_SOCK=${TMPDIR}/tinygpu.sock build/native-r9700-runtime/native_r9700_runner --native-prefill-proof --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --token-ids-json "[128000,128001]" --out logs/p3-scalar-migration.npz --log logs/p3-scalar-migration-runner.log; status=$?; printf "wrapper_exit_status: %d\\n" "$status"; exit "$status"; } >"$log" 2>&1'
 ```

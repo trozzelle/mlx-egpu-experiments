@@ -2783,22 +2783,30 @@ bool ResidentHsaSession::close(std::string* error_text) {
     state.reset_after_close();
     return true;
   }
-  std::printf("phase_timer model_load_usec: %ld\n", state.phase_timers.model_load_usec);
-  std::printf("phase_timer staging_copy_usec: %ld\n", state.phase_timers.staging_copy_usec);
-  std::printf("phase_timer sdma_setup_usec: %ld\n", state.phase_timers.sdma_setup_usec);
-  std::printf("phase_timer sdma_submit_inclusive_usec: %ld\n",
-              state.phase_timers.sdma_submit_inclusive_usec);
-  std::printf("phase_timer sdma_fence_wait_usec: %ld\n", state.phase_timers.sdma_fence_wait_usec);
-  std::printf("phase_timer pm4_build_usec: %ld\n", state.phase_timers.pm4_build_usec);
-  std::printf("phase_timer hdp_flush_usec: %ld\n", state.phase_timers.hdp_flush_usec);
-  std::printf("phase_timer doorbell_usec: %ld\n", state.phase_timers.doorbell_usec);
-  std::printf("phase_timer timeline_wait_usec: %ld\n", state.phase_timers.timeline_wait_usec);
-  std::printf("phase_counter sdma_setup_count: %llu\n",
-              static_cast<unsigned long long>(state.phase_timers.sdma_setup_count));
-  std::printf("phase_counter compute_submit_count: %llu\n",
-              static_cast<unsigned long long>(state.phase_timers.compute_submit_count));
-  std::printf("phase_counter socket_rpc_count: %llu\n",
-              static_cast<unsigned long long>(state.phase_timers.socket_rpc_count));
+  std::fprintf(stderr, "resident cleanup phase_timer model_load_usec: %ld\n",
+               state.phase_timers.model_load_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer staging_copy_usec: %ld\n",
+               state.phase_timers.staging_copy_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer sdma_setup_usec: %ld\n",
+               state.phase_timers.sdma_setup_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer sdma_submit_inclusive_usec: %ld\n",
+               state.phase_timers.sdma_submit_inclusive_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer sdma_fence_wait_usec: %ld\n",
+               state.phase_timers.sdma_fence_wait_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer pm4_build_usec: %ld\n",
+               state.phase_timers.pm4_build_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer hdp_flush_usec: %ld\n",
+               state.phase_timers.hdp_flush_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer doorbell_usec: %ld\n",
+               state.phase_timers.doorbell_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer timeline_wait_usec: %ld\n",
+               state.phase_timers.timeline_wait_usec);
+  std::fprintf(stderr, "resident cleanup phase_counter sdma_setup_count: %llu\n",
+               static_cast<unsigned long long>(state.phase_timers.sdma_setup_count));
+  std::fprintf(stderr, "resident cleanup phase_counter compute_submit_count: %llu\n",
+               static_cast<unsigned long long>(state.phase_timers.compute_submit_count));
+  std::fprintf(stderr, "resident cleanup phase_counter socket_rpc_count: %llu\n",
+               static_cast<unsigned long long>(state.phase_timers.socket_rpc_count));
 
   std::string detail;
   if (state.compute_queue_retirement != nullptr &&

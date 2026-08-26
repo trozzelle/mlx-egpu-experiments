@@ -6354,8 +6354,8 @@ inline void finalize_gpu_stage_profile_percentiles(
 // ownership before reporting the first unimplemented production layer-execution
 // prerequisite. It never creates an NPZ until all 16 layers are dispatched
 // against model weights and read back into the atomic fp16 output.
-int run_native_prefill(const NativePrefillRequest& request, NativePrefillResult* result,
-                       std::string* error_text);
+int run_native_prefill(const NativePrefillRequest& request,
+                       NativePrefillResult* result, std::string* error_text);
 
 // Request-scoped numerical diagnostic for one layer-0/token-0 resident Llama
 // boundary. This is intentionally separate from NativePrefillRequest: no trace
