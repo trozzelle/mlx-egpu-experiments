@@ -391,7 +391,7 @@ Expected observations, all required: F2 HSA/asset/catalog/numerical/evidence gat
 
 ## P1
 
-The fixed downstream `TGPUConformanceClient` binary and subcommands below are the exact P1 CLI contract. The missing full Xcode/DriverKit SDK is an explicit blocker for build/install and all hardware observations; production distribution credentials are a separate promotion blocker.
+The fixed downstream `TGPUConformanceClient` binary and subcommands below are the exact P1 CLI contract. Xcode 26.6 build `17F113` and DriverKit SDK 25.5 are selected; production distribution credentials remain a separate promotion blocker.
 
 ### SDK/build/install preflight and local install
 
@@ -405,7 +405,7 @@ xcodebuild -project TinyGPUDriverExtension.xcodeproj \
 ./install_nosip.sh
 ```
 
-The currently verified preflight result is blocked: active developer directory is CommandLineTools, DriverKit SDK version is unavailable, and full Xcode is absent. After full Xcode is installed/selected, the first command must print the selected developer directory and the second must print an exact DriverKit SDK version; that version is recorded before any source build. The local installer may use only the NoSIP development entitlement. No command in this section launches or links `Shared/server.c`. Apple PCI distribution entitlement, profiles, Developer ID/notarization credentials, and approved external signing invocation remain promotion-only inputs, separate from the missing SDK gate.
+Verified preflight on 2026-08-26: active developer directory `/Applications/Xcode.app/Contents/Developer`; Xcode 26.6 build `17F113`; DriverKit SDK `25.5` at `/Applications/Xcode.app/Contents/Developer/Platforms/DriverKit.platform/Developer/SDKs/DriverKit25.5.sdk`. The local installer may use only the NoSIP development entitlement. No command in this section launches or links `Shared/server.c`. Apple PCI distribution entitlement, profiles, Developer ID/notarization credentials, and approved external signing invocation remain promotion-only inputs, separate from the cleared SDK gate.
 
 ### P1 cold lifecycle
 

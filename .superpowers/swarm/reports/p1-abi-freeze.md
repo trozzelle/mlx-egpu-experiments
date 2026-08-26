@@ -1,7 +1,7 @@
 # P1 TinyGPU user-client ABI freeze
 
 **Task set:** P1 / 1 — ABI, security, entitlement, and command freeze  
-**Status:** Needs review  
+**Status:** Done
 **Owner:** `P1ABI`  
 **Report:** `.superpowers/swarm/reports/p1-abi-freeze.md`  
 **Review date:** 2026-08-25  
@@ -19,7 +19,7 @@ Queue rings, MQDs, HQDs, doorbells, fence-control storage, and all hardware-cons
 
 Queue reset is owner-only. Device reset and device-wide fault detail require distinct recovery/diagnostic user-client roles and exact entitlements, serialized state preconditions, a rate limit, and bounded redacted output. Normal inference clients cannot reset the device or read another client's device-wide fault detail. Release transport and personality scope is exactly AMD PCI `1002:7551`; wildcard and vendor-wide matches are local NoSIP development-only and must be absent from Release.
 
-Task set 1 remains **Needs review**. Task sets 2–4 are **Blocked** on both (a) the missing full Xcode/DriverKit SDK and (b) focused security re-review of these corrections. The supervisor verified that the active developer directory is CommandLineTools, `xcrun --sdk driverkit` fails, `xcodebuild` requires full Xcode, and no Xcode.app exists under `/Applications` or `~/Applications`; therefore the selected DriverKit SDK version is **unavailable/not recorded**. This is separate from the external production-distribution credential blocker.
+Task set 1 is **Done**. Focused security re-review found zero remaining Critical/Important findings. On 2026-08-26 the supervisor selected Xcode 26.6 build `17F113` with DriverKit SDK 25.5, clearing the implementation prerequisite for task sets 2–4. External production-distribution credentials remain a separate promotion gate.
 
 ## Normative ABI definition
 
@@ -936,15 +936,14 @@ Local development is separate: `${HOME}/Development/ml/tools/egpu/.worktrees/r97
 
 ## SDK gate and implementation status
 
-The supervisor's verified prerequisite observation is recorded exactly:
+The supervisor's refreshed prerequisite observation on 2026-08-26 is recorded exactly:
 
-* active developer directory: `/Library/Developer/CommandLineTools`;
-* `xcrun --sdk driverkit --show-sdk-version`: fails because no DriverKit SDK is available under the active developer directory;
-* `xcodebuild`: requires full Xcode rather than CommandLineTools for the DriverKit project;
-* `/Applications/Xcode.app` and `~/Applications/Xcode.app`: absent;
-* selected DriverKit SDK version: **unavailable/not recorded**, not inferred from `DRIVERKIT_DEPLOYMENT_TARGET = 22.0`.
+* active developer directory: `/Applications/Xcode.app/Contents/Developer`;
+* `xcodebuild -version`: Xcode 26.6, build `17F113`;
+* `xcrun --sdk driverkit --show-sdk-version`: `25.5`;
+* selected SDK path: `/Applications/Xcode.app/Contents/Developer/Platforms/DriverKit.platform/Developer/SDKs/DriverKit25.5.sdk`.
 
-No TinyGPU source implementation or DriverKit build/install may begin until full Xcode containing the DriverKit SDK is installed and selected, `xcrun --sdk driverkit --show-sdk-version` succeeds, and the supervisor records that exact version with a fresh review of the dated Apple records. This SDK gate is independent of the external distribution-entitlement/credential promotion gate. Task set 1 remains Needs review pending focused security re-review; task sets 2–4 remain Blocked on both the SDK gate and that re-review.
+The SDK/source gate and focused security-review gate are clear for task sets 2–4. The external distribution-entitlement/credential gate remains independent and promotion-only.
 
 ## Later task ownership matrix
 
@@ -1062,10 +1061,9 @@ The client reads exactly the accepted report fields `g0_record_id`, `g0_image_sh
 
 ## Unresolved blockers
 
-* **DriverKit SDK/source gate:** full Xcode with a selected DriverKit SDK is absent. The exact SDK version is unavailable/not recorded because the verified `xcrun --sdk driverkit` lookup fails under CommandLineTools. Task sets 2–4 cannot edit or build TinyGPU source until the SDK is installed/selected and the exact version is recorded.
-* **Focused security re-review:** `P1SecurityReview` found 1 Critical, 8 Important, and 2 Minor findings. This report records a correction for every finding below, but task set 1 remains Needs review until a focused re-review confirms zero Critical/Important findings. Task sets 2–4 are blocked on that re-review as well as the SDK gate.
+* **G0 consumption:** task set 6 and P1 promotion require the still-blocked exact F2/G0 WMMA record; task sets 2–5 may proceed independently.
 * **Physical fault injection:** the fixed `device-recovery` CLI exists as the task-5 target; physical injection may remain unavailable and must report blocked rather than be replaced by a legacy control.
-* **Distribution promotion:** Apple PCI distribution entitlement, profiles, Developer ID/notarization credentials, and approved external signing invocation remain promotion-only inputs. They are separate from the repository-controlled R9700-only Release scope and the missing SDK gate.
+* **Distribution promotion:** Apple PCI distribution entitlement, profiles, Developer ID/notarization credentials, and approved external signing invocation remain promotion-only inputs. They are separate from the repository-controlled R9700-only Release scope and do not block task sets 2–5.
 
 ## Review corrections mapping
 
@@ -1083,6 +1081,6 @@ The following table maps every finding from `agent://P1SecurityReview` to the fr
 | `P1-VAL-001` wrong checkout/placeholders | Important | Commands point to the `r9700-tinygpu-device-owner` worktree and one fixed `TGPUConformanceClient` source/binary whose ownership is sequential: task 2 common/cold, task 3 client-death, task 4 malformed/queue/fault/G0, task 5 recovery. Exact CLIs are recorded; no command launches the legacy proxy. Physical injection is explicitly blocked rather than replaced. |
 | `P1-SIGN-001` broad Release PCI scope | Important | Task set 2 owns the pre-install package cutover; Release transport/personality is exactly AMD `1002:7551` (`0x75511002&0xFFFFFFFF`); wildcard, vendor-wide, NVIDIA, and class-wide matches are forbidden in Release. Wildcard/allow-any access is local NoSIP only. |
 | `P1-ABI-002` fence polling contradiction | Minor | `timeout_ns == 0` polls the requested `fence_value`; only timeout is capped. `fence_value == 0` is explicitly an immediate initial-state query and never a signal value. |
-| `P1-SDK-001` missing DriverKit SDK datum | Minor | Exact selected DriverKit SDK is recorded as unavailable/not recorded under the verified CommandLineTools/full-Xcode prerequisite, and source/build is blocked until full Xcode installs/selects a DriverKit SDK and the exact version is captured. |
+| `P1-SDK-001` missing DriverKit SDK datum | Minor | Cleared 2026-08-26: Xcode 26.6 build `17F113`, DriverKit SDK `25.5`, and the exact selected SDK path are recorded before source/build work resumes. |
 
-Task set 1 therefore remains **Needs review**, and task sets 2–4 remain **Blocked: missing full Xcode/DriverKit SDK and pending security re-review**. No external distribution credential is treated as the reason for this implementation block.
+Task set 1 is therefore **Done**. Task sets 2–4 may proceed with the selected Xcode/DriverKit toolchain; task set 6 and phase promotion remain blocked on G0, with distribution credentials tracked separately.

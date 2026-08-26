@@ -6,7 +6,7 @@
 - `docs/IMPLEMENTATION_PLAN.md` §P1 — Harden TinyGPU device ownership and §TinyGPU source repository.
 - `docs/DESIGN.md` §TinyGPU Device Owner contract, Device lifecycle, Platform conformance gates, Error domains, and Security/review gates.
 - ADR 0007 — TinyGPU remains device owner behind the Inference HAL.
-- `.superpowers/swarm/progress.md` P1 row: Needs review; task sets 2–4 remain blocked on the missing full Xcode/DriverKit SDK and focused security re-review; G0 required for promotion.
+- `.superpowers/swarm/progress.md` P1 row: In progress; task set 1 is accepted, Xcode 26.6 with DriverKit SDK 25.5 is selected, and task sets 2–3 have resumed. G0 still blocks task set 6 and phase promotion.
 - `docs/REFERENCES.md` local TinyGPU/AMDev, mac-amdgpu, tinygrad TinyGPU/AMDev, Linux amdgpu, Apple DriverKit, linux-firmware.
 - Manifest IDs/documents: `mac-amdgpu`, `tinygrad-amdev`, `linux-amdgpu-gfx12`, `linux-firmware-r9700`, `apple-pcidriverkit-iopcidevice`, `apple-driverkit-user-client-sample`.
 
@@ -17,7 +17,7 @@ Make the existing TinyGPU DriverKit extension the production-safe sole R9700 dev
 ## Dependencies
 
 - B0 and ADR 0007 are accepted.
-- Task set 1 may review/freeze the ABI in parallel with F2/G0, but task sets 2–4 cannot edit or build TinyGPU source until focused security re-review is clear and full Xcode with a selected DriverKit SDK is available. G0 still blocks promotion.
+- Task set 1 reviewed/froze the ABI in parallel with F2/G0. Its focused security re-review is clear, and the supervisor selected Xcode 26.6 with DriverKit SDK 25.5 on 2026-08-26. Task sets 2–4 may now edit/build TinyGPU source in dependency order. G0 still blocks promotion.
 - P2 waits for P1 user-client ABI freeze and cannot promote before P1.
 - Work spans the TinyGPU repository and this `egpu` repository; the ABI owner must freeze both sides before implementation. The implementation worktree is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on `feature/r9700-device-owner`; the legacy `Shared/server.c` proxy is quarantined and not a dependency.
 
@@ -40,9 +40,9 @@ Make the existing TinyGPU DriverKit extension the production-safe sole R9700 dev
 | Task set | Status | Owner | Notes |
 |---|---|---|---|
 | 1. ABI, security, entitlement, and command freeze | Done | P1ABI | Frozen in `.superpowers/swarm/reports/p1-abi-freeze.md`; focused security re-review found zero remaining Critical/Important issues. TGPU ABI v1.0, concrete layouts, least-privilege ownership, R9700-only Release scope, proxy quarantine, and exact future CLIs are accepted.
-| 2. Cold lifecycle and firmware adaptation | Blocked | Unassigned | Blocked only on missing full Xcode/DriverKit SDK (active developer directory is CommandLineTools; DriverKit SDK version unavailable). After installation/selection, task set 2 owns source/package cutover, creates the common `TGPUConformanceClient` target and `cold-lifecycle`, then validates the future source worktree.
-| 3. Buffer/VA and per-client ownership | Blocked | Unassigned | Blocked only on missing full Xcode/DriverKit SDK. After installation/selection, task set 3 owns buffer/import/mapping client-death hooks and the sequential `client-death` CLI extension.
-| 4. Queue/executable/fence/fault boundary | Blocked | Unassigned | Blocked only on missing full Xcode/DriverKit SDK. After installation/selection, task set 4 owns driver-owned queue/executable/submission/fence cleanup hooks and malformed/queue/fault/G0 CLI extensions.
+| 2. Cold lifecycle and firmware adaptation | Blocked | P1ColdLifecycle / P1ColdSafety / P1BoundarySafety | Source/package/common-client boundary is reviewed and compiles with zero Critical/Important findings. Hardware acceptance is blocked because no approved provenance-bound PSP/SOS/TMR firmware/transition input exists; the DEXT therefore fails non-ready at `PspSosTmr` rather than accepting pre-warmed state. Signed install/profile evidence is also pending.
+| 3. Buffer/VA and per-client ownership | In progress | P1BufferOwnership | Bounded per-connection resource-table core and cross-epoch token safety are reviewed; host contracts pass. Actual DriverKit BO/import/VA operations, selector wiring, cleanup integration, and sequential `client-death` CLI extension remain.
+| 4. Queue/executable/fence/fault boundary | Blocked | Unassigned | SDK gate and task-set-2 common-client source gate are clear; waits for complete task-set-3 DriverKit handles before queue/executable/fence/fault work.
 | 5. Reset/recovery/client-death cleanup | Blocked | Unassigned | Waits for tasks 2 and 4; integrates the task-set-3/4 idempotent cleanup hooks and adds the fixed `device-recovery` CLI extension, but does not defer resource cleanup to this task. |
 | 6. Cold end-to-end conformance and G0 consumption | Blocked | Unassigned | Waits for task sets 2–5 and G0. |
 
@@ -50,8 +50,16 @@ Make the existing TinyGPU DriverKit extension the production-safe sole R9700 dev
 
 - 2026-08-25: P1ABI read the current TinyGPU `.iig`/C++/shared client structures, installer/Xcode/signing files, and the Apple DriverKit/ADR records. Task set 1 edited only this packet and `.superpowers/swarm/reports/p1-abi-freeze.md`; TinyGPU source and shared validation ledger remain unchanged.
 - 2026-08-25 security re-review: all findings from `agent://P1SecurityReview` are mapped and closed; final spot re-review found zero remaining Critical/Important issues. The legacy raw socket/proxy is quarantined; executable binding, driver-owned controls, mandatory generational handles, role/entitlement reset authority, concrete ABI layouts, R9700-only Release scope, fence semantics, ownership hooks, exact source/package cutover, and exact future client CLI split are frozen.
-- SDK gate: supervisor verified active developer directory `/Library/Developer/CommandLineTools`; `xcrun --sdk driverkit` fails; full Xcode is required and no Xcode.app exists under `/Applications` or `~/Applications`. Exact selected DriverKit SDK version is unavailable/not recorded. No DriverKit source/build command was run.
+- SDK gate cleared 2026-08-26: supervisor verified `/Applications/Xcode.app/Contents/Developer`, Xcode 26.6 build `17F113`, DriverKit SDK `25.5`, and SDK path `/Applications/Xcode.app/Contents/Developer/Platforms/DriverKit.platform/Developer/SDKs/DriverKit25.5.sdk`. Distribution signing remains a separate promotion gate.
 - The report's recorded commands point only to the future `r9700-tinygpu-device-owner` worktree and never launch or link `Shared/server.c`. The conformance client source is extended in order by task sets 2–5: common/cold, client-death, malformed/queue/fault/G0, then recovery. Agents update only their row and append evidence/notes as work completes.
+
+### Task sets 2–3 source-foundation evidence
+
+- Xcode 26.6/DriverKit 25.5 unsigned builds pass for `TinyGPUDriver` and `TGPUConformanceClient`; the exact signed build remains blocked on a selected development team/profile.
+- Host contracts pass for ordered cold coordination, MMHUB framebuffer decoding, typed inference-health requests, bounded evidence logging, and per-client resource/token lifetime.
+- The direct preinstall client fails closed with `exit_status=1` and now creates the requested bounded eight-line log; no proxy or fallback route is used.
+- Task-set-3 native control suite: 62 passed.
+- Focused code/architecture and security re-review: PASS with zero Critical/Important findings. The source gate is clear for task-set-3 integration; no hardware promotion is claimed.
 
 ## Task set 1: Freeze TinyGPU user-client ABI, security, and commands
 
