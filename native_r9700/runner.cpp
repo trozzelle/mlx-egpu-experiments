@@ -31,6 +31,7 @@
 #include <mach-o/dyld.h>
 #endif
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "runtime.h"
 #include "native_resource_worker.h"
@@ -39,6 +40,40 @@
 #include "prefill_npz.h"
 #include "hsa_code_image_asset.h"
 namespace {
+class FdStreamBuf final : public std::streambuf {
+ public:
+  explicit FdStreamBuf(int fd) : fd_(fd) {}
+
+ protected:
+  std::streamsize xsputn(const char* source, std::streamsize count) override {
+    std::streamsize written = 0;
+    while (written < count) {
+      const ssize_t result =
+          ::write(fd_, source + written, static_cast<std::size_t>(count - written));
+      if (result > 0) {
+        written += static_cast<std::streamsize>(result);
+        continue;
+      }
+      if (result < 0 && errno == EINTR) continue;
+      break;
+    }
+    return written;
+  }
+
+  int overflow(int character) override {
+    if (traits_type::eq_int_type(character, traits_type::eof())) {
+      return traits_type::not_eof(character);
+    }
+    const char value = traits_type::to_char_type(character);
+    return xsputn(&value, 1) == 1 ? character : traits_type::eof();
+  }
+
+  int sync() override { return 0; }
+
+ private:
+  int fd_;
+};
+
 constexpr std::array<const char*, 14> kRpcOperationNames = {
     "probe",      "map_bar",     "map_sysmem_fd", "cfg_read",    "cfg_write",
     "reset",      "mmio_read",   "mmio_write",    "map_sysmem",  "sysmem_read",
@@ -1265,8 +1300,22 @@ int main(int argc, char** argv) {
       std::fprintf(stderr, "error: --model-service-worker accepts no options\n");
       return 2;
     }
+    std::fflush(stdout);
+    std::cout.flush();
+    const int response_fd = ::dup(STDOUT_FILENO);
+    if (response_fd < 0 || ::dup2(STDERR_FILENO, STDOUT_FILENO) < 0) {
+      if (response_fd >= 0) ::close(response_fd);
+      std::fprintf(stderr, "error: private response stream isolation failed\n");
+      return 1;
+    }
+    FdStreamBuf response_buffer(response_fd);
+    std::ostream response_stream(&response_buffer);
     RunnerNativeResourceBackend backend(argv[0]);
-    return native_r9700::run_native_resource_worker(std::cin, std::cout, backend);
+    const int status =
+        native_r9700::run_native_resource_worker(std::cin, response_stream, backend);
+    response_stream.flush();
+    ::close(response_fd);
+    return status;
   }
   if (std::strcmp(argv[1], "--lifecycle-dry-run") == 0) {
     native_r9700::RuntimeSession session;

@@ -36,23 +36,20 @@ _BATCH = 1
 _N_KV_HEADS = 8
 _HEAD_DIM = 64
 
-# The direct-AMDev pack is the reviewed 13-image Llama execution order in
-# ``native_r9700/kernel_assets.cpp``.  Prefixing the attested image identities
-# with ``sha256:`` keeps the ResourceSpec ABI explicit and unambiguous.
+# The direct-AMDev pack is the reviewed ten-stage execution order in
+# ``llama_layer_executor.cpp::kLlamaStageAssetConfigs``. Prefixing the
+# attested image identities with ``sha256:`` keeps ResourceSpec explicit.
 _DIRECT_AMDEV_PACK_NAME = "direct-amdev-llama-fp16"
 _DIRECT_AMDEV_PACK_VERSION = "c1r-v1"
 _DIRECT_AMDEV_PACK_DIGESTS = (
+    "sha256:0878234b9282e8e83970542e3defed11e081dcae4dc7412c319ac77d179b63d0",
     "sha256:9c2f584f4bd4c918f8c2a95a0a1f29a7102c19e8080b0d538b36f26e6e8fcc9b",
     "sha256:cf200d937d6068ce1b48fdbaa6650d80abe9b4433bdeb13389e800ad3011cb6d",
-    "sha256:0878234b9282e8e83970542e3defed11e081dcae4dc7412c319ac77d179b63d0",
-    "sha256:8be1b744e76cab295943e9a78b7cabdfd20d6e22c16f92862baf140f27b1de47",
-    "sha256:e440884d246d20580826888b6d279ce61eb24018b2b0196e1a1285071d41e037",
     "sha256:6731222d478581cbbda7bfa539bdbcc97906f7fea255a49438ece1453564de91",
     "sha256:7a5a32ffc89a7f70f347555eeb8709e77ee695530e789d2f29d875ed06c2c734",
     "sha256:e1ba09cf08e053d9ef2419b35eef7f01abba6ba62f7899b9754c28c952d6ee78",
     "sha256:34e3b1ee910a66ddb07cdd5c8e37a90e0e509abf777657a551c3b4720fa0c9fb",
     "sha256:944a5d70745f9c17b9f1da1f96720779710caf1d1357f9e4fb988663017ead36",
-    "sha256:71f242dbddbcd058dd73cd8b24f39007326e77238eeec4ff719b576fd86e18ec",
     "sha256:b1c6b3eb34427a206f06c39c535c4862f2c183dd9ddd387efc4b03eecf5a0421",
     "sha256:a9ad797933d1c627ff903f47aca89d33c3cf99f22d87149c52b337a3bfde236f",
 )

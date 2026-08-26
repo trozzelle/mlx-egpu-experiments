@@ -43,7 +43,7 @@ Deliver a local long-lived R9700 Prefill Service that loads a verified model onc
 | 2. Local protocol, model registry, and private resource client | Done | F1Protocol | Final current-source review zero findings; combined task-set-2/3 focused command 107 passed.
 | 3. Native runner/resource lifetime and private worker | Done | F1Native | Persistent all-layer/embedding generation, injected budgets, N=0 cache, actual runner/pack identities, clean JSONL diagnostics, and teardown contracts accepted.
 | 4. Worker/consumer integration | Done | F1Integration | One production registry/session lifecycle, strict request-bound NPZ-to-mlx-lm cache conversion, `1.*` identity metadata, reconstructed cache validation, S=1/N=0, model/evidence binding, exact worker modes, and no native one-shot route. Task-set gate: 313 passed. |
-| 5. Repeated warm smoke and benchmark promotion | Ready | Supervisor | Implementation gate is closed. Exact hardware process smoke, ten raw warm samples, benchmark promotion, and broad evidence review are deferred to the explicit promotion gate. |
+| 5. Repeated warm smoke and benchmark promotion | Blocked | Supervisor | Real R9700 smoke now reaches native resident allocation after runner identity, pack-digest, and private-stdout fixes, then fails closed: `Resident GPU virtual address range is exhausted`. Current DynamicPageTable owns one fixed PDB1/PDB0 tree (maximum 1 GiB; current large-BAR resident window was only ~2 MiB), below the full resident Llama model. Multi-PDB1 page-table ownership is the next prerequisite before rerunning ten samples. |
 
 Agents update only their row and append evidence/notes as work completes.
 

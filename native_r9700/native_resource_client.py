@@ -276,13 +276,14 @@ class NativeResourceClient:
         self._runner_stage_dir = None
 
     @staticmethod
-    def _identity(st: os.stat_result) -> tuple[int, int, int, int, int, int, int]:
+    def _identity(st: os.stat_result) -> tuple[int, int, int, int, int, int]:
+        # Reading the verified file may legitimately update atime. Mutation
+        # detection is bound to the stable inode, mode, size, mtime, and ctime.
         return (
             int(st.st_dev),
             int(st.st_ino),
             int(st.st_mode),
             int(st.st_size),
-            int(getattr(st, "st_atime_ns", int(st.st_atime * 1_000_000_000))),
             int(getattr(st, "st_mtime_ns", int(st.st_mtime * 1_000_000_000))),
             int(getattr(st, "st_ctime_ns", int(st.st_ctime * 1_000_000_000))),
         )
