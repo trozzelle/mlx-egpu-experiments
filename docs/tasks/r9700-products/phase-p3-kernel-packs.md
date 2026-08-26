@@ -40,9 +40,9 @@ Make every production-selected executable enter through a concrete Kernel Pack r
 | Task set | Status | Owner | Notes |
 |---|---|---|---|
 | 1. Kernel Pack schema/API/command freeze | Done | P3Contract | Frozen in `.superpowers/swarm/reports/p3-contract-freeze.md`; final review closed allocation-free runtime views, the five-kind/nine-slot EvidenceRef matrix, canonical nonrecursive `pack_sha256`, migration dependencies, and active-ledger reconciliation.
-| 2. Runtime Kernel Pack identity/compatibility | In progress | P3RuntimeRed | RED contract lane dispatched in parallel with task set 3.
-| 3. Offline manifest/ISA/resource validator | In progress | P3ManifestRed | RED contract lane dispatched in parallel with task set 2.
-| 4. Scalar-control migration | Blocked | Unassigned | Waits for accepted task sets 2–3. |
+| 2. Runtime Kernel Pack identity/compatibility | Done | P3Runtime | Allocation-free record/views, exact lookup/admission, asset-owned K/V attestations, runtime/offline provenance/numerical/path/license parity, and fail-closed span/ABI/geometry/evidence checks. Focused gate: 22 passed. |
+| 3. Offline manifest/ISA/resource validator | Done | P3Manifest | Canonical manifest, RFC 8785 safe integers, complete evidence/layout proof, deterministic generation, and runtime-admissible field closure. Focused gate: 115 passed. |
+| 4. Scalar-control migration | Ready | Unassigned | Task sets 2–3 implementation gates are closed; scalar migration is the next implementation slice. |
 | 5. G0 WMMA migration | Blocked | Unassigned | Waits for accepted task sets 2–3 and G0. |
 | 6. Selection/refresh/review and promotion | Blocked | Unassigned | Waits for migrations. |
 
@@ -83,7 +83,7 @@ Agents update only their row and append evidence/notes as work completes.
 - Shared `EvidenceRef` v1 is byte-identical with the F2/P3 report contract. `record_kind` is exactly `offline_oracle`, `offline_review`, `target_conformance`, `native_run`, or `benchmark`; `evidence_slot` is exactly `numpy_oracle`, `source_review`, `isa_review`, `resource_review`, `layout_proof`, `scalar_native_projection`, `conformance`, `native_run`, or `benchmark`. Every other kind/slot combination rejects.
 - `offline_oracle/numpy_oracle` requires path/ID/record digest, `producer_kind: cpu_reference`, and input/output digests, with target/image/pack/tool exactly empty. `offline_review/{source_review,isa_review,resource_review,layout_proof}` requires path/ID/record digest plus target/image/pack/tool/input/output digests and exactly empty producer; `tool_digest` identifies the exact review script/tool plus version or signed manual-review record digest and is never optional.
 - `target_conformance/{scalar_native_projection,conformance}` and `native_run/native_run` require path/ID/digest plus target/image/pack/producer/input/output digests, exactly `producer_kind: r9700_native`, and exactly empty `tool_digest`; `native_run` remains a distinct request-bound kind/slot. `benchmark/benchmark` requires path/ID/digest plus target/image/pack/producer/input/output/tool digests; promoted performance uses `producer_kind: r9700_native`, while correctness controls omit the benchmark reference and use a nonempty `benchmark_not_applicable_reason`.
-- `pack_sha256` is exactly SHA-256 of UTF-8 RFC8785 JCS for `{ "domain":"r9700-kernel-pack-identity-v1", "pack": <the normalized complete pack record with the top-level `evidence` object and every `pack_sha256` field removed> }`; all identity/provenance/license/image/build/entry/kernarg/resource/geometry/compatibility/numerical fields and declared paths/digests are included, non-finite numbers reject, and evidence references bind to this result without a recursive digest.
+- `pack_sha256` is exactly SHA-256 of UTF-8 RFC8785 JCS for `{ "domain":"r9700-kernel-pack-identity-v1", "pack": <the normalized complete pack record with the top-level `evidence` object and every `pack_sha256` and `record_sha256` field removed> }`; complete identity/provenance/license/image/build/entry/kernarg/resource/geometry/compatibility/numerical fields, declared paths, and semantic evidence IDs/input/output digests remain included. Non-finite numbers reject; removing both binding digests prevents a recursive file-digest cycle.
 
 ### Validation
 

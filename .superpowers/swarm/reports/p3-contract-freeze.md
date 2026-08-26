@@ -37,7 +37,7 @@
 
 ## Frozen Kernel Pack schema v1
 
-The schema is closed. The only top-level fields are `schema_version`, `name`, `version`, `target`, `required_features`, `provenance`, `image`, `entries`, `compatibility`, `numerics`, and `evidence`. Unknown keys are rejected offline; missing required values are rejected both offline and before runtime allocation.
+The schema is closed. In schema v1, `entries` contains exactly one entry. The only top-level fields are `schema_version`, `name`, `version`, `target`, `required_features`, `provenance`, `image`, `entries`, `compatibility`, `numerics`, and `evidence`. Unknown keys are rejected offline; missing required values are rejected both offline and before runtime allocation.
 
 ### Identity
 
@@ -190,7 +190,7 @@ struct KernelPackEntry {
 };
 ```
 
-There must be at least one entry and symbols are unique within a pack. Every entry has one geometry rule for each compatible shape family, and each rule names that family exactly. `geometry_rule` is a closed v1 value: `exact-global-v1` uses positive `global_x/global_y/global_z` and zero `grid_tile_m/grid_tile_n`; `f2-wmma-64x64-m-tail-v1` uses `workgroup=(128,4,1)`, `grid_tile_m=64`, `grid_tile_n=64`, and computes the global size from the actual bounded runtime `M` (its global fields are explicitly zero). Workgroup/tile values and computed global dimensions must be positive and aligned; dynamic-LDS limits are checked against the image/entry. No arbitrary geometry formula, extension map, or unlisted rule is accepted.
+There must be exactly one entry, and its symbol is unique within the pack. That entry has one geometry rule for each compatible shape family, and each rule names that family exactly. `geometry_rule` is a closed v1 value: `exact-global-v1` uses positive `global_x/global_y/global_z` and zero `grid_tile_m/grid_tile_n`; `f2-wmma-64x64-m-tail-v1` uses `workgroup=(128,4,1)`, `grid_tile_m=64`, `grid_tile_n=64`, and computes the global size from the actual bounded runtime `M` (its global fields are explicitly zero). Workgroup/tile values and computed global dimensions must be positive and aligned; dynamic-LDS limits are checked against the image/entry. No arbitrary geometry formula, extension map, or unlisted rule is accepted.
 
 `kernargs.bytes` must equal the descriptor-reported kernarg segment size exactly. For ordered fields, declaration order must have strictly increasing offsets, every `offset` is aligned to its declared alignment, every field is contained in `[0, bytes)`, fields do not overlap, and `last_field_end = max(offset + size)`. The only permitted segment suffix is explicit: `tail_padding_bytes == bytes - last_field_end`; a zero value is required when the final field reaches the descriptor end. The submission path must zero the recorded suffix `[last_field_end, bytes)` and reject any nonzero tail byte before allocation/submission. No descriptor bytes, leading/interior padding, argument, or field extent may be inferred. The F2 `linear_wmma_f16` ABI therefore records a 32-byte descriptor segment, fields `activation`/`weight_nk`/`output`/`m` at offsets `0/8/16/24` with sizes `8/8/8/4` and alignments `8/8/8/4`, and `tail_padding_bytes: 4`.
 
@@ -279,7 +279,7 @@ The task-set-3 physical-layout record is `record_kind: offline_review` with `evi
 
 ### Canonical `pack_sha256` preimage
 
-`pack_sha256` is exactly the SHA-256 of the UTF-8 RFC8785 JCS for `{ "domain":"r9700-kernel-pack-identity-v1", "pack": <the normalized complete pack record with the top-level `evidence` object and every `pack_sha256` field removed> }`. The normalized complete pack record includes all identity, provenance, license, image, build, entry, kernarg, resource, geometry, compatibility, and numerical fields, including their declared paths and digests. Remove the top-level `evidence` object and recursively remove every field named `pack_sha256` before RFC8785 JCS serialization. Non-finite numbers reject. Evidence references bind to this result; there is no recursive digest.
+`pack_sha256` is exactly the SHA-256 of the UTF-8 RFC8785 JCS for `{ "domain":"r9700-kernel-pack-identity-v1", "pack": <the normalized complete pack record with the top-level `evidence` object and every `pack_sha256` and `record_sha256` field removed> }`. The normalized complete pack record includes all identity, provenance, license, image, build, entry, kernarg, resource, geometry, compatibility, and numerical fields, including declared paths and semantic evidence IDs/input/output digests. Remove the top-level `evidence` object and recursively remove every field named `pack_sha256` or `record_sha256` before RFC8785 JCS serialization. Non-finite numbers reject. Evidence references bind to this result without a recursive file-digest cycle.
 
 ### Numerics and retained references
 
@@ -315,6 +315,7 @@ The dual input digests must be identical and bind the exact activation/weight/ru
 
 ```cpp
 struct KernelPackEvidence {
+  EvidenceRef source_review;                   // offline_review/source_review, producer_kind=""
   EvidenceRef conformance;                    // target_conformance/conformance, producer_kind=r9700_native
   EvidenceRef native_run;                     // native_run/native_run, producer_kind=r9700_native
   EvidenceRef resource_review;                // offline_review/resource_review, producer_kind=""
@@ -325,7 +326,7 @@ struct KernelPackEvidence {
 };
 
 ```
-Every pack has resolved `conformance`, `native_run`, `resource_review`, and `isa_review` references. `conformance` is `record_kind: target_conformance` with `evidence_slot: conformance` and `producer_kind: r9700_native`; `native_run` is `record_kind: native_run` with `evidence_slot: native_run` and `producer_kind: r9700_native`; `resource_review` and `isa_review` are `record_kind: offline_review` with `evidence_slot: resource_review` or `isa_review`, exactly empty producer, and concrete target/image/pack/tool/input/output digests. A distinct physical `weight_packing_version` sets `layout_proof.present == true` with `record_kind: offline_review` and `evidence_slot: layout_proof`; a source-equivalent B0 pack sets `layout_proof.present == true` with `record_kind: offline_review` and `evidence_slot: source_review` for its source/byte record, or sets it false when the source/byte record is represented elsewhere in the pack contract. A `cpu_reference` record is never substituted for target/native evidence. Promoted performance sets `benchmark_record.present == true` with `record_kind: benchmark`, `evidence_slot: benchmark`, a nonempty tool digest, and `benchmark_not_applicable_reason == ""`; correctness-control packs set `benchmark_record.present == false` and use a nonempty `benchmark_not_applicable_reason`. Every non-null `pack_sha256` equals the canonical preimage digest above.
+Every pack has resolved `source_review`, `conformance`, `native_run`, `resource_review`, and `isa_review` references. `source_review` is `record_kind: offline_review` with `evidence_slot: source_review`, exactly empty producer, and concrete target/image/pack/tool/input/output digests; it binds the reviewed source/byte identity for every pack, including source-equivalent B0. `conformance` is `record_kind: target_conformance` with `evidence_slot: conformance` and `producer_kind: r9700_native`; `native_run` is `record_kind: native_run` with `evidence_slot: native_run` and `producer_kind: r9700_native`; `resource_review` and `isa_review` are `record_kind: offline_review` with `evidence_slot: resource_review` or `isa_review`, exactly empty producer, and concrete target/image/pack/tool/input/output digests. A source-equivalent B0 pack sets `layout_proof.present == false`; a distinct physical `weight_packing_version` sets `layout_proof.present == true` with `record_kind: offline_review` and `evidence_slot: layout_proof` for its source-to-byte/tile/LDS mapping. A `cpu_reference` record is never substituted for target/native evidence. Promoted performance sets `benchmark_record.present == true` with `record_kind: benchmark`, `evidence_slot: benchmark`, a nonempty tool digest, and `benchmark_not_applicable_reason == ""`; correctness-control packs set `benchmark_record.present == false` and use a nonempty `benchmark_not_applicable_reason`. Every non-null `pack_sha256` equals the canonical preimage digest above.
 
 ## Exact C++ interfaces and catalog boundary
 
@@ -382,9 +383,11 @@ const KernelPackRecord* find_kernel_pack_for_key(
     const KernelPackCompatibilityKey& key,
     KernelPackErrorBuffer error_text);
 
-// Validate the selected record and delegate image/code admission to the existing
-// HSA/KernelAsset boundary before any device allocation or submission.
+// Validate the selected record against the exact compatibility key and delegate
+// image/code admission to the existing HSA/KernelAsset boundary before any device
+// allocation or submission.
 bool admit_kernel_pack(const KernelPackRecord& record,
+                       const KernelPackCompatibilityKey& selected_key,
                        std::string_view entry_symbol,
                        std::string_view asset_root,
                        KernelDescriptor* out_descriptor,
@@ -463,6 +466,7 @@ The JSON record has no additional keys. Its top-level shape is:
   },
   "evidence": {
     "conformance": {"record_path": "<path>", "record_kind": "target_conformance", "evidence_slot": "conformance", "record_id": "<id>", "record_sha256": "<64-lowercase-hex>", "subject_target": "<target>", "image_sha256": "<image-sha256>", "pack_sha256": "<pack-sha256>", "producer_kind": "r9700_native", "tool_digest": "", "input_digest": "<input-digest>", "output_digest": "<output-digest>"},
+    "source_review": {"record_path": "<path>", "record_kind": "offline_review", "evidence_slot": "source_review", "record_id": "<id>", "record_sha256": "<64-lowercase-hex>", "subject_target": "<target>", "image_sha256": "<image-sha256>", "pack_sha256": "<pack-sha256>", "producer_kind": "", "tool_digest": "<tool-digest>", "input_digest": "<input-digest>", "output_digest": "<output-digest>"},
     "native_run": {"record_path": "<path>", "record_kind": "native_run", "evidence_slot": "native_run", "record_id": "<request-bound-r9700-native-id>", "record_sha256": "<64-lowercase-hex>", "subject_target": "<target>", "image_sha256": "<image-sha256>", "pack_sha256": "<pack-sha256>", "producer_kind": "r9700_native", "tool_digest": "", "input_digest": "<input-digest>", "output_digest": "<output-digest>"},
     "resource_review": {"record_path": "<path>", "record_kind": "offline_review", "evidence_slot": "resource_review", "record_id": "<id>", "record_sha256": "<64-lowercase-hex>", "subject_target": "<target>", "image_sha256": "<image-sha256>", "pack_sha256": "<pack-sha256>", "producer_kind": "", "tool_digest": "<tool-digest>", "input_digest": "<input-digest>", "output_digest": "<output-digest>"},
     "isa_review": {"record_path": "<path>", "record_kind": "offline_review", "evidence_slot": "isa_review", "record_id": "<id>", "record_sha256": "<64-lowercase-hex>", "subject_target": "<target>", "image_sha256": "<image-sha256>", "pack_sha256": "<pack-sha256>", "producer_kind": "", "tool_digest": "<tool-digest>", "input_digest": "<input-digest>", "output_digest": "<output-digest>"},

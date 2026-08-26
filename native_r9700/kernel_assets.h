@@ -1,6 +1,6 @@
 #ifndef NATIVE_R9700_KERNEL_ASSETS_H_
 #define NATIVE_R9700_KERNEL_ASSETS_H_
-
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -22,6 +22,51 @@ struct KernelAssetLocation {
   int32_t lds_bytes = 0;
   std::string resource_metadata_provenance;
 };
+// Allocation-free ABI metadata owned by the reviewed asset boundary. Only
+// assets explicitly returned by find_kernel_pack_attestation() may cross the
+// Kernel Pack admission boundary.
+struct KernelAssetKernargField {
+  std::string_view name;
+  std::string_view type;
+  std::uint32_t offset;
+  std::uint32_t size;
+  std::uint32_t alignment;
+};
+
+struct KernelAssetPackAttestation {
+  std::string_view target;
+  std::string_view image_path;
+  std::string_view image_sha256;
+  std::uint64_t image_size;
+  std::string_view code_object_version;
+  std::uint64_t descriptor_offset;
+  std::uint64_t entry_offset;
+  std::string_view kernarg_schema;
+  std::uint32_t kernarg_bytes;
+  std::uint32_t kernarg_tail_padding_bytes;
+  const KernelAssetKernargField* kernarg_fields;
+  std::size_t kernarg_field_count;
+  std::uint32_t rsrc1;
+  std::uint32_t rsrc2;
+  std::uint32_t rsrc3;
+  std::uint32_t wave_size;
+  std::uint32_t sgpr_count;
+  std::uint32_t vgpr_count;
+  std::uint64_t lds_bytes;
+  std::uint64_t private_segment_bytes;
+  std::string_view metadata_provenance;
+  std::uint32_t workgroup_x;
+  std::uint32_t workgroup_y;
+  std::uint32_t workgroup_z;
+  std::uint32_t global_x;
+  std::uint32_t global_y;
+  std::uint32_t global_z;
+  std::uint32_t grid_tile_m;
+  std::uint32_t grid_tile_n;
+  bool dynamic_lds_allowed;
+  std::uint64_t dynamic_lds_max_bytes;
+};
+
 
 // A manifest entry for a reviewed Llama stage. Its descriptor intentionally
 // carries no code until load_verified_kernel_code verifies its file asset.
@@ -34,6 +79,11 @@ struct LlamaKernelAsset {
 // Returns the reviewed Llama manifest entry for name, or nullptr if none is
 // available. The manifest remains empty until stage assets are reviewed.
 const LlamaKernelAsset* find_llama_kernel_asset(std::string_view name);
+
+// Returns exact ABI metadata only for assets admitted through the reviewed
+// Kernel Pack boundary. Unattested assets, including Qwen/G0 assets, return
+// nullptr rather than receiving synthesized metadata.
+const KernelAssetPackAttestation* find_kernel_pack_attestation(std::string_view name);
 
 // Returns the reviewed Qwen manifest entry for name, or nullptr if none is
 // available. Reuses the LlamaKernelAsset record shape (descriptor + location +

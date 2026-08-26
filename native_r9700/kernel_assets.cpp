@@ -15,6 +15,87 @@ namespace {
 
 // Stage assets are added here only after their code and metadata are reviewed
 // together. This intentionally excludes generic probes and archived blobs.
+constexpr KernelAssetKernargField kLlamaKProjectionPackFields[] = {
+    {"normalized", "uint64", 0U, 8U, 8U},
+    {"k_projection_weight", "uint64", 8U, 8U, 8U},
+    {"fresh_k", "uint64", 16U, 8U, 8U},
+    {"sequence_length", "uint32", 24U, 4U, 4U},
+};
+constexpr KernelAssetKernargField kLlamaVProjectionPackFields[] = {
+    {"normalized", "uint64", 0U, 8U, 8U},
+    {"v_projection_weight", "uint64", 8U, 8U, 8U},
+    {"fresh_v", "uint64", 16U, 8U, 8U},
+    {"sequence_length", "uint32", 24U, 4U, 4U},
+};
+constexpr KernelAssetPackAttestation kLlamaKProjectionPackAttestation = {
+    "gfx1201",
+    "llama_k_projection_f16.image",
+    "9c2f584f4bd4c918f8c2a95a0a1f29a7102c19e8080b0d538b36f26e6e8fcc9b",
+    14961U,
+    "amdhsa-v6",
+    1600U,
+    5888U,
+    "llama-k-projection-f16-v1",
+    32U,
+    4U,
+    kLlamaKProjectionPackFields,
+    4U,
+    3222208513U,
+    132U,
+    48U,
+    32U,
+    8U,
+    8U,
+    0U,
+    0U,
+    "source AMDGPU metadata: llvm/docs/AMDGPUUsage.rst",
+    64U,
+    1U,
+    1U,
+    64U,
+    1U,
+    1U,
+    0U,
+    0U,
+    false,
+    0U,
+};
+constexpr KernelAssetPackAttestation kLlamaVProjectionPackAttestation = {
+    "gfx1201",
+    "llama_v_projection_f16.image",
+    "cf200d937d6068ce1b48fdbaa6650d80abe9b4433bdeb13389e800ad3011cb6d",
+    14961U,
+    "amdhsa-v6",
+    1600U,
+    5888U,
+    "llama-v-projection-f16-v1",
+    32U,
+    4U,
+    kLlamaVProjectionPackFields,
+    4U,
+    3222208513U,
+    132U,
+    48U,
+    32U,
+    8U,
+    8U,
+    0U,
+    0U,
+    "source AMDGPU metadata: llvm/docs/AMDGPUUsage.rst",
+    64U,
+    1U,
+    1U,
+    64U,
+    1U,
+    1U,
+    0U,
+    0U,
+    false,
+    0U,
+};
+
+// Stage assets are added here only after their code and metadata are reviewed
+// together. This intentionally excludes generic probes and archived blobs.
 const std::array<LlamaKernelAsset, 13> kLlamaKernelManifest = {{
     {
         {"llama_k_projection_f16",
@@ -172,6 +253,20 @@ bool is_safe_direct_child_path(const std::filesystem::path& code_path) {
 const LlamaKernelAsset* find_llama_kernel_asset(std::string_view name) {
   for (const LlamaKernelAsset& asset : kLlamaKernelManifest) {
     if (asset.descriptor.name == name) return &asset;
+  }
+  return nullptr;
+}
+
+const KernelAssetPackAttestation* find_kernel_pack_attestation(std::string_view name) {
+  if (name == kLlamaKProjectionPackAttestation.image_path.substr(
+                  0, kLlamaKProjectionPackAttestation.image_path.size() -
+                         std::string_view(".image").size())) {
+    return &kLlamaKProjectionPackAttestation;
+  }
+  if (name == kLlamaVProjectionPackAttestation.image_path.substr(
+                  0, kLlamaVProjectionPackAttestation.image_path.size() -
+                         std::string_view(".image").size())) {
+    return &kLlamaVProjectionPackAttestation;
   }
   return nullptr;
 }
