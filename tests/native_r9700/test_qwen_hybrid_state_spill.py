@@ -79,8 +79,23 @@ class BufferHostTensor(bytearray):
 
 class ArraysCache:
     def __init__(self, state: tuple[OpaqueHostTensor, OpaqueHostTensor]) -> None:
-        self.state = state
+        self.cache = list(state)
+        self.left_padding = None
+        self.lengths = None
 
+    @property
+    def state(self):
+        return self.cache
+
+    @state.setter
+    def state(self, value):
+        self.cache = list(value)
+
+    def __getitem__(self, index):
+        return self.cache[index]
+
+    def __setitem__(self, index, value):
+        self.cache[index] = value
 
 class KVCache:
     def __init__(

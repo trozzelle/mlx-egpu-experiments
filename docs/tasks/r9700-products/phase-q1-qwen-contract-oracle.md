@@ -42,10 +42,10 @@ Produce a deterministic, implementation-plan-ready Qwen3.8-27B text-only package
 |---|---|---|---|
 | 1. Model/source/tensor identity and command freeze | Done | Q1Identity | Frozen in `.superpowers/swarm/reports/q1-identity-freeze.md`; final re-review found zero Critical/Important issues. Active validation ledger sections are present. Converted snapshot/header work may proceed; Q1 promotion remains blocked by `base_model_revision=unavailable_in_pinned_conversion_metadata`.
 | 2. Quantized tensor inventory and binder contract | Done | Q1TensorInventory | Final task-set command: 41 passed; strict source-pin/inventory report in `.superpowers/swarm/reports/q1-tensor-inventory.md`. Promotion blocker remains explicit.
-| 3. Hybrid cache ownership and recurrence contract | Done | Q1HybridState | Final focused command: 40 passed; real MLX/source-pin/report/atomic contracts in `.superpowers/swarm/reports/q1-hybrid-cache-green.md`.
-| 4. CPU/MLX oracle fixtures | In progress | Q1OracleRed | RED fixture contract lane dispatched. Solely owns `qwen_parity.py` fixture-generation/comparison integration and calls task-set-3 restore.
-| 5. Shared versus Qwen-specific native shape map | In progress | Q1ShapeMap | Read-only mapping lane dispatched in parallel with task set 4.
-| 6. F6 acceptance package and Q1 review | Blocked | Q1Acceptance | Waits for task sets 2–5. Review/package-only; owns the package identity projection and comparison, not parity, fixture, cache, or native implementation.
+| 3. Hybrid cache ownership and recurrence contract | Done | Q1HybridState | Final focused command: 46 passed; real MLX/source-pin/report/atomic contracts in `.superpowers/swarm/reports/q1-hybrid-cache-green.md`. |
+| 4. CPU/MLX oracle fixtures | Done | Q1OracleFixtures | Five deterministic bounded fixtures regenerated with pinned mlx-lm 0.32.0 / MLX 0.32.1; full shard/runtime binding and model-bound parity pass. |
+| 5. Shared versus Qwen-specific native shape map | Done | Q1ShapeMap | Read-only map complete in `.superpowers/swarm/reports/q1-native-shape-map.md`; no native/performance claim. |
+| 6. F6 acceptance package and Q1 review | Done | Q1Acceptance | Pinned generation/parity and the 259-test package gate pass; exact oracle-only identity projection is complete. Q1/F6 promotion remains blocked only by unavailable immutable base-model revision/license provenance. |
 
 Agents update only their row and append evidence/notes as work completes.
 

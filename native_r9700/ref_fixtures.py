@@ -58,15 +58,25 @@ phase-0 worktree), pass the phase-0 path explicitly, e.g.:
 
 from __future__ import annotations
 
+
 import argparse
+import importlib
+import importlib.metadata
+from io import BytesIO
 import hashlib
 import json
 import os
-from typing import Dict, List, Mapping, Optional, Tuple
+from pathlib import Path
+import shutil
+import sys
+import tempfile
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+import zipfile
 
 import numpy as np
 
 from .fixture_catalog import fixture_specs
+from .qwen_text_adapter import validate_qwen_tensor_inventory
 
 # ---------------------------------------------------------------------------
 # Geometry (frozen C1 contract).
@@ -256,10 +266,61 @@ def _make_primitives() -> Dict[str, np.ndarray]:
 # Oracle generation (mlx-lm). Helper code imports mlx-lm lazily -- the mlx
 # runtime is the reference oracle, not a producer-path dependency.
 # ---------------------------------------------------------------------------
-def _load_mlx(model_dir: str):
-    """Load mlx-lm model + tokenizer (reference oracle)."""
-    from mlx_lm.utils import load  # type: ignore
-    return load(model_dir)
+def _load_mlx(
+    model_dir: str, *, runtime_root: str | Path | None = None
+):
+    """Load mlx-lm, optionally requiring every import to come from one root."""
+    if runtime_root is None:
+        from mlx_lm.utils import load  # type: ignore
+
+        return load(model_dir)
+
+    verified_root = Path(runtime_root).expanduser().resolve()
+    if not verified_root.is_dir():
+        raise ValueError(f"Qwen oracle runtime root is missing: {verified_root}")
+    for module_name, module in tuple(sys.modules.items()):
+        if module is None or not (
+            module_name == "mlx_lm"
+            or module_name.startswith("mlx_lm.")
+            or module_name == "mlx"
+            or module_name.startswith("mlx.")
+        ):
+            continue
+        if module_name == "mlx":
+            # MLX is a namespace package and may expose unrelated search roots.
+            # Concrete imported modules below must still resolve inside the pin.
+            continue
+        package_name = module_name.split(".", 1)[0]
+        _qwen_require_imported_module_root(
+            module,
+            module_name,
+            verified_root / package_name,
+        )
+    path_entry = str(verified_root)
+    sys.path.insert(0, path_entry)
+    try:
+        mlx_lm = importlib.import_module("mlx_lm")
+        _qwen_require_imported_module_root(
+            mlx_lm, "mlx_lm", verified_root / "mlx_lm"
+        )
+        mlx_lm_utils = importlib.import_module("mlx_lm.utils")
+        _qwen_require_imported_module_root(
+            mlx_lm_utils, "mlx_lm.utils", verified_root / "mlx_lm"
+        )
+        importlib.import_module("mlx")
+        mlx_core = importlib.import_module("mlx.core")
+        _qwen_require_imported_module_root(
+            mlx_core, "mlx.core", verified_root / "mlx"
+        )
+        load = getattr(mlx_lm_utils, "load", None)
+        if not callable(load):
+            raise ValueError("Qwen verified mlx_lm.utils does not expose load")
+        return load(model_dir)
+    finally:
+        try:
+            sys.path.remove(path_entry)
+        except ValueError:
+            pass
 
 
 def tokenize_prompt(tokenizer, text: str) -> List[int]:
@@ -3685,11 +3746,1172 @@ def generate_layer_trace(
     }
 
 
+# ---------------------------------------------------------------------------
+# Qwen3.8-27B text-only CPU/MLX oracle fixtures (Q1 task set 4).
+# ---------------------------------------------------------------------------
+#
+# This package intentionally does not share the Llama fixture geometry above.
+# The model identity, tensor inventory, and hybrid cache order are all
+# validated before loading the reference model.  Only bounded affine windows
+# and selected cache/trace samples are persisted.
+QWEN_MODEL_FINGERPRINT = (
+    "4304f20a69213c8f0620ab7388163dd58b324278679d94c5915f279438d1b371"
+)
+QWEN_MODEL_REVISION = "3e6447f082e89cc7f0bc6e5441afd38dfce760ff"
+QWEN_BASE_MODEL_REVISION = "unavailable_in_pinned_conversion_metadata"
+QWEN_MLX_VLM_REVISION = "2b31570bdee86e2cdeea049761885aeed524a98c"
+QWEN_MLX_LM_REVISION = "e2f2fb2aef987f86878d17638446183cffe21fe4"
+QWEN_MLX_LM_VERSION = "0.32.0"
+QWEN_MLX_VERSION = "0.32.1"
+QWEN_ORACLE_RUNTIME_SOURCE_SHA256 = {
+    "mlx_lm/generate.py": (
+        "e22f38100034660c8b909ac45dab0617f67ac7c723d28e7b374ff0dd98bf1d0d"
+    ),
+    "mlx_lm/models/cache.py": (
+        "440709018cc528ee1e4e42e61ff8713ed2e0079566d9e8fa58eed3a92d334404"
+    ),
+    "mlx_lm/models/gated_delta.py": (
+        "e5d1ddffca8fbff7170639cd3774078683148ab6bc6b4375c3bd768cea9ece76"
+    ),
+    "mlx_lm/models/qwen3_5.py": (
+        "14c4898a03567998e825cb1817942001871e979b9e0cefd3b4383cbbb61eddf3"
+    ),
+    "mlx_lm/utils.py": (
+        "32d5e44a7f213529d7c72e682429bbc3b783f5853943bf5682635567cccaa7fc"
+    ),
+}
+QWEN_INVENTORY_SCHEMA_VERSION = 2
+QWEN_INVENTORY_SHA256 = (
+    "508567ed00f7d65283fcb7f5ecba55e9a9904a9f2f41e8724bf1ef37589725e4"
+)
+QWEN_SENSITIVE_DATA_POLICY = (
+    "minimal text-only token IDs; no image/video bytes or full model dump"
+)
+QWEN_PROBE_TOKEN_IDS = (760, 6511, 314, 9338, 369)
+QWEN_REJECTED_SPECIAL_TOKEN_IDS = (248053, 248054, 248056, 248057)
+QWEN_FULL_ATTENTION_LAYERS = (
+    3,
+    7,
+    11,
+    15,
+    19,
+    23,
+    27,
+    31,
+    35,
+    39,
+    43,
+    47,
+    51,
+    55,
+    59,
+    63,
+)
+QWEN_RUNTIME_LAYER_ORDER = tuple(
+    "KVCache" if index in QWEN_FULL_ATTENTION_LAYERS else "ArraysCache"
+    for index in range(64)
+)
+QWEN_SOURCE_REVISIONS = {
+    "model": QWEN_MODEL_REVISION,
+    "mlx_vlm": QWEN_MLX_VLM_REVISION,
+    "mlx_lm": QWEN_MLX_LM_REVISION,
+}
+QWEN_METADATA_SHA256 = {
+    "config.json": "14b65a0ee06517060a6bbd979bb1a8ff54e7b304b1a1f01d54344b88b8285e85",
+    "model.safetensors.index.json": (
+        "13b840162b4cb35c66fef7df072f7dbb4717908204364f5e5d9f9655a2758fa8"
+    ),
+    "tokenizer.json": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+    "tokenizer_config.json": (
+        "792fa3f0cb88b111e54ef3134c873531008c4df471d108da17903426e308aa7b"
+    ),
+}
+QWEN_SHARDS = (
+    (
+        "model-00001-of-00003.safetensors",
+        5_343_268_662,
+        "6cc1508e96fb5d0865dfd5753a79f4ec60651bf3e2a82844a7e8ae9c60528c0d",
+    ),
+    (
+        "model-00002-of-00003.safetensors",
+        5_354_185_130,
+        "83f2a20ca8058f486a3634a27faf99587f4cd3c156a83dee34fb99e6ac178670",
+    ),
+    (
+        "model-00003-of-00003.safetensors",
+        5_357_087_557,
+        "31b8c91ef899f79efaaa69e3d2c096f6e2ebeb2ff20e29222abbd9ebc79e560a",
+    ),
+)
+QWEN_FIXTURE_NAMES = (
+    "qwen_prompts.json",
+    "qwen_affine_windows.npz",
+    "qwen_hybrid_state_samples.npz",
+    "qwen_oracle_trace.npz",
+    "qwen_fixtures_schema.json",
+)
+QWEN_ARTIFACT_NAMES = QWEN_FIXTURE_NAMES[:-1]
+_QWEN_AFFINE_TENSORS = {
+    "language_model.model.layers.0.linear_attn.in_proj_qkv.weight": (
+        "model-00001-of-00003.safetensors",
+        "U32",
+        [10240, 640],
+    ),
+    "language_model.model.layers.0.linear_attn.in_proj_qkv.scales": (
+        "model-00001-of-00003.safetensors",
+        "BF16",
+        [10240, 80],
+    ),
+    "language_model.model.layers.0.linear_attn.in_proj_qkv.biases": (
+        "model-00001-of-00003.safetensors",
+        "BF16",
+        [10240, 80],
+    ),
+    "language_model.model.layers.3.self_attn.q_proj.weight": (
+        "model-00001-of-00003.safetensors",
+        "U32",
+        [12288, 640],
+    ),
+    "language_model.model.layers.3.self_attn.q_proj.scales": (
+        "model-00001-of-00003.safetensors",
+        "BF16",
+        [12288, 80],
+    ),
+    "language_model.model.layers.3.self_attn.q_proj.biases": (
+        "model-00001-of-00003.safetensors",
+        "BF16",
+        [12288, 80],
+    ),
+}
+_QWEN_MAX_WINDOW_BYTES = 64 << 10
+
+
+def _qwen_canonical_json(value: object) -> bytes:
+    """Encode a Qwen identity/preimage with the frozen canonical JSON rules."""
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+
+def _qwen_expected_shard_records() -> List[Dict[str, object]]:
+    return [
+        {"name": name, "size": size, "sha256": digest}
+        for name, size, digest in QWEN_SHARDS
+    ]
+
+
+def _qwen_validate_inventory(
+    inventory: Mapping[str, Any], inventory_path: str | Path = "inventory"
+) -> Dict[str, Any]:
+    """Compatibility wrapper for the single Qwen inventory identity owner."""
+    del inventory_path
+    return validate_qwen_tensor_inventory(inventory)
+
+
+def _qwen_load_inventory(
+    inventory: str | Path | Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Load and validate through the shared Qwen inventory identity owner."""
+    return validate_qwen_tensor_inventory(inventory)
+
+_QWEN_RUNTIME_SOURCE_CHUNK_BYTES = 64 << 10
+
+
+def _qwen_hash_runtime_source(path: str | Path) -> str:
+    """Hash one pinned runtime source file without reading it into memory."""
+    digest = hashlib.sha256()
+    try:
+        with Path(path).open("rb") as stream:
+            while chunk := stream.read(_QWEN_RUNTIME_SOURCE_CHUNK_BYTES):
+                digest.update(chunk)
+    except OSError as exc:
+        raise ValueError(f"failed to read Qwen runtime source {str(path)!r}: {exc}") from exc
+    return digest.hexdigest()
+
+
+def _qwen_parse_dist_info_metadata(
+    metadata_path: Path, expected_name: str
+) -> str:
+    """Read exactly one Name/Version pair from a local METADATA file."""
+    try:
+        text = metadata_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(f"failed to read Qwen runtime metadata {metadata_path}") from exc
+    names: List[str] = []
+    versions: List[str] = []
+    for line in text.splitlines():
+        if line.startswith("Name:"):
+            field, separator, value = line.partition(":")
+            if field != "Name" or not separator or not value.startswith(" "):
+                raise ValueError(f"malformed Qwen runtime Name field in {metadata_path}")
+            names.append(value[1:])
+        elif line.startswith("Version:"):
+            field, separator, value = line.partition(":")
+            if field != "Version" or not separator or not value.startswith(" "):
+                raise ValueError(f"malformed Qwen runtime Version field in {metadata_path}")
+            versions.append(value[1:])
+    if len(names) != 1 or names[0] != expected_name:
+        raise ValueError(
+            f"Qwen runtime metadata {metadata_path} must contain exactly "
+            f"Name: {expected_name}"
+        )
+    if len(versions) != 1 or not versions[0] or versions[0].strip() != versions[0]:
+        raise ValueError(
+            f"Qwen runtime metadata {metadata_path} must contain exactly one "
+            "nonempty Version field"
+        )
+    return versions[0]
+
+
+def _qwen_find_explicit_dist_info(
+    runtime_root: Path, project_name: str, expected_version: str
+) -> Path:
+    """Locate one normalized project dist-info directory and verify its version."""
+    normalized_name = project_name.replace("-", "_").lower()
+    candidates: List[Tuple[Path, str]] = []
+    try:
+        entries = tuple(runtime_root.iterdir())
+    except OSError as exc:
+        raise ValueError(f"failed to inspect Qwen runtime root {runtime_root}") from exc
+    for entry in entries:
+        if not entry.name.endswith(".dist-info") or not entry.is_dir():
+            continue
+        prefix, separator, path_version = entry.name[:-10].rpartition("-")
+        if (
+            not separator
+            or prefix.replace("-", "_").lower() != normalized_name
+            or not path_version
+        ):
+            continue
+        metadata_path = entry / "METADATA"
+        if not metadata_path.is_file():
+            raise ValueError(f"Qwen runtime metadata is missing: {metadata_path}")
+        metadata_version = _qwen_parse_dist_info_metadata(
+            metadata_path, project_name
+        )
+        if path_version != metadata_version:
+            raise ValueError(
+                f"Qwen runtime {project_name} dist-info directory version "
+                f"{path_version!r} disagrees with METADATA {metadata_version!r}"
+            )
+        candidates.append((entry, metadata_version))
+    if not candidates:
+        raise ValueError(
+            f"Qwen runtime {project_name} dist-info metadata is missing under "
+            f"{runtime_root}"
+        )
+    if len(candidates) != 1:
+        raise ValueError(
+            f"Qwen runtime has ambiguous {project_name} dist-info metadata under "
+            f"{runtime_root}"
+        )
+    metadata_path, actual_version = candidates[0]
+    if actual_version != expected_version:
+        raise ValueError(
+            f"Qwen runtime {project_name} version {actual_version!r} does not "
+            f"match required {expected_version!r}"
+        )
+    return metadata_path
+
+
+def _qwen_validate_mlx_lm_provenance_payload(raw: str, *, source: str) -> None:
+    """Require the exact MLX-LM commit in direct_url provenance JSON."""
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Qwen runtime mlx-lm provenance is not valid JSON ({source})") from exc
+    vcs_info = payload.get("vcs_info") if isinstance(payload, dict) else None
+    commit_id = vcs_info.get("commit_id") if isinstance(vcs_info, dict) else None
+    if (
+        not isinstance(vcs_info, dict)
+        or vcs_info.get("vcs") != "git"
+        or not isinstance(commit_id, str)
+        or commit_id != QWEN_MLX_LM_REVISION
+    ):
+        raise ValueError(
+            f"Qwen runtime mlx-lm provenance commit does not match "
+            f"{QWEN_MLX_LM_REVISION!r} ({source})"
+        )
+
+
+def _qwen_validate_mlx_lm_provenance(
+    dist_info_path: Path, *, source: str
+) -> None:
+    """Require the exact MLX-LM commit in local direct_url provenance."""
+    direct_url_path = dist_info_path / "direct_url.json"
+    try:
+        raw = direct_url_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ValueError(
+            f"Qwen runtime mlx-lm provenance is missing or unreadable ({source})"
+        ) from exc
+    _qwen_validate_mlx_lm_provenance_payload(raw, source=source)
+
+
+def _qwen_runtime_source_records(runtime_root: Path) -> Dict[str, str]:
+    """Hash and verify the five bounded source files in the pinned tree."""
+    source_hashes: Dict[str, str] = {}
+    mlx_lm_root = (runtime_root / "mlx_lm").resolve()
+    if not mlx_lm_root.is_dir():
+        raise ValueError(f"Qwen runtime mlx_lm package is missing: {mlx_lm_root}")
+    for relative_path, expected_digest in QWEN_ORACLE_RUNTIME_SOURCE_SHA256.items():
+        source_path = (runtime_root / relative_path).resolve()
+        if not source_path.is_relative_to(mlx_lm_root) or not source_path.is_file():
+            raise ValueError(f"Qwen runtime source module is missing: {runtime_root / relative_path}")
+        actual_digest = _qwen_hash_runtime_source(source_path)
+        if actual_digest != expected_digest:
+            raise ValueError(
+                f"Qwen runtime source digest mismatch for {relative_path!r}: "
+                f"{actual_digest} != {expected_digest}"
+            )
+        source_hashes[relative_path] = actual_digest
+    return source_hashes
+
+
+def _qwen_oracle_runtime_record(
+    source_hashes: Mapping[str, str],
+) -> Dict[str, object]:
+    """Build the immutable JSON-shaped executed-runtime identity record."""
+    return {
+        "kind": "qwen_oracle_runtime",
+        "loader": "mlx_lm.utils.load",
+        "model_module": "mlx_lm.models.qwen3_5",
+        "mlx_lm": {
+            "revision": QWEN_MLX_LM_REVISION,
+            "version": QWEN_MLX_LM_VERSION,
+            "source_sha256": dict(source_hashes),
+        },
+        "mlx": {"version": QWEN_MLX_VERSION},
+        "mlx_vlm": {
+            "revision": QWEN_MLX_VLM_REVISION,
+            "role": "reference_only",
+        },
+    }
+
+
+def _qwen_module_paths(module: object) -> Tuple[Path, ...]:
+    """Return all filesystem roots exposed by an imported module."""
+    paths: List[Path] = []
+    package_paths = getattr(module, "__path__", None)
+    if package_paths is not None:
+        try:
+            paths.extend(Path(item) for item in package_paths)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Qwen runtime package exposes an invalid __path__") from exc
+    module_file = getattr(module, "__file__", None)
+    if module_file:
+        paths.append(Path(module_file).parent)
+    unique: List[Path] = []
+    for path in paths:
+        resolved = path.resolve()
+        if resolved not in unique:
+            unique.append(resolved)
+    return tuple(unique)
+
+
+def _qwen_imported_package_root(module: object, description: str) -> Path:
+    paths = _qwen_module_paths(module)
+    if not paths or any(not path.is_dir() for path in paths):
+        raise ValueError(f"Qwen imported {description} package root is unavailable")
+    if len(paths) != 1:
+        raise ValueError(
+            f"Qwen imported {description} package resolves to multiple roots: "
+            f"{[str(path) for path in paths]!r}"
+        )
+    return paths[0]
+
+
+def _qwen_require_imported_module_root(
+    module: object, description: str, package_root: Path
+) -> None:
+    paths = _qwen_module_paths(module)
+    if not paths or any(not path.is_relative_to(package_root) for path in paths):
+        raise ValueError(
+            f"Qwen {description} resolved outside verified runtime root {package_root}"
+        )
+
+
+def _qwen_distribution_for_imported_package(
+    project_name: str,
+    package_root: Path,
+    package_name: str,
+    expected_version: str,
+) -> Any:
+    try:
+        distribution = importlib.metadata.distribution(project_name)
+    except importlib.metadata.PackageNotFoundError as exc:
+        raise ValueError(f"Qwen runtime distribution {project_name!r} is unavailable") from exc
+    metadata_name = distribution.metadata.get("Name")
+    if metadata_name != project_name:
+        raise ValueError(
+            f"Qwen runtime distribution metadata name {metadata_name!r} does not "
+            f"match {project_name!r}"
+        )
+    if distribution.version != expected_version:
+        raise ValueError(
+            f"Qwen runtime {project_name} version {distribution.version!r} does not "
+            f"match required {expected_version!r}"
+        )
+    located_package = Path(distribution.locate_file(package_name)).resolve()
+    if located_package != package_root:
+        raise ValueError(
+            f"Qwen imported {project_name} root {package_root} disagrees with "
+            f"distribution root {located_package}"
+        )
+    return distribution
+
+
+def _qwen_resolve_explicit_runtime(
+    runtime_root: str | Path,
+) -> Tuple[Path, Dict[str, object]]:
+    root = Path(runtime_root).expanduser().resolve()
+    if not root.is_dir():
+        raise ValueError(f"Qwen oracle runtime root is missing: {root}")
+    mlx_lm_metadata = _qwen_find_explicit_dist_info(
+        root, "mlx-lm", QWEN_MLX_LM_VERSION
+    )
+    _qwen_find_explicit_dist_info(root, "mlx", QWEN_MLX_VERSION)
+    if not (root / "mlx_lm").is_dir():
+        raise ValueError(f"Qwen runtime mlx_lm package is missing: {root / 'mlx_lm'}")
+    if not (root / "mlx").is_dir():
+        raise ValueError(f"Qwen runtime mlx package is missing: {root / 'mlx'}")
+    _qwen_validate_mlx_lm_provenance(
+        mlx_lm_metadata, source=f"explicit root {root}"
+    )
+    source_hashes = _qwen_runtime_source_records(root)
+    return root, _qwen_oracle_runtime_record(source_hashes)
+
+
+def _qwen_resolve_imported_runtime() -> Tuple[Path, Dict[str, object]]:
+    try:
+        mlx_lm = importlib.import_module("mlx_lm")
+        mlx = importlib.import_module("mlx")
+    except ImportError as exc:
+        raise ValueError(f"Qwen oracle runtime imports are unavailable: {exc}") from exc
+    mlx_lm_root = _qwen_imported_package_root(mlx_lm, "mlx_lm")
+    mlx_root = _qwen_imported_package_root(mlx, "mlx")
+    runtime_root = mlx_lm_root.parent
+    if mlx_root.parent != runtime_root:
+        raise ValueError(
+            f"Qwen imported mlx root {mlx_root} disagrees with mlx_lm root "
+            f"{mlx_lm_root}"
+        )
+    mlx_lm_distribution = _qwen_distribution_for_imported_package(
+        "mlx-lm", mlx_lm_root, "mlx_lm", QWEN_MLX_LM_VERSION
+    )
+    _qwen_distribution_for_imported_package(
+        "mlx", mlx_root, "mlx", QWEN_MLX_VERSION
+    )
+    direct_url = mlx_lm_distribution.read_text("direct_url.json")
+    if direct_url is None:
+        raise ValueError("Qwen runtime mlx-lm provenance direct_url.json is missing")
+    _qwen_validate_mlx_lm_provenance_payload(
+        direct_url, source=f"imported root {runtime_root}"
+    )
+    source_hashes = _qwen_runtime_source_records(runtime_root)
+    return runtime_root, _qwen_oracle_runtime_record(source_hashes)
+
+
+def _qwen_resolve_oracle_runtime(
+    runtime_root: str | Path | None = None,
+) -> Tuple[Path, Dict[str, object]]:
+    if runtime_root is None:
+        return _qwen_resolve_imported_runtime()
+    return _qwen_resolve_explicit_runtime(runtime_root)
+
+
+def validate_qwen_oracle_runtime(
+    runtime_root: str | Path | None = None,
+) -> dict[str, object]:
+    """Validate and return the exact executed Qwen oracle-runtime identity."""
+    _root, record = _qwen_resolve_oracle_runtime(runtime_root)
+    return record
+
+
+
+def _qwen_hash_file(path: Path, description: str) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+    except OSError as exc:
+        raise ValueError(f"failed to read Qwen {description} {str(path)!r}: {exc}") from exc
+    return digest.hexdigest()
+
+
+def _qwen_validate_model_identity(model_dir: str | Path) -> Path:
+    """Check sidecar identity and every certified shard's full digest before MLX."""
+    model_path = Path(model_dir)
+    if not model_path.is_dir():
+        raise ValueError(f"Qwen model directory is missing: {model_path}")
+    if model_path.name != QWEN_MODEL_REVISION:
+        raise ValueError(
+            f"Qwen model directory revision {model_path.name!r} does not match "
+            f"{QWEN_MODEL_REVISION!r}"
+        )
+    for name, expected_digest in QWEN_METADATA_SHA256.items():
+        path = model_path / name
+        if not path.is_file():
+            raise ValueError(f"Qwen model metadata sidecar is missing: {path}")
+        if _qwen_hash_file(path, "metadata sidecar") != expected_digest:
+            raise ValueError(f"Qwen model metadata digest mismatch for {name!r}")
+    for name, expected_size, expected_digest in QWEN_SHARDS:
+        path = model_path / name
+        try:
+            actual_size = path.stat().st_size
+        except OSError as exc:
+            raise ValueError(f"Qwen model shard is missing: {path}") from exc
+        if actual_size != expected_size:
+            raise ValueError(
+                f"Qwen model shard size mismatch for {name!r}: "
+                f"{actual_size} != {expected_size}"
+            )
+        actual_digest = _qwen_hash_file(path, "safetensors shard")
+        if actual_digest != expected_digest:
+            raise ValueError(
+                f"Qwen model shard digest mismatch for {name!r}: "
+                f"{actual_digest} != {expected_digest}"
+            )
+    return model_path
+
+
+def _qwen_parse_token_ids(raw: str | Sequence[int]) -> Tuple[int, ...]:
+    if isinstance(raw, str):
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "--token-ids-json must be a JSON array of integer token IDs"
+            ) from exc
+    else:
+        try:
+            value = list(raw)
+        except TypeError as exc:
+            raise ValueError(
+                "--token-ids-json must be a JSON array of integer token IDs"
+            ) from exc
+    if (
+        not isinstance(value, list)
+        or any(type(token_id) is not int for token_id in value)
+        or tuple(value) != QWEN_PROBE_TOKEN_IDS
+    ):
+        raise ValueError(
+            "Qwen oracle fixtures require the exact text-only probe token IDs "
+            f"{list(QWEN_PROBE_TOKEN_IDS)!r}"
+        )
+    if any(token_id in QWEN_REJECTED_SPECIAL_TOKEN_IDS for token_id in value):
+        raise ValueError("Qwen oracle fixtures reject multimodal special token IDs")
+    return tuple(value)
+
+
+def _qwen_npy_bytes(array: np.ndarray) -> bytes:
+    if np.dtype(array.dtype).hasobject:
+        raise ValueError("Qwen fixtures cannot persist object arrays")
+    stream = BytesIO()
+    np.lib.format.write_array(
+        stream,
+        np.ascontiguousarray(array),
+        allow_pickle=False,
+        pickle_kwargs=None,
+    )
+    return stream.getvalue()
+
+def _qwen_npz_bytes(arrays: Mapping[str, np.ndarray]) -> bytes:
+    """Encode a stable NPZ: sorted keys and fixed ZIP timestamps/metadata."""
+    stream = BytesIO()
+    with zipfile.ZipFile(
+        stream,
+        mode="w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=9,
+    ) as archive:
+        for key in sorted(arrays):
+            if not isinstance(key, str) or not key:
+                raise ValueError("Qwen fixture array keys must be nonempty strings")
+            info = zipfile.ZipInfo(f"{key}.npy", date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = 0o600 << 16
+            info.flag_bits = 0
+            archive.writestr(info, _qwen_npy_bytes(arrays[key]))
+    return stream.getvalue()
+
+
+def _qwen_json_bytes(value: Mapping[str, Any]) -> bytes:
+    return _qwen_canonical_json(value) + b"\n"
+
+
+def _qwen_decode_leaf(leaf: object) -> np.ndarray:
+    payload = getattr(leaf, "payload", None)
+    dtype = getattr(leaf, "dtype", None)
+    shape = getattr(leaf, "shape", None)
+    if not isinstance(payload, bytes) or not isinstance(shape, tuple):
+        raise ValueError("Qwen state sample leaf is malformed")
+    if dtype == "bfloat16":
+        if len(payload) % 2:
+            raise ValueError("Qwen bfloat16 state payload is not word aligned")
+        words = np.frombuffer(payload, dtype="<u2")
+        values = (words.astype("<u4") << np.uint32(16)).view("<f4")
+    elif dtype == "float32":
+        if len(payload) % 4:
+            raise ValueError("Qwen float32 state payload is not word aligned")
+        values = np.frombuffer(payload, dtype="<f4")
+    else:
+        raise ValueError(f"unsupported Qwen state sample dtype {dtype!r}")
+    expected_size = 1
+    for dimension in shape:
+        expected_size *= dimension
+    if values.size != expected_size:
+        raise ValueError("Qwen state sample payload size does not match its shape")
+    result = np.ascontiguousarray(values.reshape(shape), dtype=np.float32)
+    if not np.isfinite(result).all():
+        raise ValueError("Qwen state sample contains non-finite values")
+    return result
+
+
+def _qwen_state_sample_arrays(
+    state: object,
+) -> Tuple[Dict[str, np.ndarray], Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
+    entries = getattr(state, "entries", None)
+    if not isinstance(entries, tuple) or len(entries) != 64:
+        raise ValueError("Qwen captured state must contain exactly 64 ordered layers")
+    by_layer = {getattr(entry, "layer_index", -1): entry for entry in entries}
+    selected = (
+        ("layer.0.arrays.conv_state", 0, 0, (slice(0, 1), slice(0, 3), slice(0, 256))),
+        (
+            "layer.0.arrays.delta_state",
+            0,
+            1,
+            (slice(0, 1), slice(0, 2), slice(0, 16), slice(0, 16)),
+        ),
+        (
+            "layer.3.full_attention.keys",
+            3,
+            0,
+            (slice(0, 1), slice(0, 4), slice(0, 4), slice(0, 64)),
+        ),
+        (
+            "layer.3.full_attention.values",
+            3,
+            1,
+            (slice(0, 1), slice(0, 4), slice(0, 4), slice(0, 64)),
+        ),
+    )
+    arrays: Dict[str, np.ndarray] = {}
+    records: Dict[str, Dict[str, Any]] = {}
+    components: List[Dict[str, Any]] = []
+    component_contract = {
+        "layer.0.arrays.conv_state": {
+            "class_name": "ArraysCache",
+            "shape": [1, 3, 10240],
+            "dtype": "bfloat16",
+            "owner": "Qwen3_5GatedDeltaNet",
+            "update": "retain_last_3_mixed_qkv_rows",
+            "position": "committed_position",
+            "trim_supported": False,
+        },
+        "layer.0.arrays.delta_state": {
+            "class_name": "ArraysCache",
+            "shape": [1, 48, 128, 128],
+            "dtype": "float32",
+            "owner": "gated_delta_update",
+            "update": "recurrent_delta_update",
+            "position": "committed_position",
+            "trim_supported": False,
+        },
+        "layer.3.full_attention.keys": {
+            "class_name": "KVCache",
+            "shape": [1, 4, 4, 256],
+            "dtype": "bfloat16",
+            "owner": "Qwen3_5Attention/KVCache",
+            "update": "KVCache.update_and_fetch",
+            "position": "offset=N",
+            "trim_supported": "KVCache.trim",
+        },
+        "layer.3.full_attention.values": {
+            "class_name": "KVCache",
+            "shape": [1, 4, 4, 256],
+            "dtype": "bfloat16",
+            "owner": "Qwen3_5Attention/KVCache",
+            "update": "KVCache.update_and_fetch",
+            "position": "offset=N",
+            "trim_supported": "KVCache.trim",
+        },
+    }
+    for component_id, layer_index, leaf_index, slices in selected:
+        entry = by_layer.get(layer_index)
+        if entry is None:
+            raise ValueError(f"Qwen captured state is missing layer {layer_index}")
+        leaves = getattr(entry, "leaves", None)
+        if not isinstance(leaves, tuple) or len(leaves) != 2:
+            raise ValueError(f"Qwen captured layer {layer_index} does not contain two leaves")
+        leaf = leaves[leaf_index]
+        source = _qwen_decode_leaf(leaf)
+        sample = np.ascontiguousarray(source[slices], dtype=np.float32)
+        array_key = component_id.replace(".", "_") + "_fp32"
+        arrays[array_key] = sample
+        record = {
+            **component_contract[component_id],
+            "array_key": array_key,
+            "component_id": component_id,
+            "model_fingerprint": QWEN_MODEL_FINGERPRINT,
+            "prefix_position": 4,
+            "source_shape": list(source.shape),
+            "source_dtype": getattr(leaf, "dtype"),
+            "stored_shape": list(sample.shape),
+            "stored_dtype": str(sample.dtype),
+            "array_sha256": digest_bytes(sample.tobytes()),
+            "sample_slice": [
+                [part.start, part.stop, part.step]
+                for part in slices
+            ],
+        }
+        records[component_id] = record
+    for component_id in (
+        "layer.0.arrays.conv_state",
+        "layer.0.arrays.delta_state",
+        "layer.3.full_attention.keys",
+        "layer.3.full_attention.values",
+    ):
+        components.append(dict(records[component_id]))
+    return arrays, records, components
+
+
+def _qwen_affine_windows(
+    model_path: Path, inventory: Mapping[str, Any]
+) -> Tuple[Dict[str, np.ndarray], Dict[str, Dict[str, Any]]]:
+    tensor_by_name = inventory["_tensor_by_name"]
+    shard_by_name = inventory["_shard_by_name"]
+    arrays: Dict[str, np.ndarray] = {}
+    records: Dict[str, Dict[str, Any]] = {}
+    for tensor_name in sorted(_QWEN_AFFINE_TENSORS):
+        tensor = tensor_by_name[tensor_name]
+        shard_name = tensor["shard"]
+        shard = shard_by_name[shard_name]
+        header_bytes = shard.get("header_bytes")
+        if not isinstance(header_bytes, int) or isinstance(header_bytes, bool):
+            # Header byte counts are part of task-set-2's inventory output.
+            # A schema-v2 inventory without them cannot locate a source window.
+            raise ValueError(f"Qwen inventory shard {shard_name!r} lacks header_bytes")
+        start = tensor["data_offset_start"]
+        stop = tensor["data_offset_end"]
+        if (
+            not isinstance(start, int)
+            or isinstance(start, bool)
+            or not isinstance(stop, int)
+            or isinstance(stop, bool)
+            or start < 0
+            or stop <= start
+        ):
+            raise ValueError(f"Qwen affine tensor {tensor_name!r} has invalid source offsets")
+        window_size = min(stop - start, _QWEN_MAX_WINDOW_BYTES)
+        source_offset = 8 + header_bytes + start
+        path = model_path / shard_name
+        try:
+            with path.open("rb") as stream:
+                stream.seek(source_offset)
+                payload = stream.read(window_size)
+        except OSError as exc:
+            raise ValueError(f"failed to read bounded Qwen window {tensor_name!r}") from exc
+        if len(payload) != window_size:
+            raise ValueError(f"truncated bounded Qwen window {tensor_name!r}")
+        array_key = (
+            "window_"
+            + tensor_name.removeprefix("language_model.").replace(".", "_")
+        )
+        array = np.frombuffer(payload, dtype=np.uint8).copy()
+        arrays[array_key] = array
+        records[array_key] = {
+            "array_key": array_key,
+            "tensor_name": tensor_name,
+            "source_shard": shard_name,
+            "source_offset": source_offset,
+            "source_data_offset": start,
+            "byte_count": int(array.nbytes),
+            "source_byte_count": stop - start,
+            "source_shape": list(tensor["shape"]),
+            "source_dtype": tensor["dtype"],
+            "shape": list(array.shape),
+            "dtype": str(array.dtype),
+            "mode": "affine",
+            "bits": 4,
+            "group_size": 64,
+            "model_fingerprint": QWEN_MODEL_FINGERPRINT,
+            "window_sha256": digest_bytes(array.tobytes()),
+        }
+    return arrays, records
+
+
+def _qwen_generation_token(item: object) -> int:
+    token = item[0] if isinstance(item, tuple) else item
+    if isinstance(token, (int, np.integer)):
+        return int(token)
+    try:
+        return int(token.item())
+    except AttributeError:
+        return int(token)
+
+
+def _qwen_capture_reference_state(model: object, token_ids: Sequence[int]) -> object:
+    """Capture S-1 state through task-set-3's MLX cache/spill seam."""
+    try:
+        import mlx.core as mx  # type: ignore
+        from mlx_lm.generate import generate_step as mlx_generate_step  # type: ignore
+        from mlx_lm.models.cache import make_prompt_cache  # type: ignore
+        from native_r9700.qwen_spill import capture_qwen_hybrid_state
+    except ImportError as exc:  # pragma: no cover - environment dependent
+        raise ValueError(f"Qwen MLX oracle support is unavailable: {exc}") from exc
+    language_model = getattr(model, "language_model", None)
+    if language_model is None:
+        raise ValueError("Qwen reference model must expose language_model")
+    cache = make_prompt_cache(language_model)
+    prefix = mx.array(list(token_ids[:-1]))
+    for _ in mlx_generate_step(
+        prefix,
+        language_model,
+        max_tokens=0,
+        prompt_cache=cache,
+    ):
+        pass
+    layers = getattr(cache, "layers", cache)
+    return capture_qwen_hybrid_state(
+        layers,
+        model_identity=QWEN_MODEL_FINGERPRINT,
+        committed_position=len(token_ids) - 1,
+    )
+
+
+def _qwen_trace_arrays(
+    state: object, model: object, token_ids: Sequence[int]
+) -> Tuple[Dict[str, np.ndarray], Dict[str, Dict[str, Any]]]:
+    state_arrays, state_records, _components = _qwen_state_sample_arrays(state)
+    try:
+        from native_r9700.qwen_parity import generate_qwen_from_hybrid_state
+    except ImportError as exc:  # pragma: no cover - local package failure
+        raise ValueError(f"Qwen parity seam is unavailable: {exc}") from exc
+    generated = [
+        _qwen_generation_token(item)
+        for item in generate_qwen_from_hybrid_state(
+            model,
+            state,
+            token_ids,
+            max_tokens=1,
+        )
+    ]
+    if not generated:
+        raise ValueError("Qwen final-token oracle produced no output token")
+    trace_arrays: Dict[str, np.ndarray] = {}
+    trace_records: Dict[str, Dict[str, Any]] = {}
+    for component_id, state_record in state_records.items():
+        key = "trace_" + state_record["array_key"]
+        trace_arrays[key] = state_arrays[state_record["array_key"]]
+        trace_records[key] = {
+            "array_key": key,
+            "boundary": "layer0" if component_id.startswith("layer.0") else "layer3",
+            "layer_index": 0 if component_id.startswith("layer.0") else 3,
+            "source_dtype": state_record["source_dtype"],
+            "stored_shape": list(trace_arrays[key].shape),
+            "stored_dtype": str(trace_arrays[key].dtype),
+            "token_range": [0, 4],
+            "tolerance_policy": "exact CPU/MLX reference sample bytes",
+            "component_id": component_id,
+            "array_sha256": digest_bytes(trace_arrays[key].tobytes()),
+        }
+    final_input_key = "trace_final_input_token_ids"
+    final_output_key = "trace_generated_token_ids"
+    trace_arrays[final_input_key] = np.asarray([token_ids[-1]], dtype=np.int64)
+    trace_arrays[final_output_key] = np.asarray(generated, dtype=np.int64)
+    for key, array in (
+        (final_input_key, trace_arrays[final_input_key]),
+        (final_output_key, trace_arrays[final_output_key]),
+    ):
+        trace_records[key] = {
+            "array_key": key,
+            "boundary": "final",
+            "layer_index": None,
+            "source_dtype": "int64",
+            "stored_shape": list(array.shape),
+            "stored_dtype": str(array.dtype),
+            "token_range": [4, 5],
+            "tolerance_policy": "exact token IDs",
+            "array_sha256": digest_bytes(array.tobytes()),
+        }
+    return trace_arrays, trace_records
+
+
+def _qwen_publish_artifacts(
+    fixtures_dir: str | Path, artifacts: Mapping[str, bytes]
+) -> List[str]:
+    """Publish all five files as one rollback-capable transaction."""
+    destination = Path(fixtures_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    if not set(artifacts) == set(QWEN_FIXTURE_NAMES):
+        raise ValueError("Qwen fixture publication requires exactly five files")
+    staging = Path(tempfile.mkdtemp(prefix=".qwen-fixtures-", dir=str(destination)))
+    managed = list(QWEN_FIXTURE_NAMES)
+    try:
+        for name in sorted(artifacts):
+            path = staging / name
+            with path.open("wb") as stream:
+                stream.write(artifacts[name])
+                stream.flush()
+                os.fsync(stream.fileno())
+        # Remove stale qwen_* files only after they have been moved into the
+        # transaction's backup area, so a failed replacement restores them.
+        for path in destination.iterdir():
+            if (
+                path.is_file()
+                or path.is_symlink()
+            ) and path.name.startswith("qwen_") and path.name not in managed:
+                managed.append(path.name)
+        backups: Dict[str, Path] = {}
+        published: List[str] = []
+        try:
+            for index, name in enumerate(managed):
+                target = destination / name
+                if target.exists() or target.is_symlink():
+                    if target.is_dir() and not target.is_symlink():
+                        raise ValueError(f"Qwen fixture target is a directory: {target}")
+                    backup = staging / f".backup-{index}"
+                    os.replace(target, backup)
+                    backups[name] = backup
+            for name in QWEN_FIXTURE_NAMES:
+                os.replace(staging / name, destination / name)
+                published.append(name)
+        except Exception:
+            for name in reversed(published):
+                (destination / name).unlink(missing_ok=True)
+            for name, backup in reversed(tuple(backups.items())):
+                if backup.exists() or backup.is_symlink():
+                    os.replace(backup, destination / name)
+            raise
+        return [str(destination / name) for name in QWEN_FIXTURE_NAMES]
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+
+def _qwen_write_json_atomically(path: str | Path, value: Mapping[str, Any]) -> None:
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.", dir=str(destination.parent)
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            descriptor = -1
+            stream.write(_qwen_json_bytes(value))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, destination)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        temporary.unlink(missing_ok=True)
+
+
+def generate_qwen_fixtures(
+    model_dir: str | Path,
+    fixtures_dir: str | Path = DEFAULT_FIXTURES_DIR,
+    *,
+    token_ids: Sequence[int] = QWEN_PROBE_TOKEN_IDS,
+    inventory: str | Path | Mapping[str, Any] | None = None,
+    inventory_path: str | Path | None = None,
+    report_path: str | Path | None = None,
+    runtime_root: str | Path | None = None,
+) -> List[str]:
+    """Generate the deterministic five-file Qwen CPU/MLX oracle package."""
+    if inventory is not None and inventory_path is not None:
+        raise ValueError("Qwen inventory and inventory_path are mutually exclusive")
+    token_sequence = _qwen_parse_token_ids(token_ids)
+    if report_path is not None:
+        report_destination = Path(report_path)
+        fixture_destination = Path(fixtures_dir)
+        if any(
+            report_destination.resolve() == (fixture_destination / name).resolve()
+            for name in QWEN_FIXTURE_NAMES
+        ):
+            raise ValueError("Qwen generation report must not alias a fixture artifact")
+    if inventory is None:
+        if inventory_path is None:
+            raise ValueError("Qwen fixture generation requires task-set-2 inventory")
+        inventory = inventory_path
+    try:
+        checked_inventory = validate_qwen_tensor_inventory(inventory)
+    except TypeError as exc:
+        raise ValueError("Qwen inventory must be a path or mapping") from exc
+    verified_runtime_root, oracle_runtime = _qwen_resolve_oracle_runtime(runtime_root)
+    model_path = _qwen_validate_model_identity(model_dir)
+
+    affine_arrays, affine_records = _qwen_affine_windows(model_path, checked_inventory)
+    model, _tokenizer = _load_mlx(
+        str(model_path), runtime_root=verified_runtime_root
+    )
+    state = _qwen_capture_reference_state(model, token_sequence)
+    state_arrays, state_records, state_components = _qwen_state_sample_arrays(state)
+    trace_arrays, trace_records = _qwen_trace_arrays(state, model, token_sequence)
+
+    prompts = {
+        "schema_version": 1,
+        "model_fingerprint": QWEN_MODEL_FINGERPRINT,
+        "producer_kind": "cpu_reference",
+        "native_evidence": False,
+        "text_only": True,
+        "prompts": {
+            "prompt-0": {
+                "token_ids": list(token_sequence),
+                "S": len(token_sequence),
+                "prefix_token_ids": list(token_sequence[:-1]),
+                "prefix_length": len(token_sequence) - 1,
+                "final_token_id": token_sequence[-1],
+                "rejected_special_token_ids": list(QWEN_REJECTED_SPECIAL_TOKEN_IDS),
+            }
+        },
+    }
+    state_array_records = {
+        record["array_key"]: {
+            **record,
+            # ``shape``/``dtype`` describe the stored bounded NPZ array for
+            # the shared fixture catalog.  The complete source geometry stays
+            # explicit in ``source_shape``/``source_dtype`` and components.
+            "model_fingerprint": QWEN_MODEL_FINGERPRINT,
+            "shape": list(record["stored_shape"]),
+            "dtype": record["stored_dtype"],
+        }
+        for record in state_records.values()
+    }
+    artifact_arrays = {
+        "qwen_affine_windows.npz": affine_arrays,
+        "qwen_hybrid_state_samples.npz": state_arrays,
+        "qwen_oracle_trace.npz": trace_arrays,
+    }
+    artifact_bytes: Dict[str, bytes] = {
+        "qwen_prompts.json": _qwen_json_bytes(prompts),
+        **{
+            name: _qwen_npz_bytes(arrays)
+            for name, arrays in artifact_arrays.items()
+        },
+    }
+    trace_array_records = {
+        key: {
+            **record,
+            "model_fingerprint": QWEN_MODEL_FINGERPRINT,
+            "shape": list(record["stored_shape"]),
+            "dtype": record["stored_dtype"],
+        }
+        for key, record in trace_records.items()
+    }
+    files: Dict[str, Dict[str, Any]] = {
+        "qwen_prompts.json": {
+            "kind": "json",
+            "sha256": digest_bytes(artifact_bytes["qwen_prompts.json"]),
+            "keys": ["prompt-0"],
+        },
+        "qwen_affine_windows.npz": {
+            "kind": "npz",
+            "sha256": digest_bytes(artifact_bytes["qwen_affine_windows.npz"]),
+            "arrays": affine_records,
+            "bounded_window_bytes": _QWEN_MAX_WINDOW_BYTES,
+        },
+        "qwen_hybrid_state_samples.npz": {
+            "kind": "npz",
+            "sha256": digest_bytes(artifact_bytes["qwen_hybrid_state_samples.npz"]),
+            "arrays": state_array_records,
+            "selected_components": list(state_records),
+        },
+        "qwen_oracle_trace.npz": {
+            "kind": "npz",
+            "sha256": digest_bytes(artifact_bytes["qwen_oracle_trace.npz"]),
+            "arrays": trace_array_records,
+            "boundaries": ["layer0", "layer3", "final"],
+        },
+    }
+    shards = _qwen_expected_shard_records()
+    schema: Dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "qwen3.8_text_oracle",
+        "model_fingerprint": QWEN_MODEL_FINGERPRINT,
+        "model_revision": QWEN_MODEL_REVISION,
+        "base_model_revision": QWEN_BASE_MODEL_REVISION,
+        "mlx_vlm_revision": QWEN_MLX_VLM_REVISION,
+        "mlx_lm_revision": QWEN_MLX_LM_REVISION,
+        "source_revisions": dict(QWEN_SOURCE_REVISIONS),
+        "metadata_sha256": dict(QWEN_METADATA_SHA256),
+        "shards": shards,
+        "inventory_schema_version": QWEN_INVENTORY_SCHEMA_VERSION,
+        "inventory_sha256": checked_inventory["inventory_sha256"],
+        "producer_kind": "cpu_reference",
+        "native_evidence": False,
+        "text_only": True,
+        "sensitive_data_policy": QWEN_SENSITIVE_DATA_POLICY,
+        "prompt_ids": ["prompt-0"],
+        "runtime_layer_order": list(QWEN_RUNTIME_LAYER_ORDER),
+        "oracle_runtime": oracle_runtime,
+        "full_attention_layers": list(QWEN_FULL_ATTENTION_LAYERS),
+        "arrays_cache_layers": 48,
+        "kv_cache_layers": 16,
+        "committed_position": 4,
+        "final_token_id": token_sequence[-1],
+        "state_components": state_components,
+        "files": files,
+        "restore_api": (
+            "native_r9700.qwen_hybrid_cache."
+            "restore_qwen_hybrid_cache_into_mlx"
+        ),
+        "determinism_inputs": [
+            "model_fingerprint",
+            "inventory_sha256",
+            "oracle_runtime",
+            "source_revisions",
+            "shards",
+            "fixture_file_sha256",
+        ],
+    }
+    determinism_preimage = {
+        "model_fingerprint": schema["model_fingerprint"],
+        "inventory_sha256": schema["inventory_sha256"],
+        "oracle_runtime": schema["oracle_runtime"],
+        "source_revisions": QWEN_SOURCE_REVISIONS,
+        "shards": shards,
+        "fixture_file_sha256": {
+            name: files[name]["sha256"] for name in sorted(QWEN_ARTIFACT_NAMES)
+        },
+    }
+    schema["determinism_digest"] = digest_bytes(
+        _qwen_canonical_json(determinism_preimage)
+    )
+    artifact_bytes["qwen_fixtures_schema.json"] = _qwen_json_bytes(schema)
+    paths = _qwen_publish_artifacts(fixtures_dir, artifact_bytes)
+    if report_path is not None:
+        _qwen_write_json_atomically(
+            report_path,
+            {
+                "status": "pass",
+                "producer_kind": "cpu_reference",
+                "native_evidence": False,
+                "text_only": True,
+                "model_fingerprint": QWEN_MODEL_FINGERPRINT,
+                "inventory_sha256": checked_inventory["inventory_sha256"],
+                "oracle_runtime": oracle_runtime,
+                "output_files": list(QWEN_FIXTURE_NAMES),
+                "determinism_digest": schema["determinism_digest"],
+                "restore_api": schema["restore_api"],
+                "prefix_length": 4,
+                "final_token_input": [token_sequence[-1]],
+            },
+        )
+    return paths
+
 def generate_all(model_dir: str, fixtures_dir: str) -> List[str]:
     """Generate every fixture file under ``fixtures_dir``; returns file paths."""
     os.makedirs(fixtures_dir, exist_ok=True)
     written: List[str] = []
     schema: Dict[str, object] = {
+
         "model_dir": model_dir,
         "geometry": {
             "num_layers": NUM_LAYERS,
@@ -4529,23 +5751,77 @@ def generate_all(model_dir: str, fixtures_dir: str) -> List[str]:
 # ---------------------------------------------------------------------------
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="native_r9700.ref_fixtures")
-    parser.add_argument("--generate", action="store_true",
-                        help="(Re)generate the reference fixture files on disk.")
-    parser.add_argument("--model", default=DEFAULT_MODEL,
-                        help="mlx model dir (default: %(default)s).")
-    parser.add_argument("--fixtures-dir", default=DEFAULT_FIXTURES_DIR,
-                        help="output fixtures dir (default: %(default)s).")
+    modes = parser.add_mutually_exclusive_group(required=True)
+    modes.add_argument(
+        "--generate",
+        action="store_true",
+        help="(Re)generate the legacy Llama reference fixture files on disk.",
+    )
+    modes.add_argument(
+        "--generate-qwen",
+        action="store_true",
+        help="generate the five-file Qwen CPU/MLX oracle package",
+    )
+    parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help="model directory (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--fixtures-dir",
+        default=DEFAULT_FIXTURES_DIR,
+        help="output fixtures dir (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--token-ids-json",
+        help="exact Qwen text-only probe token IDs as a JSON array",
+    )
+    parser.add_argument(
+        "--inventory",
+        help="task-set-2 schema-v2 Qwen tensor inventory JSON",
+    )
+    parser.add_argument("--report", help="optional Qwen generation report JSON path")
+    parser.add_argument(
+        "--runtime-root",
+        help="verified local mlx-lm/MLX runtime root for --generate-qwen",
+    )
     args = parser.parse_args(argv)
-    if not args.generate:
-        parser.error("--generate is required (this module only generates fixtures).")
-    try:
-        written = generate_all(args.model, args.fixtures_dir)
-    except Exception as exc:  # loud, clear failure (C1 error behavior)
-        print(f"error: fixture generation failed: {exc}")
-        return 1
+    if args.generate:
+        if (
+            args.token_ids_json is not None
+            or args.inventory is not None
+            or args.report is not None
+            or args.runtime_root is not None
+        ):
+            parser.error(
+                "--token-ids-json, --inventory, --report, and --runtime-root "
+                "require --generate-qwen"
+            )
+        try:
+            written = generate_all(args.model, args.fixtures_dir)
+        except Exception as exc:  # loud, clear failure (C1 error behavior)
+            print(f"error: fixture generation failed: {exc}")
+            return 1
+    else:
+        if args.token_ids_json is None:
+            parser.error("--token-ids-json is required with --generate-qwen")
+        if args.inventory is None:
+            parser.error("--inventory is required with --generate-qwen")
+        try:
+            written = generate_qwen_fixtures(
+                args.model,
+                args.fixtures_dir,
+                token_ids=_qwen_parse_token_ids(args.token_ids_json),
+                inventory_path=args.inventory,
+                report_path=args.report,
+                runtime_root=args.runtime_root,
+            )
+        except Exception as exc:
+            print(f"error: Qwen fixture generation failed: {exc}")
+            return 1
     print(f"wrote {len(written)} fixture files to {args.fixtures_dir}:")
-    for w in written:
-        print(f"  {os.path.relpath(w)}")
+    for path in written:
+        print(f"  {os.path.relpath(path)}")
     return 0
 
 

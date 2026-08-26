@@ -126,8 +126,12 @@ def restore_qwen_hybrid_cache_into_mlx(
     # boundary.  Runtime cache setters only receive real MLX arrays here.
     try:
         for entry, layer, decoded in prepared:
-            layer.state = list(decoded) if entry.class_name == "ArraysCache" else decoded
-            if entry.class_name == "KVCache":
+            if entry.class_name == "ArraysCache":
+                layer.cache = list(decoded)
+                layer.left_padding = None
+                layer.lengths = None
+            else:
+                layer.state = decoded
                 layer.offset = entry.offset
     except Exception as exc:
         raise QwenHybridCacheError(
@@ -166,18 +170,18 @@ def _validate_target_layer(entry: QwenStateEntry, layer: object) -> None:
             f"Qwen MLX layer {entry.layer_index} must be {entry.class_name}, "
             f"got {type(layer).__name__}"
         )
-    state_descriptor = getattr(type(layer), "state", None)
-    if state_descriptor is None:
-        try:
-            writable = "state" in vars(layer)
-        except TypeError:
-            writable = False
+    if entry.class_name == "ArraysCache":
+        raw_cache = getattr(layer, "cache", None)
+        if not isinstance(raw_cache, list) or len(raw_cache) != 2:
+            raise QwenHybridCacheError(
+                f"Qwen MLX layer {entry.layer_index} has no two-leaf cache field"
+            )
     else:
-        writable = hasattr(state_descriptor, "__set__")
-    if not writable:
-        raise QwenHybridCacheError(
-            f"Qwen MLX layer {entry.layer_index} has no writable state field"
-        )
+        state_descriptor = getattr(type(layer), "state", None)
+        if state_descriptor is None or not hasattr(state_descriptor, "__set__"):
+            raise QwenHybridCacheError(
+                f"Qwen MLX layer {entry.layer_index} has no writable state field"
+            )
     if entry.class_name == "KVCache" and not hasattr(layer, "offset"):
         raise QwenHybridCacheError(
             f"Qwen MLX full-attention layer {entry.layer_index} has no offset field"

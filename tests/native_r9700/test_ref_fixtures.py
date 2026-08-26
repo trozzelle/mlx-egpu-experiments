@@ -3542,3 +3542,678 @@ def test_layer0_attention_future_head_scores_softmax_context_fixtures_match_gqa_
     assert np.all(row_sums[5:] == 0.0)
     np.testing.assert_allclose(context_probs[:5, :5].astype(np.float32), probs[:5, :5].astype(np.float16).astype(np.float32), rtol=0.0, atol=0.0)
     np.testing.assert_allclose(context, context_probs.astype(np.float32) @ v_as_b.astype(np.float32), rtol=0.0, atol=0.0)
+# ---------------------------------------------------------------------------
+# Q1 Qwen3.8-27B text-only oracle fixtures (task set 4 RED contract).
+# ---------------------------------------------------------------------------
+_QWEN_FIXTURE_NAMES = (
+    "qwen_prompts.json",
+    "qwen_affine_windows.npz",
+    "qwen_hybrid_state_samples.npz",
+    "qwen_oracle_trace.npz",
+    "qwen_fixtures_schema.json",
+)
+_QWEN_ARTIFACT_NAMES = _QWEN_FIXTURE_NAMES[:-1]
+_QWEN_MODEL_FINGERPRINT = (
+    "4304f20a69213c8f0620ab7388163dd58b324278679d94c5915f279438d1b371"
+)
+_QWEN_INVENTORY_SHA256 = (
+    "508567ed00f7d65283fcb7f5ecba55e9a9904a9f2f41e8724bf1ef37589725e4"
+)
+_QWEN_BASE_MODEL_REVISION = "unavailable_in_pinned_conversion_metadata"
+_QWEN_SOURCE_REVISIONS = {
+    "model": "3e6447f082e89cc7f0bc6e5441afd38dfce760ff",
+    "mlx_vlm": "2b31570bdee86e2cdeea049761885aeed524a98c",
+    "mlx_lm": "e2f2fb2aef987f86878d17638446183cffe21fe4",
+}
+_QWEN_METADATA_SHA256 = {
+    "config.json": "14b65a0ee06517060a6bbd979bb1a8ff54e7b304b1a1f01d54344b88b8285e85",
+    "model.safetensors.index.json": (
+        "13b840162b4cb35c66fef7df072f7dbb4717908204364f5e5d9f9655a2758fa8"
+    ),
+    "tokenizer.json": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+    "tokenizer_config.json": (
+        "792fa3f0cb88b111e54ef3134c873531008c4df471d108da17903426e308aa7b"
+    ),
+}
+_QWEN_SHARDS = (
+    (
+        "model-00001-of-00003.safetensors",
+        5_343_268_662,
+        "6cc1508e96fb5d0865dfd5753a79f4ec60651bf3e2a82844a7e8ae9c60528c0d",
+    ),
+    (
+        "model-00002-of-00003.safetensors",
+        5_354_185_130,
+        "83f2a20ca8058f486a3634a27faf99587f4cd3c156a83dee34fb99e6ac178670",
+    ),
+    (
+        "model-00003-of-00003.safetensors",
+        5_357_087_557,
+        "31b8c91ef899f79efaaa69e3d2c096f6e2ebeb2ff20e29222abbd9ebc79e560a",
+    ),
+)
+_QWEN_PROMPT_TOKEN_IDS = [760, 6511, 314, 9338, 369]
+_QWEN_REJECTED_SPECIAL_TOKEN_IDS = [248053, 248054, 248056, 248057]
+_QWEN_FULL_ATTENTION_LAYERS = [3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51, 55, 59, 63]
+
+
+def _qwen_fixture_path(name: str) -> Path:
+    return Path(_FIXTURES_DIR) / name
+
+
+def _load_qwen_fixture_schema() -> dict:
+    schema_path = _qwen_fixture_path("qwen_fixtures_schema.json")
+    assert schema_path.is_file(), (
+        "missing Qwen fixture schema; implement --generate-qwen before "
+        "running the Q1 oracle contract"
+    )
+    return json.loads(schema_path.read_text(encoding="utf-8"))
+
+
+def _tiny_qwen_generation_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    wrong_shard_digest: bool = False,
+) -> tuple[Path, dict[str, object]]:
+    """Build a tiny model/inventory pair for pre-read generation guards."""
+    model_dir = tmp_path / rf.QWEN_MODEL_REVISION
+    model_dir.mkdir()
+
+    metadata_names = tuple(rf.QWEN_METADATA_SHA256)
+    metadata_bytes = b"{}"
+    for name in metadata_names:
+        (model_dir / name).write_bytes(metadata_bytes)
+    monkeypatch.setattr(
+        rf,
+        "QWEN_METADATA_SHA256",
+        {name: rf.digest_bytes(metadata_bytes) for name in metadata_names},
+    )
+
+    shard_names = tuple(name for name, _size, _digest in rf.QWEN_SHARDS)
+    shard_bytes = b"synthetic-shard-bytes" * 2
+    shard_digest = rf.digest_bytes(shard_bytes)
+    shard_contract = tuple(
+        (
+            name,
+            len(shard_bytes),
+            "0" * 64 if wrong_shard_digest and index == 0 else shard_digest,
+        )
+        for index, name in enumerate(shard_names)
+    )
+    monkeypatch.setattr(rf, "QWEN_SHARDS", shard_contract)
+    for name in shard_names:
+        (model_dir / name).write_bytes(shard_bytes)
+
+    tensor_records = [
+        {
+            "name": name,
+            "shard": shard_name,
+            "dtype": dtype,
+            "shape": list(shape),
+            "data_offset_start": 0,
+            "data_offset_end": 1,
+        }
+        for name, (shard_name, dtype, shape) in sorted(rf._QWEN_AFFINE_TENSORS.items())
+    ]
+    affine_stems = sorted({record["name"].rsplit(".", 1)[0] for record in tensor_records})
+    affine_classification = [
+        {"stem": stem, "mode": "affine", "bits": 4, "group_size": 64}
+        for stem in affine_stems
+    ]
+    canonical = {
+        "schema_version": rf.QWEN_INVENTORY_SCHEMA_VERSION,
+        "model_fingerprint": rf.QWEN_MODEL_FINGERPRINT,
+        "tensors": tensor_records,
+        "affine_classification": affine_classification,
+    }
+    inventory_digest = rf.digest_bytes(rf._qwen_canonical_json(canonical))
+    monkeypatch.setattr(rf, "QWEN_INVENTORY_SHA256", inventory_digest)
+    inventory = {
+        "schema_version": rf.QWEN_INVENTORY_SCHEMA_VERSION,
+        "kind": "qwen_tensor_inventory",
+        "model_fingerprint": rf.QWEN_MODEL_FINGERPRINT,
+        "header_only": True,
+        "tensor_count": 2180,
+        "language_model_tensor_count": 1847,
+        "vision_tensor_count": 333,
+        "affine_stem_count": 498,
+        "affine_entry_count": 1494,
+        "tensor_payload_bytes": 16054262240,
+        "producer_kind": "cpu_reference",
+        "native_evidence": False,
+        "shards": [
+            {
+                "name": name,
+                "size": size,
+                "sha256": digest,
+                "header_bytes": 0,
+            }
+            for name, size, digest in shard_contract
+        ],
+        "tensors": tensor_records,
+        "affine_classification": affine_classification,
+        "inventory_sha256": inventory_digest,
+    }
+    return model_dir, inventory
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("producer_kind", None),
+        ("producer_kind", "r9700_native"),
+        ("native_evidence", None),
+        ("native_evidence", True),
+    ),
+)
+def test_qwen_fixture_inventory_rejects_non_cpu_reference_labels(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: object,
+) -> None:
+    _model_dir, inventory = _tiny_qwen_generation_inputs(tmp_path, monkeypatch)
+    if value is None:
+        inventory.pop(field)
+    else:
+        inventory[field] = value
+
+    with pytest.raises(ValueError):
+        rf._qwen_validate_inventory(inventory)
+
+
+def test_qwen_fixture_generation_rehashes_selected_shards_before_reading_windows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_dir, inventory = _tiny_qwen_generation_inputs(
+        tmp_path,
+        monkeypatch,
+        wrong_shard_digest=True,
+    )
+    calls: list[str] = []
+
+    def unexpected_affine_reader(*_args: object, **_kwargs: object) -> object:
+        calls.append("_qwen_affine_windows")
+        raise AssertionError("affine windows must not be read after shard digest drift")
+
+    def unexpected_mlx_loader(*_args: object, **_kwargs: object) -> object:
+        calls.append("_load_mlx")
+        raise AssertionError("MLX must not load after shard digest drift")
+
+    monkeypatch.setattr(rf, "_qwen_affine_windows", unexpected_affine_reader)
+    monkeypatch.setattr(rf, "_load_mlx", unexpected_mlx_loader)
+    with pytest.raises(ValueError, match="digest"):
+        rf.generate_qwen_fixtures(
+            model_dir,
+            tmp_path / "fixtures",
+            inventory=inventory,
+        )
+    assert calls == []
+
+
+def test_qwen_fixture_package_has_exact_five_committed_files_and_identity():
+    """The Q1 package is a bounded, model-bound five-file artifact."""
+    actual = {
+        path.name
+        for path in Path(_FIXTURES_DIR).iterdir()
+        if path.is_file() and path.name.startswith("qwen_")
+    }
+    assert actual == set(_QWEN_FIXTURE_NAMES)
+
+    schema = _load_qwen_fixture_schema()
+    assert schema["schema_version"] == 1
+    assert schema["kind"] == "qwen3.8_text_oracle"
+    assert schema["model_fingerprint"] == _QWEN_MODEL_FINGERPRINT
+    assert schema["base_model_revision"] == _QWEN_BASE_MODEL_REVISION
+    assert schema["inventory_schema_version"] == 2
+    assert schema["inventory_sha256"] == _QWEN_INVENTORY_SHA256
+    assert schema["producer_kind"] == "cpu_reference"
+    assert schema["native_evidence"] is False
+    assert schema["text_only"] is True
+    assert schema["sensitive_data_policy"] == (
+        "minimal text-only token IDs; no image/video bytes or full model dump"
+    )
+    assert set(schema["files"]) == set(_QWEN_ARTIFACT_NAMES)
+    for artifact_name in _QWEN_ARTIFACT_NAMES:
+        artifact_path = _qwen_fixture_path(artifact_name)
+        assert artifact_path.is_file()
+        assert schema["files"][artifact_name]["sha256"] == rf.digest_bytes(
+            artifact_path.read_bytes()
+        )
+
+    assert schema["model_revision"] == _QWEN_SOURCE_REVISIONS["model"]
+    assert schema["mlx_vlm_revision"] == _QWEN_SOURCE_REVISIONS["mlx_vlm"]
+    assert schema["mlx_lm_revision"] == _QWEN_SOURCE_REVISIONS["mlx_lm"]
+    assert schema["oracle_runtime"] == _QWEN_ORACLE_RUNTIME_RECORD
+    assert schema["oracle_runtime"]["mlx_vlm"]["role"] == "reference_only"
+    assert schema["oracle_runtime"]["loader"] == "mlx_lm.utils.load"
+    assert schema["oracle_runtime"]["model_module"] == "mlx_lm.models.qwen3_5"
+    assert schema["oracle_runtime"]["mlx_lm"]["source_sha256"] == (
+        _QWEN_ORACLE_RUNTIME_SOURCE_SHA256
+    )
+    assert schema["metadata_sha256"] == _QWEN_METADATA_SHA256
+    assert [
+        (record["name"], record["size"], record["sha256"])
+        for record in schema["shards"]
+    ] == list(_QWEN_SHARDS)
+
+
+def test_qwen_prompts_freeze_s_minus_one_and_text_only_rejections():
+    schema = _load_qwen_fixture_schema()
+    prompts_path = _qwen_fixture_path("qwen_prompts.json")
+    assert prompts_path.is_file()
+    prompts = json.loads(prompts_path.read_text(encoding="utf-8"))
+
+    assert prompts["schema_version"] == 1
+    assert prompts["model_fingerprint"] == _QWEN_MODEL_FINGERPRINT
+    assert prompts["producer_kind"] == "cpu_reference"
+    assert prompts["native_evidence"] is False
+    assert prompts["text_only"] is True
+    assert list(prompts["prompts"]) == ["prompt-0"]
+    prompt = prompts["prompts"]["prompt-0"]
+    assert prompt["token_ids"] == _QWEN_PROMPT_TOKEN_IDS
+    assert prompt["S"] == 5
+    assert prompt["prefix_token_ids"] == _QWEN_PROMPT_TOKEN_IDS[:4]
+    assert prompt["prefix_length"] == 4
+    assert prompt["final_token_id"] == 369
+    assert prompt["rejected_special_token_ids"] == _QWEN_REJECTED_SPECIAL_TOKEN_IDS
+    assert schema["prompt_ids"] == ["prompt-0"]
+
+
+def test_qwen_hybrid_state_samples_freeze_runtime_order_components_and_shapes():
+    schema = _load_qwen_fixture_schema()
+    assert schema["runtime_layer_order"] == [
+        "ArraysCache" if index not in _QWEN_FULL_ATTENTION_LAYERS else "KVCache"
+        for index in range(64)
+    ]
+    assert schema["full_attention_layers"] == _QWEN_FULL_ATTENTION_LAYERS
+    assert schema["committed_position"] == 4
+    assert schema["final_token_id"] == 369
+
+    state_file = schema["files"]["qwen_hybrid_state_samples.npz"]
+    assert state_file["kind"] == "npz"
+    state_path = _qwen_fixture_path("qwen_hybrid_state_samples.npz")
+    assert state_path.is_file()
+    with np.load(state_path, allow_pickle=False) as archive:
+        state_arrays = set(archive.files)
+        assert state_arrays == {
+            record["array_key"] for record in state_file["arrays"].values()
+        }
+        for record in state_file["arrays"].values():
+            assert record["prefix_position"] == 4
+            assert record["model_fingerprint"] == _QWEN_MODEL_FINGERPRINT
+            assert record["stored_dtype"] == "float32"
+            assert record["source_dtype"] in {"bfloat16", "float32"}
+            assert record["component_id"].startswith("layer.")
+            assert record["array_sha256"] == rf.digest_bytes(archive[record["array_key"]].tobytes())
+
+    components = {
+        record["component_id"]: record
+        for record in schema["state_components"]
+    }
+    assert list(components) == [
+        "layer.0.arrays.conv_state",
+        "layer.0.arrays.delta_state",
+        "layer.3.full_attention.keys",
+        "layer.3.full_attention.values",
+    ]
+    assert components["layer.0.arrays.conv_state"]["class_name"] == "ArraysCache"
+    assert components["layer.0.arrays.conv_state"]["shape"] == [1, 3, 10240]
+    assert components["layer.0.arrays.conv_state"]["dtype"] == "bfloat16"
+    assert components["layer.0.arrays.conv_state"]["owner"] == "Qwen3_5GatedDeltaNet"
+    assert components["layer.0.arrays.conv_state"]["update"] == "retain_last_3_mixed_qkv_rows"
+    assert components["layer.0.arrays.conv_state"]["position"] == "committed_position"
+    assert components["layer.0.arrays.conv_state"]["trim_supported"] is False
+    assert components["layer.0.arrays.delta_state"]["class_name"] == "ArraysCache"
+    assert components["layer.0.arrays.delta_state"]["shape"] == [1, 48, 128, 128]
+    assert components["layer.0.arrays.delta_state"]["dtype"] == "float32"
+    assert components["layer.0.arrays.delta_state"]["owner"] == "gated_delta_update"
+    assert components["layer.0.arrays.delta_state"]["update"] == "recurrent_delta_update"
+    assert components["layer.0.arrays.delta_state"]["position"] == "committed_position"
+    assert components["layer.0.arrays.delta_state"]["trim_supported"] is False
+    for component_id in ("layer.3.full_attention.keys", "layer.3.full_attention.values"):
+        component = components[component_id]
+        assert component["class_name"] == "KVCache"
+        assert component["shape"] == [1, 4, 4, 256]
+        assert component["dtype"] == "bfloat16"
+        assert component["owner"] == "Qwen3_5Attention/KVCache"
+        assert component["update"] == "KVCache.update_and_fetch"
+        assert component["position"] == "offset=N"
+        assert component["trim_supported"] == "KVCache.trim"
+
+
+def test_qwen_affine_and_oracle_trace_are_bounded_schema_bound_arrays():
+    schema = _load_qwen_fixture_schema()
+    affine_path = _qwen_fixture_path("qwen_affine_windows.npz")
+    trace_path = _qwen_fixture_path("qwen_oracle_trace.npz")
+    assert affine_path.is_file()
+    assert trace_path.is_file()
+
+    affine_file = schema["files"]["qwen_affine_windows.npz"]
+    expected_stems = (
+        "language_model.model.layers.0.linear_attn.in_proj_qkv",
+        "language_model.model.layers.3.self_attn.q_proj",
+    )
+    expected_tensor_names = {
+        f"{stem}.{suffix}"
+        for stem in expected_stems
+        for suffix in ("weight", "scales", "biases")
+    }
+    affine_records = affine_file["arrays"]
+    assert {record["tensor_name"] for record in affine_records.values()} == expected_tensor_names
+    with np.load(affine_path, allow_pickle=False) as archive:
+        assert set(archive.files) == set(affine_records)
+        for array_key, record in affine_records.items():
+            array = archive[array_key]
+            assert array.dtype == np.dtype("uint8")
+            assert array.nbytes == record["byte_count"] <= 1 << 20
+            assert record["source_shard"] in {shard[0] for shard in _QWEN_SHARDS}
+            assert isinstance(record["source_offset"], int)
+            assert record["source_offset"] >= 0
+            expected_shapes = {
+                "language_model.model.layers.0.linear_attn.in_proj_qkv.weight": [10240, 640],
+                "language_model.model.layers.0.linear_attn.in_proj_qkv.scales": [10240, 80],
+                "language_model.model.layers.0.linear_attn.in_proj_qkv.biases": [10240, 80],
+                "language_model.model.layers.3.self_attn.q_proj.weight": [12288, 640],
+                "language_model.model.layers.3.self_attn.q_proj.scales": [12288, 80],
+                "language_model.model.layers.3.self_attn.q_proj.biases": [12288, 80],
+            }
+            assert record["source_shape"] == expected_shapes[record["tensor_name"]]
+            assert record["source_dtype"] in {"U32", "BF16"}
+            assert record["mode"] == "affine"
+            assert record["bits"] == 4
+            assert record["group_size"] == 64
+            assert record["model_fingerprint"] == _QWEN_MODEL_FINGERPRINT
+            assert record["window_sha256"] == rf.digest_bytes(array.tobytes())
+
+    trace_file = schema["files"]["qwen_oracle_trace.npz"]
+    trace_records = trace_file["arrays"]
+    assert trace_records
+    required_trace_boundaries = {"layer0", "layer3", "final"}
+    assert required_trace_boundaries <= {
+        record["boundary"] for record in trace_records.values()
+    }
+    with np.load(trace_path, allow_pickle=False) as archive:
+        assert set(archive.files) == set(trace_records)
+        for array_key, record in trace_records.items():
+            array = archive[array_key]
+            assert list(array.shape) == record["stored_shape"]
+            assert str(array.dtype) == record["stored_dtype"]
+            assert record["source_dtype"]
+            assert record["token_range"] in ([0, 4], [4, 5], [0, 5])
+            assert record["tolerance_policy"]
+            assert record["array_sha256"] == rf.digest_bytes(array.tobytes())
+
+
+def test_qwen_fixture_generation_exposes_deterministic_owner():
+    generator = getattr(rf, "generate_qwen_fixtures", None)
+    assert callable(generator), (
+        "native_r9700.ref_fixtures must expose generate_qwen_fixtures "
+        "for the --generate-qwen owner"
+    )
+    schema = _load_qwen_fixture_schema()
+    assert isinstance(schema["determinism_digest"], str)
+    assert len(schema["determinism_digest"]) == 64
+    assert all(character in "0123456789abcdef" for character in schema["determinism_digest"])
+    assert schema["determinism_inputs"] == [
+        "model_fingerprint",
+        "inventory_sha256",
+        "oracle_runtime",
+        "source_revisions",
+        "shards",
+        "fixture_file_sha256",
+    ]
+    canonical = {
+        "model_fingerprint": schema["model_fingerprint"],
+        "inventory_sha256": schema["inventory_sha256"],
+        "oracle_runtime": schema["oracle_runtime"],
+        "source_revisions": _QWEN_SOURCE_REVISIONS,
+        "shards": schema["shards"],
+        "fixture_file_sha256": {
+            name: schema["files"][name]["sha256"]
+            for name in sorted(_QWEN_ARTIFACT_NAMES)
+        },
+    }
+    assert schema["determinism_digest"] == rf.digest_bytes(
+        json.dumps(
+            canonical,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    )
+
+
+# ---------------------------------------------------------------------------
+# Q1 executed mlx-lm/MLX oracle-runtime pin (runtime-pin RED contract).
+# ---------------------------------------------------------------------------
+_QWEN_ORACLE_RUNTIME_SOURCE_SHA256 = {
+    "mlx_lm/generate.py": (
+        "e22f38100034660c8b909ac45dab0617f67ac7c723d28e7b374ff0dd98bf1d0d"
+    ),
+    "mlx_lm/models/cache.py": (
+        "440709018cc528ee1e4e42e61ff8713ed2e0079566d9e8fa58eed3a92d334404"
+    ),
+    "mlx_lm/models/gated_delta.py": (
+        "e5d1ddffca8fbff7170639cd3774078683148ab6bc6b4375c3bd768cea9ece76"
+    ),
+    "mlx_lm/models/qwen3_5.py": (
+        "14c4898a03567998e825cb1817942001871e979b9e0cefd3b4383cbbb61eddf3"
+    ),
+    "mlx_lm/utils.py": (
+        "32d5e44a7f213529d7c72e682429bbc3b783f5853943bf5682635567cccaa7fc"
+    ),
+}
+_QWEN_ORACLE_RUNTIME_RECORD = {
+    "kind": "qwen_oracle_runtime",
+    "loader": "mlx_lm.utils.load",
+    "model_module": "mlx_lm.models.qwen3_5",
+    "mlx_lm": {
+        "revision": _QWEN_SOURCE_REVISIONS["mlx_lm"],
+        "version": "0.32.0",
+        "source_sha256": _QWEN_ORACLE_RUNTIME_SOURCE_SHA256,
+    },
+    "mlx": {"version": "0.32.1"},
+    "mlx_vlm": {
+        "revision": _QWEN_SOURCE_REVISIONS["mlx_vlm"],
+        "role": "reference_only",
+    },
+}
+
+
+def _write_tiny_qwen_oracle_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    mlx_lm_version: str = "0.32.0",
+    mlx_version: str = "0.32.1",
+    missing_source: str | None = None,
+    changed_source: str | None = None,
+) -> Path:
+    """Build a package tree without installing mlx-lm/MLX.
+
+    The source files intentionally contain tiny synthetic bytes.  The narrow
+    source-I/O seam is patched to return the frozen digests for unchanged
+    paths, while a changed path returns its actual tiny-file digest.  This
+    keeps the verifier tests local while retaining the exact production pin.
+    """
+    runtime_root = tmp_path / "qwen-oracle-runtime"
+    runtime_root.mkdir()
+    (runtime_root / "mlx_lm" / "models").mkdir(parents=True)
+    (runtime_root / "mlx").mkdir()
+
+    (runtime_root / "mlx_lm" / "__init__.py").write_text(
+        f'__version__ = "{mlx_lm_version}"\n',
+        encoding="utf-8",
+    )
+    (runtime_root / "mlx" / "__init__.py").write_text(
+        f'__version__ = "{mlx_version}"\n',
+        encoding="utf-8",
+    )
+    (runtime_root / "mlx_lm" / "models" / "__init__.py").write_text(
+        "",
+        encoding="utf-8",
+    )
+    for relative in _QWEN_ORACLE_RUNTIME_SOURCE_SHA256:
+        if relative == missing_source:
+            continue
+        path = runtime_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"# tiny qwen oracle runtime source\n" + relative.encode("ascii"))
+    if changed_source is not None:
+        changed_path = runtime_root / changed_source
+        changed_path.write_bytes(changed_path.read_bytes() + b"\x00")
+
+    (runtime_root / "mlx_lm-0.32.0.dist-info").mkdir()
+    (runtime_root / "mlx_lm-0.32.0.dist-info" / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: mlx-lm\n"
+        f"Version: {mlx_lm_version}\n",
+        encoding="utf-8",
+    )
+    (runtime_root / "mlx_lm-0.32.0.dist-info" / "direct_url.json").write_text(
+        json.dumps(
+            {
+                "url": "https://github.com/ml-explore/mlx-lm.git",
+                "vcs_info": {
+                    "vcs": "git",
+                    "commit_id": _QWEN_SOURCE_REVISIONS["mlx_lm"],
+                },
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    (runtime_root / "mlx-0.32.1.dist-info").mkdir()
+    (runtime_root / "mlx-0.32.1.dist-info" / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: mlx\n"
+        f"Version: {mlx_version}\n",
+        encoding="utf-8",
+    )
+
+    def tiny_source_hash(path: str | Path) -> str:
+        source_path = Path(path)
+        relative = source_path.relative_to(runtime_root).as_posix()
+        if relative == changed_source:
+            return rf.digest_bytes(source_path.read_bytes())
+        return _QWEN_ORACLE_RUNTIME_SOURCE_SHA256[relative]
+
+    monkeypatch.setattr(
+        rf,
+        "_qwen_hash_runtime_source",
+        tiny_source_hash,
+        raising=False,
+    )
+    return runtime_root
+
+
+def test_validate_qwen_oracle_runtime_accepts_exact_versions_and_all_source_digests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert rf.QWEN_ORACLE_RUNTIME_SOURCE_SHA256 == _QWEN_ORACLE_RUNTIME_SOURCE_SHA256
+    runtime_root = _write_tiny_qwen_oracle_runtime(tmp_path, monkeypatch)
+
+    record = rf.validate_qwen_oracle_runtime(runtime_root)
+
+    assert record == _QWEN_ORACLE_RUNTIME_RECORD
+    assert sorted(record["mlx_lm"]["source_sha256"]) == sorted(
+        _QWEN_ORACLE_RUNTIME_SOURCE_SHA256
+    )
+
+
+@pytest.mark.parametrize(
+    ("package", "version"),
+    (
+        ("mlx-lm", "0.32.1"),
+        ("mlx", "0.32.0"),
+    ),
+)
+def test_validate_qwen_oracle_runtime_rejects_wrong_package_versions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    package: str,
+    version: str,
+) -> None:
+    kwargs = {"mlx_lm_version": version} if package == "mlx-lm" else {"mlx_version": version}
+    runtime_root = _write_tiny_qwen_oracle_runtime(tmp_path, monkeypatch, **kwargs)
+
+    with pytest.raises(ValueError, match="version"):
+        rf.validate_qwen_oracle_runtime(runtime_root)
+
+
+def test_validate_qwen_oracle_runtime_rejects_missing_source_module(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime_root = _write_tiny_qwen_oracle_runtime(
+        tmp_path,
+        monkeypatch,
+        missing_source="mlx_lm/models/gated_delta.py",
+    )
+
+    with pytest.raises(ValueError, match="missing"):
+        rf.validate_qwen_oracle_runtime(runtime_root)
+
+
+def test_validate_qwen_oracle_runtime_rejects_one_changed_source_byte(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime_root = _write_tiny_qwen_oracle_runtime(
+        tmp_path,
+        monkeypatch,
+        changed_source="mlx_lm/models/cache.py",
+    )
+
+    with pytest.raises(ValueError, match="digest"):
+        rf.validate_qwen_oracle_runtime(runtime_root)
+
+
+def test_generate_qwen_fixtures_verifies_runtime_before_model_oracle_reads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_dir, inventory = _tiny_qwen_generation_inputs(tmp_path, monkeypatch)
+    runtime_root = _write_tiny_qwen_oracle_runtime(
+        tmp_path,
+        monkeypatch,
+        mlx_lm_version="0.32.1",
+    )
+    calls: list[str] = []
+    original_hash_file = rf._qwen_hash_file
+
+    def unexpected_model_hash(path: Path, description: str) -> str:
+        if Path(path).is_relative_to(model_dir):
+            calls.append(f"model-hash:{description}")
+            raise AssertionError("runtime mismatch must precede model shard hashing")
+        return original_hash_file(path, description)
+
+    def unexpected_affine_reader(*_args: object, **_kwargs: object) -> object:
+        calls.append("affine-windows")
+        raise AssertionError("runtime mismatch must precede affine windows")
+
+    def unexpected_mlx_loader(*_args: object, **_kwargs: object) -> object:
+        calls.append("load-mlx")
+        raise AssertionError("runtime mismatch must precede _load_mlx")
+
+    monkeypatch.setattr(
+        rf,
+        "validate_qwen_tensor_inventory",
+        lambda value: dict(value),
+    )
+    monkeypatch.setattr(rf, "_qwen_hash_file", unexpected_model_hash)
+    monkeypatch.setattr(rf, "_qwen_affine_windows", unexpected_affine_reader)
+    monkeypatch.setattr(rf, "_load_mlx", unexpected_mlx_loader)
+
+    with pytest.raises(ValueError, match="runtime|version"):
+        rf.generate_qwen_fixtures(
+            model_dir,
+            tmp_path / "fixtures",
+            inventory=inventory,
+            runtime_root=runtime_root,
+        )
+    assert calls == []
+
+def test_qwen_generation_report_binds_exact_oracle_runtime() -> None:
+    report_path = Path(_REPO_ROOT) / "logs" / "q1-qwen-oracle-fixtures.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["oracle_runtime"] == _QWEN_ORACLE_RUNTIME_RECORD
+
+

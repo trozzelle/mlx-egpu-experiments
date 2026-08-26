@@ -164,7 +164,11 @@ def capture_qwen_hybrid_state(
             raise QwenStateSpillError(
                 f"Qwen layer {layer_index} must be {class_name}, got {type(layer).__name__}"
             )
-        raw_leaves = getattr(layer, "state", None)
+        raw_leaves = (
+            getattr(layer, "cache", None)
+            if class_name == "ArraysCache"
+            else getattr(layer, "state", None)
+        )
         if (
             not isinstance(raw_leaves, Sequence)
             or isinstance(raw_leaves, (str, bytes, bytearray))
