@@ -19,6 +19,7 @@ def compile_layout_probe(tmp_path: Path) -> Path:
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <string>
 #include <utility>
 #include <type_traits>
@@ -31,10 +32,19 @@ constexpr uint64_t kKiB = 1ULL << 10;
 constexpr uint64_t kMiB = 1ULL << 20;
 constexpr uint64_t kPageBytes = 1ULL << 12;
 constexpr uint64_t kDiscoveryBytes = 64ULL * kKiB;
+constexpr uint64_t kOneGiB = 1ULL << 30;
+constexpr uint64_t kPdb2EntryBytes = 1ULL << 39;
 constexpr uint64_t kBootBytes = 32ULL * kMiB;
 constexpr uint64_t kGfx12TailReservationBytes = 64ULL * kMiB;
 constexpr uint32_t kValidMemsizeMiB = 1024;
 constexpr uint64_t kValidVramBytes = kValidMemsizeMiB * kMiB;
+constexpr uint32_t kThirtyTwoGiBMemsizeMiB = 32768;
+constexpr uint64_t kThirtyTwoGiBVramBytes =
+    static_cast<uint64_t>(kThirtyTwoGiBMemsizeMiB) * kMiB;
+constexpr uint64_t kVerifiedModelResidentBytes = 4ULL << 30;
+constexpr uint32_t kPdb2EscapeMemsizeMiB = (1U << 19) + 97U;
+constexpr uint64_t kPdb2EscapeVramBytes =
+    static_cast<uint64_t>(kPdb2EscapeMemsizeMiB) * kMiB;
 constexpr uint32_t kObservedSmallMemsizeMiB = 32624;
 constexpr uint64_t kC0RootAndScratchReservedBase = 0x00000000ULL;
 constexpr uint64_t kC0RootAndScratchReservedBytes = 0x00003000ULL;
@@ -52,6 +62,9 @@ constexpr uint64_t kResidentGpuVaLimit = 0x200000200000ULL;
 constexpr uint64_t kC0Pdb1GpuVaBase = 0x200000000000ULL;
 constexpr uint64_t kC0Pdb1GpuVaBytes = 1ULL << 30;
 constexpr uint64_t kC0Pdb1GpuVaLimit = kC0Pdb1GpuVaBase + kC0Pdb1GpuVaBytes;
+constexpr uint64_t kCurrentPdb2Base =
+    kResidentGpuVaBase & ~(kPdb2EntryBytes - 1);
+constexpr uint64_t kCurrentPdb2End = kCurrentPdb2Base + kPdb2EntryBytes;
 
 
 bool require(bool condition, const char* message) {
@@ -191,16 +204,70 @@ bool resident_gpu_va_window() {
   std::string error_text;
   if (!require(native_r9700::derive_vram_layout(kValidMemsizeMiB, kValidVramBytes, &layout,
                                                 &error_text),
-               "layout with resident VA window must derive")) {
+               "large-BAR layout with resident VA window must derive")) {
     return false;
   }
 
-  return require(layout.resident_gpu_va_base == kResidentGpuVaBase,
-                 "resident mappings must start after C0's active PTB entries") &&
-         require(layout.resident_gpu_va_limit == kResidentGpuVaLimit,
-                 "resident mappings must stop at the one-PTB C0 mapping limit") &&
-         require(layout.resident_gpu_va_base < layout.resident_gpu_va_limit,
-                 "resident GPU VA window must be a non-empty half-open interval");
+  const uint64_t expected_limit = kResidentGpuVaBase + layout.allocatable_bytes;
+  return require(layout.large_bar,
+                 "a BAR covering all discovered VRAM must select the large-BAR layout") &&
+         require(layout.resident_gpu_va_base == kResidentGpuVaBase,
+                 "large-BAR resident mappings must start after C0's active PTB entries") &&
+         require(layout.resident_gpu_va_limit == expected_limit,
+                 "large-BAR resident mappings must span the complete allocator interval") &&
+         require(layout.resident_gpu_va_limit > kResidentGpuVaLimit,
+                 "large-BAR resident mappings must exceed the old single-PTB limit") &&
+         require(layout.resident_gpu_va_base % kPageBytes == 0 &&
+                     layout.resident_gpu_va_limit % kPageBytes == 0,
+                 "large-BAR resident GPU VA window must be page aligned") &&
+         require(layout.resident_gpu_va_limit <= kCurrentPdb2End,
+                 "large-BAR resident GPU VA window must remain in its current PDB2 entry");
+}
+
+bool large_bar_32_gib_resident_gpu_va_window() {
+  native_r9700::VramLayout layout{};
+  std::string error_text;
+  if (!require(native_r9700::derive_vram_layout(kThirtyTwoGiBMemsizeMiB,
+                                                kThirtyTwoGiBVramBytes, &layout, &error_text),
+               "32 GiB large-BAR layout must derive")) {
+    return false;
+  }
+
+  const uint64_t expected_allocatable_bytes =
+      kThirtyTwoGiBVramBytes - kGfx12TailReservationBytes - kBootBytes;
+  if (!require(layout.resident_gpu_va_base < layout.resident_gpu_va_limit,
+               "32 GiB resident GPU VA window must be non-empty")) {
+    return false;
+  }
+  const uint64_t resident_bytes =
+      layout.resident_gpu_va_limit - layout.resident_gpu_va_base;
+  return require(layout.large_bar,
+                 "32 GiB BAR coverage must select the large-BAR layout") &&
+         require(layout.allocatable_base == kBootBytes,
+                 "32 GiB large-BAR allocation must begin after the boot reservation") &&
+         require(layout.allocatable_bytes == expected_allocatable_bytes,
+                 "32 GiB large-BAR allocation must exclude boot and gfx12 tail reservations") &&
+         require(layout.resident_gpu_va_limit ==
+                     layout.resident_gpu_va_base + layout.allocatable_bytes,
+                 "32 GiB resident window must cover all allocator-visible bytes") &&
+         require(resident_bytes > kVerifiedModelResidentBytes,
+                 "32 GiB resident window must exceed the verified model resident bytes") &&
+         require(resident_bytes > kOneGiB,
+                 "32 GiB resident window must exceed one GiB") &&
+         require(layout.resident_gpu_va_limit % kPageBytes == 0,
+                 "32 GiB resident GPU VA limit must be page aligned") &&
+         require(layout.resident_gpu_va_limit <= kCurrentPdb2End,
+                 "32 GiB resident GPU VA window must remain in its current PDB2 entry");
+}
+
+bool rejects_large_bar_pdb2_escape() {
+  if (!require(rejects(kPdb2EscapeMemsizeMiB, kPdb2EscapeVramBytes),
+               "a large-BAR interval escaping the current PDB2 entry must reject")) {
+    return false;
+  }
+  return require(rejects(std::numeric_limits<uint32_t>::max(),
+                         std::numeric_limits<uint64_t>::max()),
+                 "maximum decoded VRAM must reject instead of escaping the current PDB2 entry");
 }
 
 bool small_aperture_resident_gpu_va_window() {
@@ -238,6 +305,12 @@ int main(int argc, char** argv) {
   if (mode == "valid") return valid_layout() ? 0 : 2;
   if (mode == "c0-reserved-physical-ranges") return c0_reserved_physical_ranges() ? 0 : 6;
   if (mode == "resident-gpu-va-window") return resident_gpu_va_window() ? 0 : 7;
+  if (mode == "large-bar-32-gib-resident-gpu-va-window") {
+    return large_bar_32_gib_resident_gpu_va_window() ? 0 : 11;
+  }
+  if (mode == "large-bar-pdb2-escape") {
+    return rejects_large_bar_pdb2_escape() ? 0 : 12;
+  }
   if (mode == "small-aperture-resident-gpu-va-window") {
     return small_aperture_resident_gpu_va_window() ? 0 : 10;
   }
@@ -329,10 +402,20 @@ def test_vram_layout_rejects_invalid_small_bar0_aperture_boundaries(tmp_path: Pa
 
 
 
-def test_vram_layout_exposes_the_single_ptb_resident_gpu_va_window(tmp_path: Path) -> None:
-    """Catches resident mappings escaping the C0 PTB window before dynamic PTE ownership exists."""
+def test_vram_layout_maps_the_full_large_bar_allocator_window(tmp_path: Path) -> None:
+    """A large BAR must map every allocator-visible byte beyond the old ~2 MiB limit."""
     run_layout_probe(tmp_path, "resident-gpu-va-window")
 
+def test_vram_layout_exposes_32_gib_large_bar_capacity(tmp_path: Path) -> None:
+    """A 32 GiB R9700 layout must exceed the verified model and one-GiB resident spans."""
+    run_layout_probe(tmp_path, "large-bar-32-gib-resident-gpu-va-window")
+
+
+def test_vram_layout_rejects_large_bar_pdb2_escape_and_capacity_overflow(
+    tmp_path: Path,
+) -> None:
+    """Large-BAR limits must fail closed before escaping or wrapping the current PDB2 entry."""
+    run_layout_probe(tmp_path, "large-bar-pdb2-escape")
 
 def test_vram_layout_maps_the_full_small_bar_payload_in_c0s_pdb1_subtree(
     tmp_path: Path,

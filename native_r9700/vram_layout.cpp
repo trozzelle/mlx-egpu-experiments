@@ -29,6 +29,7 @@ constexpr uint64_t kResidentGpuVaBase = 0x0000200000011000ULL;
 constexpr uint64_t kResidentGpuVaLimit = 0x0000200000200000ULL;
 constexpr uint64_t kC0Pdb1GpuVaBase = 0x0000200000000000ULL;
 constexpr uint64_t kC0Pdb1GpuVaLimit = 0x0000200040000000ULL;
+constexpr uint64_t kPdb2EntryBytes = 1ULL << 39;
 
 
 bool fail(std::string* error_text, const char* text) {
@@ -62,6 +63,27 @@ bool derive_vram_layout(uint32_t rcc_config_memsize, uint64_t bar0_bytes,
   uint64_t allocatable_base = kBootReservedBytes;
   uint64_t allocatable_bytes = allocator_vram_bytes - kBootReservedBytes;
   uint64_t resident_gpu_va_limit = kResidentGpuVaLimit;
+  if (large_bar) {
+    const uint64_t current_pdb2_base =
+        kResidentGpuVaBase & ~(kPdb2EntryBytes - 1);
+    if (current_pdb2_base >
+        std::numeric_limits<uint64_t>::max() - kPdb2EntryBytes) {
+      return fail(error_text, "large BAR current PDB2 end overflows");
+    }
+    const uint64_t current_pdb2_end = current_pdb2_base + kPdb2EntryBytes;
+    if (allocatable_bytes >
+        std::numeric_limits<uint64_t>::max() - kResidentGpuVaBase) {
+      return fail(error_text, "large BAR resident GPU VA limit overflows");
+    }
+    resident_gpu_va_limit = kResidentGpuVaBase + allocatable_bytes;
+    if (resident_gpu_va_limit > current_pdb2_end) {
+      return fail(error_text, "large BAR resident GPU VA window escapes current PDB2 entry");
+    }
+    if (kResidentGpuVaBase % kPageBytes != 0 ||
+        resident_gpu_va_limit % kPageBytes != 0) {
+      return fail(error_text, "large BAR resident GPU VA window must be page aligned");
+    }
+  }
 
   if (!large_bar) {
     if (bar0_bytes == 0 || bar0_bytes % kPageBytes != 0) {
