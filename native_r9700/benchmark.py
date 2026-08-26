@@ -402,6 +402,10 @@ def write_benchmark_log(path: str | Path, result: Mapping[str, Any]) -> None:
         ("status", result.get("status")),
         ("exit_status", result.get("exit_status")),
         ("error", result.get("error")),
+        ("raw_warm_sample_count", result.get("raw_warm_sample_count")),
+        ("scope_aggregate_count", result.get("scope_aggregate_count")),
+        ("records_by_scope", result.get("records_by_scope")),
+        ("total_record_count", result.get("total_record_count")),
     ]
     rows = result.get("rows") if isinstance(result.get("rows"), list) else []
     for row in rows:
@@ -410,6 +414,10 @@ def write_benchmark_log(path: str | Path, result: Mapping[str, Any]) -> None:
         lines.extend(
             [
                 ("prompt_name", row.get("prompt_name")),
+                ("request_id", row.get("request_id")),
+                ("record_kind", row.get("record_kind")),
+                ("scope", row.get("scope")),
+                ("aggregate_identity", row.get("aggregate_identity")),
                 ("row_role", row.get("row_role")),
                 ("producer_kind", row.get("producer_kind")),
                 ("gate_result", row.get("gate_result")),

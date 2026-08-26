@@ -264,6 +264,19 @@ def test_persistent_worker_evidence_expands_rows_and_separates_scope_aggregates(
         f"worker-warm-prefill-{index}" for index in range(1, 11)
     ]
     assert warm["tokens_per_sec_prefill"] == pytest.approx(128 / 5.5)
+    scoped_log_path = tmp_path / "scoped-benchmark.log"
+    benchmark.write_benchmark_log(scoped_log_path, result)
+    scoped_log = scoped_log_path.read_text(encoding="utf-8")
+    assert (
+        'records_by_scope: {"cold_process": 1, "gpu_compute": 1, "warm_prefill": 11}'
+        in scoped_log
+    )
+    assert scoped_log.count("record_kind: raw_sample") == 10
+    assert scoped_log.count("record_kind: scope_aggregate") == 3
+    assert "scope: cold_process" in scoped_log
+    assert "scope: warm_prefill" in scoped_log
+    assert "scope: gpu_compute" in scoped_log
+    assert "aggregate_identity: warm_prefill_median_mad_v1" in scoped_log
 
     for invalid_update in (
         {"status": "error", "exit_status": 2},

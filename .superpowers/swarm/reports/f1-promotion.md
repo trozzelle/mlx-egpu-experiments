@@ -29,7 +29,7 @@ Evidence root: `logs/f1-persistent-worker/`
 - `scope_aggregate_count=3`
 - `records_by_scope={\"cold_process\":1,\"warm_prefill\":11,\"gpu_compute\":1}`
 - `total_record_count=13`
-- Every aggregate record retains the complete `native_r9700_benchmark_v1` timing, transfer, correctness, route/cache, hardware-log, and `row_role=native_benchmark` fields.
+- Every aggregate record retains the complete `native_r9700_benchmark_v1` timing, transfer, correctness, route/cache, hardware-log, and `row_role=native_benchmark` fields; JSON, Markdown report, and key-value log preserve the 10 raw + 3 aggregate scope identities and exact `records_by_scope`.
 
 ## Scope separation
 
@@ -45,6 +45,7 @@ Evidence root: `logs/f1-persistent-worker/`
 
 - Complete F1 protocol/resource/service/serving/benchmark acceptance suite: 288 passed.
 - F1 task-set-5 promotion contract: 190 passed, with two dependency deprecation warnings.
+- Scoped benchmark JSON/report/log regression suite: 11 passed.
 - Multi-PDB1/process acceptance gate: 125 passed.
 - Real process smoke: exit 0.
 - Real ten-sample warm command: exit 0.

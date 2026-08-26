@@ -820,7 +820,6 @@ def test_inventory_rejects_forged_canonical_identity_before_sidecar_parsing(
         digest = hashlib.sha256(shard_path.read_bytes()).hexdigest()
         shard["sha256"] = digest
         shard["expected_sha256"] = digest
-    report["model_fingerprint"] = _source_pin_expected_output(model_dir)["model_fingerprint"]
     source_pin_path.write_text(
         json.dumps(report, separators=(",", ":")), encoding="utf-8"
     )
@@ -839,7 +838,9 @@ def test_inventory_rejects_forged_canonical_identity_before_sidecar_parsing(
         return real_read_json_object(path, error_type)
 
     monkeypatch.setattr(module, "_read_json_object", track_sidecar_parse)
-    with pytest.raises(QwenTextIndexError):
+    with pytest.raises(
+        QwenTextIndexError, match="forged canonical model fingerprint"
+    ):
         inventory_api(model_dir, source_pin_report=source_pin_path)
     assert parsed_sidecars == []
 
