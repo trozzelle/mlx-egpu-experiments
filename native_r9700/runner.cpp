@@ -1050,8 +1050,13 @@ class RunnerNativeResourceBackend final : public native_r9700::NativeResourceBac
       return false;
     }
     if (!execution_->prepare_resident(&detail)) {
+      const std::string sized_detail =
+          detail + " (planned_resident_bytes=" +
+          std::to_string(planned_resident_bytes) +
+          ", planned_scratch_bytes=" + std::to_string(planned_scratch_bytes) +
+          ", planned_total_bytes=" + std::to_string(planned_total_bytes) + ")";
       execution_.reset();
-      set_error(error, "resource_exhaustion", detail, "prepare_resident");
+      set_error(error, "resource_exhaustion", sized_detail, "prepare_resident");
       return false;
     }
 

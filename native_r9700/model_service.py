@@ -1465,6 +1465,27 @@ class ModelRegistry:
             reject("installed prompt cache is missing or unreadable", exc)
         if cache_length <= 0:
             reject("installed prompt cache is empty")
+        kv_cache_log_path = Path(paths["kv_cache_log_path"])
+        try:
+            kv_cache_log_path.write_text(
+                "\n".join(
+                    (
+                        f"request_id: {request_id}",
+                        "producer_kind: r9700_native",
+                        f"producer_fingerprint: {fingerprint}",
+                        f"model_digest: {self._model_digest}",
+                        f"n_prefix: {prefix}",
+                        f"prompt_cache_path: {prompt_cache_path}",
+                        "cache_validation: pass",
+                        "exit_status: 0",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            prompt_cache_path.unlink(missing_ok=True)
+            reject("native prompt cache log could not be written", exc)
 
         return {
             "prompt_cache_path": paths["prompt_cache_path"],

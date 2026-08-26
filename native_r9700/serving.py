@@ -376,10 +376,10 @@ def _native_prefill_evidence_problems(
             problems.append("compute_completion_policy=terminal")
         if evidence.get("compute_barrier_policy") != _NATIVE_BARRIER_POLICY:
             problems.append("compute_barrier_policy=full")
-        if evidence.get("failure_stage") != "":
-            problems.append("failure_stage=empty")
-        if evidence.get("failure_text") != "":
-            problems.append("failure_text=empty")
+        if evidence.get("failure_stage") != "none":
+            problems.append("failure_stage=none")
+        if evidence.get("failure_text") != "none":
+            problems.append("failure_text=none")
 
         for key in ("kernel_count", "transfer_bytes", "block_tokens", "block_count", "exit_status"):
             value = evidence.get(key)

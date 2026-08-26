@@ -1628,9 +1628,9 @@ class _LiveServiceDispatcher:
                 "transfer_bytes": 4096,
                 "block_tokens": n_prefix,
                 "block_count": 1,
-                "failure_stage": "",
+                "failure_stage": "none",
                 "exit_status": 0,
-                "failure_text": "",
+                "failure_text": "none",
             }
             evidence.update(self.evidence_override)
             return self._response(
@@ -2790,8 +2790,8 @@ def test_persistent_prefill_accepts_declared_zero_prefix_without_positive_work_c
     assert evidence["compute_barrier_policy"] == "full"
     assert evidence["block_tokens"] == 0
     assert evidence["block_count"] == 0
-    assert evidence["failure_stage"] == ""
-    assert evidence["failure_text"] == ""
+    assert evidence["failure_stage"] == "none"
+    assert evidence["failure_text"] == "none"
     assert generated and generated[0][0] == [777]
     assert generated[0][1] is not None
     assert [call["operation"] for call in service.calls] == [

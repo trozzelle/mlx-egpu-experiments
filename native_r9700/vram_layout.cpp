@@ -25,10 +25,11 @@ constexpr std::array<VramPhysicalRange, 3> kC0ReservedPhysicalRanges = {{
     kC0PageTablesAndMqdReservedRange,
     kC0FixedApertureReservedRange,
 }};
-constexpr uint64_t kResidentGpuVaBase = 0x0000200000011000ULL;
-constexpr uint64_t kResidentGpuVaLimit = 0x0000200000200000ULL;
-constexpr uint64_t kC0Pdb1GpuVaBase = 0x0000200000000000ULL;
-constexpr uint64_t kC0Pdb1GpuVaLimit = 0x0000200040000000ULL;
+// The final PDB0 slot in C0's first PDB1 entry is the fixed SDMA sysmem
+// staging mapping. Resident mappings begin at the next PDB1 entry so they
+// can never replace that parent PTE.
+constexpr uint64_t kResidentGpuVaBase = 0x0000200040000000ULL;
+constexpr uint64_t kResidentGpuVaLimit = 0x0000200040200000ULL;
 constexpr uint64_t kPdb2EntryBytes = 1ULL << 39;
 
 
@@ -114,7 +115,12 @@ bool derive_vram_layout(uint32_t rcc_config_memsize, uint64_t bar0_bytes,
     page_table_pool_base = kC0PageTablePoolBase;
     page_table_pool_bytes = pte_arena_end - page_table_pool_base;
     allocatable_base = kC0PayloadBase;
-    allocatable_bytes = bar0_bytes - allocatable_base;
+    if (allocator_vram_bytes <= allocatable_base) {
+      return fail(error_text, "small BAR0 layout has no resident VRAM payload");
+    }
+    // Only the page-table pool must remain BAR-visible. Resident payloads are
+    // uploaded/read back through SDMA and may occupy the full VRAM interval.
+    allocatable_bytes = allocator_vram_bytes - allocatable_base;
 
     if (allocatable_bytes > std::numeric_limits<uint64_t>::max() - kResidentGpuVaBase) {
       return fail(error_text, "small BAR0 resident GPU VA limit overflows");
@@ -124,9 +130,12 @@ bool derive_vram_layout(uint32_t rcc_config_memsize, uint64_t bar0_bytes,
         resident_gpu_va_limit % kPageBytes != 0) {
       return fail(error_text, "small BAR0 resident GPU VA window must be page aligned");
     }
-    if (kResidentGpuVaBase < kC0Pdb1GpuVaBase ||
-        resident_gpu_va_limit > kC0Pdb1GpuVaLimit) {
-      return fail(error_text, "small BAR0 resident GPU VA window escapes C0 PDB1");
+    const uint64_t current_pdb2_base =
+        kResidentGpuVaBase & ~(kPdb2EntryBytes - 1);
+    if (current_pdb2_base >
+            std::numeric_limits<uint64_t>::max() - kPdb2EntryBytes ||
+        resident_gpu_va_limit > current_pdb2_base + kPdb2EntryBytes) {
+      return fail(error_text, "small BAR0 resident GPU VA window escapes current PDB2");
     }
   }
 

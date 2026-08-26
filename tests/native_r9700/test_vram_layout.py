@@ -56,9 +56,11 @@ constexpr uint64_t kObservedSmallBar0Bytes = 0x10000000ULL;
 constexpr uint64_t kObservedSmallPageTablePoolBase = 0x02004000ULL;
 constexpr uint64_t kObservedSmallPageTablePoolBytes = 0x03FFC000ULL;
 constexpr uint64_t kObservedSmallPayloadBase = 0x06010000ULL;
-constexpr uint64_t kObservedSmallPayloadBytes = 0x09FF0000ULL;
-constexpr uint64_t kResidentGpuVaBase = 0x200000011000ULL;
-constexpr uint64_t kResidentGpuVaLimit = 0x200000200000ULL;
+constexpr uint64_t kObservedSmallPayloadBytes =
+    static_cast<uint64_t>(kObservedSmallMemsizeMiB) * kMiB -
+    kGfx12TailReservationBytes - kObservedSmallPayloadBase;
+constexpr uint64_t kResidentGpuVaBase = 0x200040000000ULL;
+constexpr uint64_t kResidentGpuVaLimit = 0x200040200000ULL;
 constexpr uint64_t kC0Pdb1GpuVaBase = 0x200000000000ULL;
 constexpr uint64_t kC0Pdb1GpuVaBytes = 1ULL << 30;
 constexpr uint64_t kC0Pdb1GpuVaLimit = kC0Pdb1GpuVaBase + kC0Pdb1GpuVaBytes;
@@ -176,9 +178,11 @@ bool small_aperture_layout_impl() {
            require(layout.allocatable_base == kObservedSmallPayloadBase,
                    "small-BAR payload must begin after the fixed C0 aperture") &&
            require(layout.allocatable_bytes == kObservedSmallPayloadBytes,
-                   "small-BAR payload must occupy [0x06010000, 0x10000000)") &&
-           require(payload_end == kObservedSmallBar0Bytes,
-                   "small-BAR payload must end at the BAR0 aperture boundary") &&
+                   "small-BAR payload must span VRAM beyond the BAR-visible table pool") &&
+           require(payload_end ==
+                       static_cast<uint64_t>(kObservedSmallMemsizeMiB) * kMiB -
+                           kGfx12TailReservationBytes,
+                   "small-BAR payload must end before the reserved VRAM tail") &&
            require(layout.page_table_pool_base % kPageBytes == 0 &&
                        layout.page_table_pool_bytes % kPageBytes == 0 &&
                        layout.allocatable_base % kPageBytes == 0 &&
@@ -291,9 +295,8 @@ bool small_aperture_resident_gpu_va_window() {
          require(layout.resident_gpu_va_base % kPageBytes == 0 &&
                      layout.resident_gpu_va_limit % kPageBytes == 0,
                  "small-BAR resident GPU VA window must be page aligned") &&
-         require(layout.resident_gpu_va_base >= kC0Pdb1GpuVaBase &&
-                     layout.resident_gpu_va_limit <= kC0Pdb1GpuVaLimit,
-                 "small-BAR resident GPU VA window must remain in C0's PDB1 subtree");
+         require(layout.resident_gpu_va_limit <= kCurrentPdb2End,
+                 "small-BAR resident GPU VA window must remain in C0's PDB2 subtree");
 }
 
 

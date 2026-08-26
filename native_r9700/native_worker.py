@@ -26,6 +26,7 @@ _DEFAULT_RUNNER_ENV = "NATIVE_R9700_PREFILL_RUNNER"
 _BLOCK_TOKENS_ENV = "NATIVE_R9700_PREFILL_BLOCK_TOKENS"
 _ALLOWED_BLOCK_TOKENS = frozenset({"1", "2", "4", "8", "16", "32"})
 _DEFAULT_LLAMA_PREFILL_BLOCK_TOKENS = 4
+_PERSISTENT_LLAMA_PREFILL_BLOCK_TOKENS = 32
 _EXPECTED_RUNTIME_SUBSTRATE = "TinyGPU.app/APLRemotePCIDevice/PCIIface"
 _SELECTED_COMPLETION_POLICY = "terminal"
 _SELECTED_BARRIER_POLICY = "full"
@@ -1385,8 +1386,8 @@ def _validate_worker_serving_sample(
     if exit_status != 0:
         raise ValueError("accepted serving generation has nonzero exit_status")
     for field in ("failure_stage", "failure_text"):
-        if sample.get(field) != "":
-            raise ValueError(f"accepted serving generation has {field}")
+        if sample.get(field) != "none":
+            raise ValueError(f"accepted serving generation has non-none {field}")
     if sample.get("native_prefill_acceptance") != _PASS_ACCEPTANCE:
         raise ValueError("native prefill acceptance is not pass")
     if sample.get("native_prefill_full_layer_loop_status") != _PASS_ACCEPTANCE:
@@ -1399,7 +1400,7 @@ def _validate_worker_serving_sample(
         raise ValueError("native barrier policy is not full")
 
     expected_block_tokens = (
-        0 if expected_n == 0 else _DEFAULT_LLAMA_PREFILL_BLOCK_TOKENS
+        0 if expected_n == 0 else _PERSISTENT_LLAMA_PREFILL_BLOCK_TOKENS
     )
     kernel_count = _worker_exact_int(sample.get("kernel_count"), field="kernel_count")
     transfer_bytes = _worker_exact_int(
