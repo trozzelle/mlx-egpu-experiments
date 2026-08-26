@@ -40,8 +40,8 @@ Admit and execute a reusable gfx1201 wave32 FP16 WMMA linear family with FP32 ac
 | Task set | Status | Owner | Notes |
 |---|---|---|---|
 | 1. Source/ABI/validation freeze | Done | F2Contract | Frozen in `.superpowers/swarm/reports/f2-contract-freeze.md`; final review closed the EvidenceRef matrix, physical-layout gate, pack digest preimage, G0 independence, and command-ledger reconciliation.
-| 2. Independent lane-map hardware proof | In progress | F2LaneRed | RED contract lane dispatched; hardware execution remains supervisor-owned.
-| 3. Offline ISA/resource and physical-layout admission | In progress | F2AdmissionRed | RED contract lane dispatched in parallel with task set 2. Owns `tools/f2-wmma-layout-proof`, the versioned physical-layout spec, inverse fixture, and accepted `offline_review/layout_proof` record; task set 4 cannot start without this proof.
+| 2. Independent lane-map hardware proof | Done | F2LaneRed / Supervisor | Fresh R9700/gfx1201 lane-map hardware and comparator evidence is exact; focused gate: 22 passed. |
+| 3. Offline ISA/resource and physical-layout admission | Blocked | F2AdmissionRed | The offline proof tool and fail-closed contracts pass 34 tests. Real acceptance requires unavailable pinned rocWMMA/AITER checkouts plus a selected linear WMMA image and bound ISA/resource/layout reports. |
 | 4. FP16 WMMA linear source and asset | Blocked | Unassigned | Waits for accepted task sets 2 and 3: lane-map evidence plus ISA/resource and physical-layout admission. |
 | 5. Numerical/tail/performance harness | Blocked | Unassigned | Waits for task-set-4 ABI; may overlap implementation. |
 | 6. Hardware benchmark and G0 publication | Blocked | Unassigned | Waits for task sets 2–5 and review. |
