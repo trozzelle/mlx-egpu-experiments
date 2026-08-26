@@ -41,8 +41,8 @@ Make the existing TinyGPU DriverKit extension the production-safe sole R9700 dev
 |---|---|---|---|
 | 1. ABI, security, entitlement, and command freeze | Done | P1ABI | Frozen in `.superpowers/swarm/reports/p1-abi-freeze.md`; focused security re-review found zero remaining Critical/Important issues. TGPU ABI v1.0, concrete layouts, least-privilege ownership, R9700-only Release scope, proxy quarantine, and exact future CLIs are accepted.
 | 2. Cold lifecycle and firmware adaptation | Blocked | P1ColdLifecycle / P1ColdSafety / P1BoundarySafety | Source/package/common-client boundary is reviewed and compiles with zero Critical/Important findings. Hardware acceptance is blocked because no approved provenance-bound PSP/SOS/TMR firmware/transition input exists; the DEXT therefore fails non-ready at `PspSosTmr` rather than accepting pre-warmed state. Signed install/profile evidence is also pending.
-| 3. Buffer/VA and per-client ownership | In progress | P1BufferOwnership | Bounded per-connection resource-table core and cross-epoch token safety are reviewed; host contracts pass. Actual DriverKit BO/import/VA operations, selector wiring, cleanup integration, and sequential `client-death` CLI extension remain.
-| 4. Queue/executable/fence/fault boundary | Blocked | Unassigned | SDK gate and task-set-2 common-client source gate are clear; waits for complete task-set-3 DriverKit handles before queue/executable/fence/fault work.
+| 3. Buffer/VA and per-client ownership | In progress | P1BufferIntegration | Bounded resource/token/request/owner/transport cores are reviewed. Real type-0 DriverKit OSData transport, host-visible backing allocation/release, ordered close cleanup, and exact `client-death` source command compile. Device-local/import/map/unmap remain fail-closed pending real VRAM, descriptor-sideband, and AMD private-VM PTE paths.
+| 4. Queue/executable/fence/fault boundary | Blocked | Unassigned | SDK and common-client source gates are clear; waits for task-set-3 real import/private-VA mappings before queue bindings can be safe.
 | 5. Reset/recovery/client-death cleanup | Blocked | Unassigned | Waits for tasks 2 and 4; integrates the task-set-3/4 idempotent cleanup hooks and adds the fixed `device-recovery` CLI extension, but does not defer resource cleanup to this task. |
 | 6. Cold end-to-end conformance and G0 consumption | Blocked | Unassigned | Waits for task sets 2–5 and G0. |
 
@@ -55,11 +55,12 @@ Make the existing TinyGPU DriverKit extension the production-safe sole R9700 dev
 
 ### Task sets 2–3 source-foundation evidence
 
-- Xcode 26.6/DriverKit 25.5 unsigned builds pass for `TinyGPUDriver` and `TGPUConformanceClient`; the exact signed build remains blocked on a selected development team/profile.
-- Host contracts pass for ordered cold coordination, MMHUB framebuffer decoding, typed inference-health requests, bounded evidence logging, and per-client resource/token lifetime.
-- The direct preinstall client fails closed with `exit_status=1` and now creates the requested bounded eight-line log; no proxy or fallback route is used.
+- The direct preinstall `cold-lifecycle` and `client-death` commands fail closed with `exit_status=1`, create their requested bounded eight-line logs, and use no proxy/fallback route.
+- Nine host contracts pass under `-Wall -Wextra -Werror`: cold ordering, framebuffer decode, health request, evidence log, resource/token lifetime, buffer request, buffer owner/backing lifetime, fixed transport, and response validation.
+- Xcode 26.6/DriverKit 25.5 unsigned builds pass for `TinyGPUDriver` and `TGPUConformanceClient`. Static analyzer emits two reviewed false-positive placement-new leak warnings; every construction/failure/Stop/free path runs the explicit destructor and `IOFree`. The exact signed build remains blocked on a selected development team/profile.
 - Task-set-3 native control suite: 62 passed.
-- Focused code/architecture and security re-review: PASS with zero Critical/Important findings. The source gate is clear for task-set-3 integration; no hardware promotion is claimed.
+- Focused code/architecture and security review/fix/re-review gates pass with zero remaining Critical/Important findings. One nonblocking role-semantic item remains owned by later integration: recovery currently returns structured `UNSUPPORTED` for inference operations, and diagnostic capabilities are restricted, reducing rather than broadening authority.
+- Task set 3 remains In progress. No hardware success, import, device-local, or GPU-VA claim is made.
 
 ## Task set 1: Freeze TinyGPU user-client ABI, security, and commands
 

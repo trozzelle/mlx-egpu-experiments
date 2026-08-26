@@ -66,4 +66,24 @@
 - Code/architecture re-review: PASS, zero findings.
 - Security re-review: PASS, zero findings.
 - Quality bar: correctness, maintainability, frozen architecture fit, least privilege, and simplicity pass for the current source boundary.
-- Remaining blockers are explicit: task-set-2 cold hardware acceptance lacks approved provenance-bound firmware/transitions and signed install evidence; task-set-3 still lacks actual DriverKit BO/import/VA and sequential client integration.
+- Remaining blockers after Wave P1-A were task-set-2 approved firmware/transitions/signing and task-set-3 real DriverKit buffer integration; Wave P1-B below closes the host-visible allocate/release/client-death slice while preserving the remaining import/private-VA blockers.
+
+## Wave P1-B: buffer ownership integration
+
+### Agents and reports
+
+| Agent | Target | Report | Status |
+|---|---|---|---|
+| P1BufferIntegrationRed / Core | Typed buffer validation and bounded owner/provider lifetime | `p1-buffer-integration-red.md`; `p1-buffer-integration-core.md` | Host core Done |
+| P1BufferDriverKit | OSData transport, real host-visible backing, allocate/release/cleanup, `client-death` | `p1-buffer-driverkit-integration.md` | Partial task-set integration Done |
+| P1DriverKitReviewRed / P1TransportFix | Frozen transport/response/readiness review fixes | `p1-buffer-driverkit-review-red.md`; integration report | Done |
+
+### Supervisor gate
+
+- Nine host binaries compile with `-Wall -Wextra -Werror` and exit 0.
+- Unsigned DriverKit and conformance-client Xcode targets build.
+- Preinstall `client-death` fails closed and writes bounded evidence; no installed/hardware pass is claimed.
+- Task-set-3 native controls: 62 passed.
+- Code/architecture and security review/fix/re-review: zero remaining Critical/Important findings.
+- Nonblocking residual: recovery/diagnostic role behavior is intentionally narrower than the frozen final authority until later task sets; every denial is structured and cannot broaden access.
+- Task set 3 remains In progress: device-local VRAM, descriptor import, and real AMD private-VM PTE map/unmap are absent and remain fail-closed.
