@@ -40,10 +40,10 @@ Deliver a local long-lived R9700 Prefill Service that loads a verified model onc
 | Task set | Status | Owner | Notes |
 |---|---|---|---|
 | 1. Contract and validation-command freeze | Done | F1Contract | Frozen in `.superpowers/swarm/reports/f1-contract-freeze.md`; final review found zero Critical/Important issues and authorized task sets 2–3. Active ledger commands are reconciled.
-| 2. Local protocol, model registry, and private resource client | In progress | F1ProtocolRed | RED contract lane dispatched; owns the bounded public protocol, one-slot registry, active-request accounting, fixed drain/repeat-unload policy, `ResourceSpec` verification/assembly, `native_resource_client.py`, one private child lifetime, and Python-side producer-fingerprint binding.
-| 3. Native runner/resource lifetime and private worker | In progress | F1NativeRed | RED contract lane dispatched independently of task set 2; owns `runner.cpp`, `runtime.*`, existing resource files, `native_resource_worker.*`, `--model-service-worker`, private JSONL dispatch, cleanup semantics, fingerprint computation, every independent runner-linked source closure, and runner source-list updates; never registry/public protocol.
-| 4. Worker/consumer integration | Blocked | Unassigned | Waits for accepted task sets 2–3; owns public worker/serving routing through the client, cache writer/validator, exact fingerprint equality, and private child-process evidence; no one-shot warm runner. |
-| 5. Repeated warm smoke and benchmark promotion | Blocked | Unassigned | Waits for task set 4 and re-review. |
+| 2. Local protocol, model registry, and private resource client | Done | F1Protocol | Final current-source review zero findings; combined task-set-2/3 focused command 107 passed.
+| 3. Native runner/resource lifetime and private worker | Done | F1Native | Persistent all-layer/embedding generation, injected budgets, N=0 cache, actual runner/pack identities, clean JSONL diagnostics, and teardown contracts accepted.
+| 4. Worker/consumer integration | Done | F1Integration | One production registry/session lifecycle, strict request-bound NPZ-to-mlx-lm cache conversion, `1.*` identity metadata, reconstructed cache validation, S=1/N=0, model/evidence binding, exact worker modes, and no native one-shot route. Task-set gate: 313 passed. |
+| 5. Repeated warm smoke and benchmark promotion | Ready | Supervisor | Implementation gate is closed. Exact hardware process smoke, ten raw warm samples, benchmark promotion, and broad evidence review are deferred to the explicit promotion gate. |
 
 Agents update only their row and append evidence/notes as work completes.
 

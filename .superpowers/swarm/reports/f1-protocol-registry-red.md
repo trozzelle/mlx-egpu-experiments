@@ -184,3 +184,25 @@ that no hardcoded 1 GiB budget reaches `Prepare`.
 forces post-Prepare inventory invalidation, a failed first `Rollback`, and a
 successful retry. It requires no public handle, `draining` plus
 `release-failed` Health visibility, and the retry to precede child `Shutdown`.
+
+## JCS decimal formatting RED extension
+
+Added exact-byte checks that `canonical_jcs({"x": 0.1})` emits
+`b'{"x":0.1}'` and `canonical_jcs({"x": 0.001})` emits
+`b'{"x":0.001}'`.
+
+## Final-review residual: Prefill token boundaries
+
+Added direct `ModelRegistry.dispatch` contracts for empty and 130-token
+`Prefill` bodies, requiring `token_bounds`, and for string, boolean, negative,
+and above-`uint32` token values, requiring `token_validation` rather than the
+generic `operation_validation` stage.
+
+## Checkpoint residual: persistent child stderr backpressure
+
+Added `test_persistent_child_stderr_backpressure_cannot_block_private_response`.
+Its fake child writes 1 MiB to stderr before sending the `Health` response;
+the test requires completion despite exceeding a normal pipe buffer. Cleanup
+terminates only the intentionally blocked RED child, while successful
+implementations receive normal `Shutdown`. No commands or verification runs
+were performed.

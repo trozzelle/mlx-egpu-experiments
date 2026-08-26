@@ -20,8 +20,8 @@ import time
 from collections.abc import Mapping
 from typing import Any, Callable
 
+from . import kv_cache as _kv_cache
 from . import service_protocol as _protocol
-
 
 _MODEL_FINGERPRINT_KEYS = {
     "model_digest",
@@ -243,7 +243,9 @@ class ResourceSpec:
 
 
 @dataclasses.dataclass(slots=True)
-class _VerifiedModel:
+class VerifiedModel:
+    """The canonical, independently verified model identity."""
+
     canonical_uri: str
     digest: str
     fingerprint: dict[str, Any]
@@ -351,8 +353,19 @@ def _read_safetensors_members(path: Path) -> list[str]:
     return sorted(members, key=lambda item: item.encode("utf-8"))
 
 
-def _verify_model(model_uri: str, supplied_digest: str) -> _VerifiedModel:
-    if not isinstance(model_uri, str) or not isinstance(supplied_digest, str):
+def verify_model_identity(
+    model_uri: str, supplied_digest: str | None = None
+) -> VerifiedModel:
+    """Verify a Llama safetensors model directory and return its identity.
+
+    ``supplied_digest`` is optional for callers that need to discover the
+    canonical digest.  When present, it is compared byte-for-byte with the
+    digest computed from the verified model inventory.
+    """
+
+    if not isinstance(model_uri, str) or (
+        supplied_digest is not None and not isinstance(supplied_digest, str)
+    ):
         raise ValueError("model identity is invalid")
     source = Path(model_uri)
     try:
@@ -411,7 +424,11 @@ def _verify_model(model_uri: str, supplied_digest: str) -> _VerifiedModel:
             raise ValueError("model index is invalid")
         shard_names = set()
         for tensor_name, shard_name in weight_map.items():
-            if not isinstance(tensor_name, str) or not _safe_relative(shard_name) or not shard_name.endswith(".safetensors"):
+            if (
+                not isinstance(tensor_name, str)
+                or not _safe_relative(shard_name)
+                or not shard_name.endswith(".safetensors")
+            ):
                 raise ValueError("model index is invalid")
             shard_names.add(shard_name)
         members = [
@@ -439,7 +456,9 @@ def _verify_model(model_uri: str, supplied_digest: str) -> _VerifiedModel:
             raise ValueError("model shard is invalid")
         if relative_index is not None:
             header_members = _read_safetensors_members(shard_path)
-            declared = {item["tensor_name"] for item in members if item["shard"] == name}
+            declared = {
+                item["tensor_name"] for item in members if item["shard"] == name
+            }
             if not declared.issubset(set(header_members)):
                 raise ValueError("model index tensor membership is invalid")
         shard_paths.append((name, shard_path))
@@ -450,7 +469,9 @@ def _verify_model(model_uri: str, supplied_digest: str) -> _VerifiedModel:
         all_files.append((relative_index, index_path))
     all_files.extend(shard_paths)
     total_size = 0
-    for relative, path in sorted(all_files, key=lambda item: item[0].encode("utf-8")):
+    for relative, path in sorted(
+        all_files, key=lambda item: item[0].encode("utf-8")
+    ):
         size, digest = _stream_file_digest(path)
         total_size += size
         file_entries.append(
@@ -478,7 +499,7 @@ def _verify_model(model_uri: str, supplied_digest: str) -> _VerifiedModel:
         "shard_index": {"index_path": relative_index, "members": members},
     }
     expected_digest = _protocol.compute_model_digest(identity)
-    if supplied_digest != expected_digest:
+    if supplied_digest is not None and supplied_digest != expected_digest:
         raise ValueError("model digest verification failed")
     fingerprint = {
         "model_digest": expected_digest,
@@ -492,7 +513,7 @@ def _verify_model(model_uri: str, supplied_digest: str) -> _VerifiedModel:
         "rope_theta": 500000.0,
         "rope_scaling": dict(_ROPE_SCALING),
     }
-    return _VerifiedModel(str(canonical), expected_digest, fingerprint, total_size)
+    return VerifiedModel(str(canonical), expected_digest, fingerprint, total_size)
 
 
 def _safe_result(value: Any) -> dict[str, Any]:
@@ -672,6 +693,16 @@ class ModelRegistry:
             return request_id, None, _error_response(request_id, None, {"domain": "invalid_request", "message": "operation is invalid", "failure_stage": "operation_validation"})
         try:
             _protocol._validate_body(operation, request["body"])
+        except _protocol._BodyValidationError as exc:
+            return request_id, operation, _error_response(
+                request_id,
+                operation,
+                {
+                    "domain": "invalid_request",
+                    "message": "operation body is invalid",
+                    "failure_stage": exc.failure_stage,
+                },
+            )
         except ValueError:
             return request_id, operation, _error_response(request_id, operation, {"domain": "invalid_request", "message": "operation body is invalid", "failure_stage": "operation_validation"})
         return request_id, operation, None
@@ -888,7 +919,7 @@ class ModelRegistry:
             self._state = "validating"
             self._condition.notify_all()
         try:
-            verified = _verify_model(body["model_uri"], body["model_digest"])
+            verified = verify_model_identity(body["model_uri"], body["model_digest"])
             kernel_pack = _kernel_pack_from_source(self._kernel_pack_source)
             resource_budget = _resource_budget_from_source(
                 self._resource_budget_source
@@ -970,7 +1001,7 @@ class ModelRegistry:
                 )
 
             try:
-                rebound = _verify_model(verified.canonical_uri, verified.digest)
+                rebound = verify_model_identity(verified.canonical_uri, verified.digest)
             except ValueError as exc:
                 rollback_needed = True
                 raise _protocol.ServiceProtocolError(
@@ -1350,52 +1381,91 @@ class ModelRegistry:
             finish_request()
         return result_response
 
-    def _cache_projection(self, request_id: str, body: Mapping[str, Any], paths: Mapping[str, str], native: Mapping[str, Any], fingerprint: str) -> dict[str, Any]:
+    def _cache_projection(
+        self,
+        request_id: str,
+        body: Mapping[str, Any],
+        paths: Mapping[str, str],
+        native: Mapping[str, Any],
+        fingerprint: str,
+    ) -> dict[str, Any]:
         token_count = len(body["token_ids"])
         prefix = token_count - 1
         payload_path = Path(paths["prefill_npz_path"])
-        try:
-            payload_length, payload_sha256 = _stream_file_digest(payload_path)
-        except ValueError as exc:
-            raise _protocol.ServiceProtocolError(
-                "native prefill artifact is invalid",
+
+        def reject(message: str, cause: BaseException | None = None) -> None:
+            error = _protocol.ServiceProtocolError(
+                message,
                 error={
                     "domain": "cache_rejection",
-                    "message": "native prefill artifact is missing or unreadable",
-                    "failure_stage": "cache_validation",
-                },
-            ) from exc
-        if payload_length <= 0:
-            raise _protocol.ServiceProtocolError(
-                "native prefill artifact is empty",
-                error={
-                    "domain": "cache_rejection",
-                    "message": "native prefill artifact is empty",
+                    "message": message,
                     "failure_stage": "cache_validation",
                 },
             )
+            if cause is not None:
+                raise error from cause
+            raise error
+
+        try:
+            payload_length, payload_sha256 = _stream_file_digest(payload_path)
+        except ValueError as exc:
+            reject("native prefill artifact is missing or unreadable", exc)
+        if payload_length <= 0:
+            reject("native prefill artifact is empty")
+
+        try:
+            prefill_result = _kv_cache.prefill_result_from_npz(
+                payload_path,
+                model=self._model_uri,
+                strict=True,
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            reject("native prefill NPZ failed strict validation", exc)
+
+        if prefill_result.get("model") != self._model_uri:
+            reject("native prefill NPZ model identity did not match the loaded model")
+        if prefill_result.get("producer_kind") != "r9700_native":
+            reject("native prefill NPZ producer identity was not r9700_native")
+        if prefill_result.get("n_prefix") != prefix:
+            reject("native prefill NPZ n_prefix did not match the request prefix")
+
         metadata = {
             "schema_version": "mlx_lm_prompt_cache_v1",
-            "producer_fingerprint": fingerprint,
             "producer_kind": "r9700_native",
+            "producer_fingerprint": fingerprint,
             "model_digest": self._model_digest,
+            "request_id": request_id,
             "num_layers": 16,
-            "n_kv_heads": 8,
-            "offset": prefix,
-            "head_dim": 64,
             "batch": 1,
+            "n_kv_heads": 8,
             "sequence_length": prefix,
-            "dtype": "float16",
-            "physical_layout": "B,H,S,D",
+            "head_dim": 64,
             "absolute_start_position": 0,
             "absolute_end_position": prefix,
+            "offset": prefix,
             "rope_theta": 500000.0,
             "rope_scaling": dict(_ROPE_SCALING),
+            "dtype": "float16",
+            "physical_layout": "B,H,S,D",
             "cache_class": "KVCache",
             "cache_variant": "llama3.2_1b_fp16",
-            "request_id": request_id,
             "meta_state": ["" for _ in range(16)],
         }
+        prefill_result["metadata"] = metadata
+
+        prompt_cache_path = Path(paths["prompt_cache_path"])
+        try:
+            _kv_cache.emit_prompt_cache(prefill_result, prompt_cache_path)
+        except (OSError, TypeError, ValueError) as exc:
+            reject("native prompt cache conversion failed", exc)
+
+        try:
+            cache_length, _cache_sha256 = _stream_file_digest(prompt_cache_path)
+        except ValueError as exc:
+            reject("installed prompt cache is missing or unreadable", exc)
+        if cache_length <= 0:
+            reject("installed prompt cache is empty")
+
         return {
             "prompt_cache_path": paths["prompt_cache_path"],
             "metadata": metadata,

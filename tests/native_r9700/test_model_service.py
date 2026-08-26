@@ -17,6 +17,8 @@ import threading
 import time
 from typing import Any
 
+import numpy as np
+
 import pytest
 
 def _require_model_service():
@@ -180,16 +182,18 @@ class FakeResourceClient:
         self.block_prefill = False
         self.prepare_hook: Any = None
         self.write_prefill_artifact = True
-        self.prefill_artifact: bytes | None = b"native prefill artifact"
+        self.prefill_artifact: bytes | None = None
         self.shutdown_entered = threading.Event()
         self.allow_shutdown = threading.Event()
         self.block_shutdown = False
         self.shutdown_called = False
         self.health_state = "resident-ready"
         self.health_error: dict[str, Any] | None = None
+        self.model_uri: str | None = None
 
     def prepare(self, resource_spec: ResourceSpec) -> dict[str, Any]:
         self.calls.append(("Prepare", resource_spec))
+        self.model_uri = resource_spec.model_uri
         self.prepare_entered.set()
         if self.block_prepare:
             assert self.allow_prepare.wait(timeout=5)
@@ -262,8 +266,20 @@ class FakeResourceClient:
         if self.write_prefill_artifact:
             payload = self.prefill_artifact
             if payload is None:
-                payload = b"native prefill artifact"
-            Path(prefill_npz_path).write_bytes(payload)
+                n_prefix = len(token_ids)
+                arrays: dict[str, Any] = {
+                    "n_prefix": np.array(n_prefix, dtype=np.int64),
+                    "producer_kind": np.array("r9700_native"),
+                    "model": np.array(self.model_uri),
+                    "num_layers": np.array(16, dtype=np.int64),
+                }
+                shape = (1, 8, n_prefix, 64)
+                for layer_index in range(16):
+                    arrays[f"layer{layer_index}_K"] = np.zeros(shape, dtype=np.float16)
+                    arrays[f"layer{layer_index}_V"] = np.zeros(shape, dtype=np.float16)
+                np.savez(prefill_npz_path, **arrays)
+            else:
+                Path(prefill_npz_path).write_bytes(payload)
             Path(hardware_log_path).write_bytes(b"native hardware evidence\n")
         return {
             "resource_generation": resource_generation,
@@ -1055,7 +1071,6 @@ def test_metrics_expose_only_the_declared_transfer_counters(
     model_dir, model_digest = _make_model_dir(tmp_path)
     client = FakeResourceClient()
     client.write_prefill_artifact = True
-    client.prefill_artifact = b"nonempty prefill payload"
     registry = _registry(client, tmp_path / "artifacts")
     loaded = registry.dispatch(
         _request(
@@ -1137,6 +1152,203 @@ def test_prefill_rejects_missing_or_empty_native_artifact(
     assert rejected["status"] == "blocked"
     assert rejected["error"]["domain"] == "cache_rejection"
     assert rejected["error"]["failure_stage"] == "cache_validation"
+@pytest.mark.parametrize(
+    "artifact_kind",
+    [
+        pytest.param("valid_native_npz", id="valid-native-npz"),
+        pytest.param("reserved_bytes", id="arbitrary-reserved-bytes"),
+        pytest.param("zero_byte_placeholder", id="zero-byte-placeholder"),
+    ],
+)
+def test_prefill_accepts_only_a_bound_s_minus_one_prompt_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    artifact_kind: str,
+) -> None:
+    """Prefill must convert native evidence, never publish its reservation."""
+    model_dir, model_digest = _make_model_dir(tmp_path)
+    artifact_dir = tmp_path / "artifacts"
+    client = FakeResourceClient()
+    if artifact_kind == "valid_native_npz":
+        # Reuse the native-worker fixture writer so this is a schema-valid
+        # r9700_native NPZ rather than an arbitrary non-empty byte string.
+        from test_native_worker_evidence import _write_native_prefill_npz
+
+        source_npz = tmp_path / "bound-native-prefill.npz"
+        _write_native_prefill_npz(
+            source_npz,
+            n_prefix=2,
+            model=str(model_dir),
+            producer_kind="r9700_native",
+        )
+        client.prefill_artifact = source_npz.read_bytes()
+    elif artifact_kind == "reserved_bytes":
+        client.prefill_artifact = b"reserved path bytes"
+    else:
+        client.prefill_artifact = b""
+
+    request_id = f"cache-conversion-{artifact_kind}"
+    registry = _registry(client, artifact_dir)
+
+    # Keep the real canonical emitter in the loop while recording its input;
+    # a reserved path alone is not evidence that conversion happened.
+    from native_r9700 import kv_cache
+
+    writer_calls: list[tuple[dict[str, Any], Path]] = []
+    real_emit_prompt_cache = kv_cache.emit_prompt_cache
+
+    def record_emit(prefill_result: dict[str, Any], out_path: str | Path) -> None:
+        writer_calls.append((prefill_result, Path(out_path)))
+        real_emit_prompt_cache(prefill_result, out_path)
+
+    monkeypatch.setattr(kv_cache, "emit_prompt_cache", record_emit)
+
+    loaded = registry.dispatch(
+        _request(
+            f"{request_id}-load",
+            "LoadModel",
+            {**_load_body(str(model_dir)), "model_digest": model_digest},
+        )
+    )
+    assert loaded["status"] == "pass"
+    handle = loaded["result"]["model_handle"]
+    produced = registry.dispatch(
+        _request(request_id, "Prefill", _prefill_body(handle))
+    )
+    prompt_cache_path = artifact_dir / f"{request_id}.prompt-cache.safetensors"
+
+    if artifact_kind != "valid_native_npz":
+        assert produced["status"] == "blocked"
+        assert produced["result"] == {}
+        assert produced["error"]["domain"] == "cache_rejection"
+        assert produced["error"]["failure_stage"] == "cache_validation"
+        assert writer_calls == []
+        # The service may retain its zero-byte reservation for uniqueness, but
+        # it must never expose that placeholder as an accepted cache.
+        assert not prompt_cache_path.exists() or prompt_cache_path.stat().st_size == 0
+        return
+
+    assert produced["status"] == "pass"
+    assert len(writer_calls) == 1
+    emitted_result, emitted_path = writer_calls[0]
+    assert emitted_path == prompt_cache_path
+    assert emitted_result["model"] == str(model_dir)
+    assert emitted_result["producer_kind"] == "r9700_native"
+    assert emitted_result["n_prefix"] == 2
+    assert len(emitted_result["layers"]) == 16
+    assert emitted_result["layers"][0]["K"].shape == (1, 8, 2, 64)
+    assert emitted_result["layers"][0]["V"].shape == (1, 8, 2, 64)
+    assert emitted_result["layers"][0]["K"].dtype.name == "float16"
+    assert emitted_result["layers"][0]["V"].dtype.name == "float16"
+
+    expected_typed_metadata = {
+        "schema_version": "mlx_lm_prompt_cache_v1",
+        "producer_kind": "r9700_native",
+        "producer_fingerprint": _PRODUCER_FINGERPRINT,
+        "model_digest": model_digest,
+        "request_id": request_id,
+        "num_layers": 16,
+        "batch": 1,
+        "n_kv_heads": 8,
+        "sequence_length": 2,
+        "head_dim": 64,
+        "absolute_start_position": 0,
+        "absolute_end_position": 2,
+        "offset": 2,
+        "rope_theta": 500000.0,
+        "rope_scaling": {
+            "rope_type": "llama3",
+            "factor": 32.0,
+            "high_freq_factor": 4.0,
+            "low_freq_factor": 1.0,
+            "original_max_position_embeddings": 8192,
+        },
+        "dtype": "float16",
+        "physical_layout": "B,H,S,D",
+        "cache_class": "KVCache",
+        "cache_variant": "llama3.2_1b_fp16",
+        "meta_state": ["" for _ in range(16)],
+    }
+    assert emitted_result["metadata"] == expected_typed_metadata
+    cache = produced["result"]["cache"]
+    assert cache["prompt_cache_path"] == str(prompt_cache_path)
+    assert prompt_cache_path.is_file()
+    assert prompt_cache_path.stat().st_size > 0
+    assert cache["metadata"] == expected_typed_metadata
+    assert produced["request_id"] == request_id
+    assert produced["evidence"]["producer_kind"] == "r9700_native"
+    assert produced["evidence"]["producer_fingerprint"] == _PRODUCER_FINGERPRINT
+    assert "resource_generation" not in produced["evidence"]
+    assert produced["evidence"]["prefill_npz_path"] == cache["prefill_npz_path"]
+    assert produced["evidence"]["hardware_log_path"] == cache["prefill_log_path"]
+
+    prefill_call = next(
+        payload for name, payload in client.calls if name == "Prefill"
+    )
+    assert prefill_call["request_id"] == request_id
+    assert prefill_call["token_ids"] == [11, 12]
+    assert Path(prefill_call["prefill_npz_path"]).name == f"{request_id}.prefill.npz"
+    assert Path(prefill_call["hardware_log_path"]).name == f"{request_id}.prefill.log"
+    assert Path(prefill_call["prefill_npz_path"]).stat().st_size > 0
+    assert Path(prefill_call["hardware_log_path"]).read_text(
+        encoding="utf-8"
+    ).strip()
+
+    try:
+        from safetensors import safe_open
+    except ImportError as exc:  # pragma: no cover - dependency is expected here.
+        pytest.fail(f"safetensors is required for prompt-cache checks: {exc}")
+
+    structural_metadata = {
+        **{f"0.{index}": "" for index in range(16)},
+        **{f"2.{index}": "KVCache" for index in range(16)},
+        "1.offset": "2",
+        "1.num_layers": "16",
+        "1.n_kv_heads": "8",
+        "1.head_dim": "64",
+    }
+    expected_tensor_keys = {
+        f"{index}.{suffix}"
+        for index in range(16)
+        for suffix in (0, 1)
+    }
+    with safe_open(str(prompt_cache_path), framework="np") as cache_file:
+        assert set(cache_file.keys()) == expected_tensor_keys
+        header_metadata = cache_file.metadata()
+        assert header_metadata is not None
+        for key, value in structural_metadata.items():
+            assert header_metadata[key] == value
+        for key in expected_tensor_keys:
+            tensor = cache_file.get_tensor(key)
+            assert tensor.shape == (1, 8, 2, 64)
+            assert tensor.dtype.name == "float16"
+
+    mlx_cache = pytest.importorskip(
+        "mlx_lm.models.cache",
+        reason="mlx-lm prompt-cache reader is required for this contract",
+    )
+    loaded_cache, loaded_metadata = mlx_cache.load_prompt_cache(
+        str(prompt_cache_path), return_metadata=True
+    )
+    assert loaded_metadata["offset"] == "2"
+    assert loaded_metadata["num_layers"] == "16"
+    assert loaded_metadata["n_kv_heads"] == "8"
+    assert loaded_metadata["head_dim"] == "64"
+    assert loaded_metadata["schema_version"] == "mlx_lm_prompt_cache_v1"
+    assert loaded_metadata["producer_kind"] == "r9700_native"
+    assert loaded_metadata["producer_fingerprint"] == _PRODUCER_FINGERPRINT
+    assert loaded_metadata["model_digest"] == model_digest
+    assert loaded_metadata["request_id"] == request_id
+    assert loaded_metadata["sequence_length"] == "2"
+    assert loaded_metadata["absolute_start_position"] == "0"
+    assert loaded_metadata["absolute_end_position"] == "2"
+    assert loaded_metadata["rope_theta"] == "500000"
+    assert len(loaded_cache) == 16
+    for cache_layer in loaded_cache:
+        assert type(cache_layer).__name__ == "KVCache"
+        assert cache_layer.offset == 2
+        assert cache_layer.size() == 2
+
 
 
 def test_model_handles_skip_issued_values_after_unload(
@@ -1284,3 +1496,115 @@ def test_failed_prepare_inventory_rollback_is_health_visible_and_close_retried(
     assert client.shutdown_called is True
     assert registry.state == "unloaded"
     assert registry.model_handle is None
+
+
+@pytest.mark.parametrize("token_ids", [[], [11] * 130])
+def test_dispatch_prefill_rejects_token_count_at_protocol_boundary(
+    tmp_path: Path, token_ids: list[Any]
+) -> None:
+    registry = _registry(FakeResourceClient(), tmp_path / "artifacts")
+    body = _prefill_body("mh_" + "a" * 32)
+    body["token_ids"] = token_ids
+    rejected = registry.dispatch(
+        _request(
+            f"prefill-token-count-{len(token_ids)}",
+            "Prefill",
+            body,
+        )
+    )
+    assert rejected["status"] == "blocked"
+    assert rejected["error"]["domain"] == "invalid_request"
+    assert rejected["error"]["failure_stage"] == "token_bounds"
+
+
+@pytest.mark.parametrize("bad_token", ["11", True, -1, 2**32])
+def test_dispatch_prefill_rejects_invalid_token_values(
+    tmp_path: Path, bad_token: Any
+) -> None:
+    registry = _registry(FakeResourceClient(), tmp_path / "artifacts")
+    body = _prefill_body("mh_" + "a" * 32)
+    body["token_ids"] = [bad_token]
+    rejected = registry.dispatch(
+        _request(
+            f"prefill-token-value-{type(bad_token).__name__}",
+            "Prefill",
+            body,
+        )
+    )
+    assert rejected["status"] == "blocked"
+    assert rejected["error"]["domain"] == "invalid_request"
+    assert rejected["error"]["failure_stage"] == "token_validation"
+
+
+def test_prefill_s1_accepts_public_token_and_sends_empty_native_prefix(
+    tmp_path: Path,
+) -> None:
+    """Public S=1 must expose an empty private prefix and cache."""
+    model_dir, model_digest = _make_model_dir(tmp_path)
+    artifact_dir = tmp_path / "artifacts"
+    client = FakeResourceClient()
+    registry = _registry(client, artifact_dir)
+
+    loaded = registry.dispatch(
+        _request(
+            "s1-load",
+            "LoadModel",
+            {**_load_body(str(model_dir)), "model_digest": model_digest},
+        )
+    )
+    assert loaded["status"] == "pass"
+    handle = loaded["result"]["model_handle"]
+
+    body = _prefill_body(handle)
+    body["token_ids"] = [374]
+    produced = registry.dispatch(_request("s1-prefill", "Prefill", body))
+
+    assert produced["status"] == "pass"
+    assert produced["result"]["prompt_token_count"] == 1
+    assert produced["result"]["prefix_token_count"] == 0
+    prefill_call = next(
+        payload for name, payload in client.calls if name == "Prefill"
+    )
+    assert prefill_call["token_ids"] == []
+    prefill_npz_path = Path(prefill_call["prefill_npz_path"])
+    assert prefill_npz_path.is_file()
+    with np.load(prefill_npz_path, allow_pickle=False) as native_npz:
+        assert int(native_npz["n_prefix"]) == 0
+        assert int(native_npz["num_layers"]) == 16
+        assert native_npz["model"].item() == str(model_dir)
+        assert native_npz["producer_kind"].item() == "r9700_native"
+        for layer_index in range(16):
+            assert native_npz[f"layer{layer_index}_K"].shape == (1, 8, 0, 64)
+            assert native_npz[f"layer{layer_index}_V"].shape == (1, 8, 0, 64)
+            assert native_npz[f"layer{layer_index}_K"].dtype == np.float16
+            assert native_npz[f"layer{layer_index}_V"].dtype == np.float16
+
+    prompt_cache_path = Path(
+        produced["result"]["cache"]["prompt_cache_path"]
+    )
+    assert prompt_cache_path.is_file()
+    assert prompt_cache_path.stat().st_size > 0
+    try:
+        from safetensors import safe_open
+    except ImportError as exc:  # pragma: no cover - dependency is expected here.
+        pytest.fail(f"safetensors is required for S=1 cache checks: {exc}")
+    with safe_open(str(prompt_cache_path), framework="np") as cache_file:
+        assert cache_file.metadata()["1.offset"] == "0"
+        assert cache_file.metadata()["1.num_layers"] == "16"
+        assert len(cache_file.keys()) == 32
+        for key in cache_file.keys():
+            assert cache_file.get_tensor(key).shape == (1, 8, 0, 64)
+            assert cache_file.get_tensor(key).dtype == np.float16
+
+    mlx_cache = pytest.importorskip(
+        "mlx_lm.models.cache",
+        reason="mlx-lm prompt-cache reader is required for S=1",
+    )
+    loaded_cache, loaded_metadata = mlx_cache.load_prompt_cache(
+        str(prompt_cache_path), return_metadata=True
+    )
+    assert loaded_metadata["offset"] == "0"
+    assert len(loaded_cache) == 16
+    for cache_layer in loaded_cache:
+        assert cache_layer.offset == 0
+        assert cache_layer.size() == 0

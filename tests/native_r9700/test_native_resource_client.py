@@ -277,6 +277,10 @@ for raw in sys.stdin.buffer:
         sys.stdout.buffer.flush()
         first = False
         continue
+    if MODE == "stderr-pressure" and first:
+        sys.stderr.buffer.write(b"e" * (1024 * 1024))
+        sys.stderr.buffer.flush()
+        first = False
     if MODE == "unterminated-oversized" and first:
         sys.stdout.buffer.write(b"x" * (65536 + 1))
         sys.stdout.buffer.flush()
@@ -858,3 +862,41 @@ def test_blocked_private_request_error_is_request_scoped_and_health_recovers(
     health = client.health()
     assert health["resource_state"] == "resident-ready"
     client.shutdown()
+
+
+def test_persistent_child_stderr_backpressure_cannot_block_private_response(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _, _, _, _ = _client(
+        tmp_path, monkeypatch, mode="stderr-pressure"
+    )
+    errors: list[BaseException] = []
+    result: list[dict[str, Any]] = []
+    finished = threading.Event()
+
+    def call_health() -> None:
+        try:
+            result.append(client.health())
+        except BaseException as exc:  # pragma: no cover - RED assertion captures it
+            errors.append(exc)
+        finally:
+            finished.set()
+
+    worker = threading.Thread(target=call_health)
+    worker.start()
+    try:
+        assert finished.wait(timeout=3), (
+            "persistent child stderr must not backpressure the private response"
+        )
+        assert not errors
+        assert result and result[0]["resource_state"] == "resident-ready"
+    finally:
+        process = client._process
+        if worker.is_alive():
+            process.terminate()
+        else:
+            try:
+                client.shutdown()
+            except BaseException:
+                process.terminate()
+        worker.join(timeout=3)

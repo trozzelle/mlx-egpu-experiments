@@ -385,6 +385,19 @@ def test_canonical_jcs_fixture_is_byte_exact_and_has_no_trailing_newline() -> No
     assert not canonical_jcs(value).endswith(b"\n")
 
 
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (0.1, b'{"x":0.1}'),
+        (0.001, b'{"x":0.001}'),
+    ],
+)
+def test_canonical_jcs_preserves_short_decimal_fraction_bytes(
+    value: float, expected: bytes
+) -> None:
+    assert canonical_jcs({"x": value}) == expected
+
+
 def test_model_digest_is_sha256_of_exact_jcs_bytes() -> None:
     identity = {"z": -0.0, "a": 1e-5, "n": 500000.0, "u": "é"}
     expected = "sha256:a5f32101f172484252004bacdcb9b2f194e82948b19be1634ffd6a39d60a65fd"

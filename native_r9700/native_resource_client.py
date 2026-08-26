@@ -246,7 +246,7 @@ class NativeResourceClient:
                 executable=self._runner_stage_path,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
                 close_fds=True,
                 bufsize=0,
             )

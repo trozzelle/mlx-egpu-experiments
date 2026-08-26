@@ -523,7 +523,9 @@ def _number_text(value: int | float) -> str:
     else:
         digits = coefficient
         decimal_index = len(coefficient) + exponent
+    leading_zeroes = len(digits) - len(digits.lstrip("0"))
     digits = digits.lstrip("0") or "0"
+    decimal_index -= leading_zeroes
 
     # ECMAScript/JCS uses ordinary decimal notation for [1e-6, 1e21).
     ordinary = 1e-6 <= magnitude < 1e21
