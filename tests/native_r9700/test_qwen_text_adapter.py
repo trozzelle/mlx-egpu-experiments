@@ -227,6 +227,8 @@ def _write_synthetic_qwen_snapshot(
         "schema_version": 1,
         "kind": "qwen_source_pin",
         "status": "pass",
+        "producer_kind": "cpu_reference",
+        "native_evidence": False,
         "fallback_used": False,
         "promotion_gate": "blocked_base_model_revision",
         "model_revision": _FROZEN_MODEL_REVISION,
@@ -316,6 +318,8 @@ def _source_pin_expected_output(model_dir: Path) -> dict[str, object]:
         "schema_version": 1,
         "kind": "qwen_source_pin",
         "status": "pass",
+        "producer_kind": "cpu_reference",
+        "native_evidence": False,
         "fallback_used": False,
         "promotion_gate": "blocked_base_model_revision",
         "model_revision": _FROZEN_MODEL_REVISION,
@@ -458,6 +462,8 @@ def test_inventory_emits_schema_v2_six_field_records_and_sorted_affine_table(
 
     assert inventory["schema_version"] == 2
     assert inventory["kind"] == "qwen_tensor_inventory"
+    assert inventory["producer_kind"] == "cpu_reference"
+    assert inventory["native_evidence"] is False
     assert inventory["model_fingerprint"] == source_pin["model_fingerprint"]
     assert inventory["header_only"] is True
     assert inventory["tensor_count"] == 9
@@ -710,6 +716,54 @@ def test_check_source_pin_emits_exact_synthetic_full_byte_identity_without_inven
     assert output_path.read_text(encoding="utf-8") == (
         json.dumps(expected, sort_keys=True, indent=2) + "\n"
     )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("producer_kind", None),
+        ("producer_kind", "r9700_native"),
+        ("native_evidence", None),
+        ("native_evidence", True),
+    ),
+)
+def test_load_verified_source_pin_rejects_non_cpu_reference_labels(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    model_dir, source_pin_path = _write_synthetic_qwen_snapshot(tmp_path)
+    report = json.loads(source_pin_path.read_text(encoding="utf-8"))
+    if value is None:
+        report.pop(field)
+    else:
+        report[field] = value
+    source_pin_path.write_text(json.dumps(report, separators=(",", ":")), encoding="utf-8")
+
+    module = importlib.import_module("native_r9700.qwen_text_adapter")
+    with pytest.raises(QwenTextIndexError):
+        module._load_verified_source_pin(model_dir, source_pin_path)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("producer_kind", None),
+        ("producer_kind", "r9700_native"),
+        ("native_evidence", None),
+        ("native_evidence", True),
+    ),
+)
+def test_inventory_rejects_non_cpu_reference_source_pin_labels(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    model_dir, source_pin_path = _write_synthetic_qwen_snapshot(tmp_path)
+    report = json.loads(source_pin_path.read_text(encoding="utf-8"))
+    if value is None:
+        report.pop(field)
+    else:
+        report[field] = value
+    source_pin_path.write_text(json.dumps(report, separators=(",", ":")), encoding="utf-8")
+
+    _assert_inventory_failure(model_dir, source_pin_path, tmp_path / "bad-labels.json")
 
 
 @pytest.mark.parametrize(

@@ -101,6 +101,76 @@ _SAFETENSORS_DTYPE_BYTES = {
     "F64": 8,
 }
 _MAX_SAFETENSORS_HEADER_BYTES = 64 * 1024 * 1024
+_QWEN_INVENTORY_SHA256 = (
+    "508567ed00f7d65283fcb7f5ecba55e9a9904a9f2f41e8724bf1ef37589725e4"
+)
+_QWEN_INVENTORY_SHARDS = (
+    (
+        "model-00001-of-00003.safetensors",
+        5_343_268_662,
+        104_654,
+        5_343_164_000,
+        "6cc1508e96fb5d0865dfd5753a79f4ec60651bf3e2a82844a7e8ae9c60528c0d",
+    ),
+    (
+        "model-00002-of-00003.safetensors",
+        5_354_185_130,
+        94_306,
+        5_354_090_816,
+        "83f2a20ca8058f486a3634a27faf99587f4cd3c156a83dee34fb99e6ac178670",
+    ),
+    (
+        "model-00003-of-00003.safetensors",
+        5_357_087_557,
+        80_125,
+        5_357_007_424,
+        "31b8c91ef899f79efaaa69e3d2c096f6e2ebeb2ff20e29222abbd9ebc79e560a",
+    ),
+)
+_QWEN_INVENTORY_COUNTS = {
+    "tensor_count": 2_180,
+    "language_model_tensor_count": 1_847,
+    "vision_tensor_count": 333,
+    "affine_stem_count": 498,
+    "affine_entry_count": 1_494,
+    "tensor_payload_bytes": 16_054_262_240,
+}
+_QWEN_INVENTORY_FIELDS = frozenset(
+    {
+        "schema_version",
+        "kind",
+        "producer_kind",
+        "native_evidence",
+        "model_fingerprint",
+        "header_only",
+        "tensor_count",
+        "language_model_tensor_count",
+        "vision_tensor_count",
+        "affine_stem_count",
+        "affine_entry_count",
+        "tensor_payload_bytes",
+        "shards",
+        "tensors",
+        "affine_classification",
+        "inventory_sha256",
+    }
+)
+_QWEN_INVENTORY_SHARD_FIELDS = frozenset(
+    {"name", "header_bytes", "payload_bytes", "sha256"}
+)
+_QWEN_INVENTORY_TENSOR_FIELDS = frozenset(
+    {
+        "name",
+        "shard",
+        "dtype",
+        "shape",
+        "data_offset_start",
+        "data_offset_end",
+    }
+)
+_QWEN_INVENTORY_AFFINE_FIELDS = frozenset(
+    {"stem", "mode", "bits", "group_size"}
+)
 
 
 class QwenTextAdapterError(ValueError):
@@ -388,6 +458,9 @@ def _load_verified_source_pin(
     for key, expected in (
         ("schema_version", 1),
         ("kind", "qwen_source_pin"),
+        ("status", "pass"),
+        ("producer_kind", "cpu_reference"),
+        ("native_evidence", False),
         ("fallback_used", False),
         ("promotion_gate", "blocked_base_model_revision"),
         ("model_revision", _FROZEN_MODEL_REVISION),
@@ -397,7 +470,13 @@ def _load_verified_source_pin(
         ("local_snapshot_revision", _FROZEN_MODEL_REVISION),
         ("model_fingerprint", _FROZEN_MODEL_FINGERPRINT),
     ):
-        if report.get(key) != expected:
+        actual = report.get(key)
+        matches = (
+            actual is expected
+            if key == "native_evidence"
+            else actual == expected
+        )
+        if not matches:
             raise QwenTextIndexError(
                 f"Qwen source-pin report {str(report_path)!r} has unsupported "
                 f"{key}={report.get(key)!r}; expected {expected!r}"
@@ -611,6 +690,8 @@ def _build_qwen_source_pin(model_dir: str | Path) -> dict[str, Any]:
         "schema_version": 1,
         "kind": "qwen_source_pin",
         "status": "pass",
+        "producer_kind": "cpu_reference",
+        "native_evidence": False,
         "fallback_used": False,
         "promotion_gate": "blocked_base_model_revision",
         "model_revision": _FROZEN_MODEL_REVISION,
@@ -865,6 +946,328 @@ def _classify_affine_headers(
         raise QwenTextIndexError("Qwen inventory contains no language_model affine triplets")
     return classifications
 
+def validate_qwen_tensor_inventory(
+    inventory: str | Path | Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate a complete schema-v2 inventory and expose consumer lookups.
+
+    The returned mapping is a copy of the validated public inventory with
+    private ``_tensor_by_name`` and ``_shard_by_name`` indexes for bounded
+    fixture readers.  Those derived indexes are never part of the canonical
+    inventory digest or accepted on the wire.
+    """
+    if isinstance(inventory, Mapping):
+        source = "inventory mapping"
+        try:
+            raw = dict(inventory)
+        except (TypeError, ValueError) as exc:
+            raise QwenTextIndexError(
+                "Qwen tensor inventory mapping could not be copied"
+            ) from exc
+    elif isinstance(inventory, (str, Path)):
+        source = str(inventory)
+        raw = dict(
+            _read_json_object(Path(inventory), QwenTextIndexError)
+        )
+    else:
+        raise QwenTextIndexError(
+            "Qwen tensor inventory must be a path or mapping"
+        )
+
+    if set(raw) != _QWEN_INVENTORY_FIELDS:
+        missing = sorted(_QWEN_INVENTORY_FIELDS - set(raw), key=repr)
+        extra = sorted(set(raw) - _QWEN_INVENTORY_FIELDS, key=repr)
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} has invalid schema-v2 fields; "
+            f"missing={missing!r}, extra={extra!r}"
+        )
+
+    scalar_fields = {
+        "schema_version": 2,
+        "kind": "qwen_tensor_inventory",
+        "producer_kind": "cpu_reference",
+        "native_evidence": False,
+        "model_fingerprint": _FROZEN_MODEL_FINGERPRINT,
+        "header_only": True,
+        **_QWEN_INVENTORY_COUNTS,
+    }
+    for key, expected in scalar_fields.items():
+        actual = raw.get(key)
+        if isinstance(expected, bool):
+            matches = actual is expected
+        else:
+            matches = type(actual) is type(expected) and actual == expected
+        if not matches:
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} has {key}={actual!r}; "
+                f"expected {expected!r}"
+            )
+
+    tensors = raw["tensors"]
+    affine_classification = raw["affine_classification"]
+    shards = raw["shards"]
+    if not isinstance(tensors, list):
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} tensors must be an array"
+        )
+    if not isinstance(affine_classification, list):
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} affine_classification must be an array"
+        )
+    if not isinstance(shards, list):
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} shards must be an array"
+        )
+
+    canonical = {
+        "schema_version": raw["schema_version"],
+        "model_fingerprint": raw["model_fingerprint"],
+        "tensors": tensors,
+        "affine_classification": affine_classification,
+    }
+    try:
+        digest = sha256(
+            json.dumps(
+                canonical,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()
+    except (TypeError, ValueError) as exc:
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} cannot be canonically encoded"
+        ) from exc
+    if digest != raw["inventory_sha256"] or digest != _QWEN_INVENTORY_SHA256:
+        raise QwenTextIndexError(
+            f"Qwen inventory canonical digest mismatch for {source!r}: {digest}"
+        )
+
+    expected_shards = {
+        name: (size, header_bytes, payload_bytes, shard_digest)
+        for name, size, header_bytes, payload_bytes, shard_digest
+        in _QWEN_INVENTORY_SHARDS
+    }
+    if len(shards) != len(expected_shards):
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} must contain exactly "
+            f"{len(expected_shards)} shard records"
+        )
+    shard_details: dict[str, dict[str, Any]] = {}
+    seen_shards: set[str] = set()
+    for record in shards:
+        if not isinstance(record, dict):
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} contains a malformed shard record"
+            )
+        if set(record) != _QWEN_INVENTORY_SHARD_FIELDS:
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} shard records must use exactly "
+                "name/header_bytes/payload_bytes/sha256 fields"
+            )
+        name = record["name"]
+        if not isinstance(name, str) or name in seen_shards or name not in expected_shards:
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} contains an unexpected or duplicate shard"
+            )
+        size, header_bytes, payload_bytes, shard_digest = expected_shards[name]
+        if (
+            type(record["header_bytes"]) is not int
+            or type(record["payload_bytes"]) is not int
+            or record["header_bytes"] <= 0
+            or record["payload_bytes"] <= 0
+            or record["header_bytes"] != header_bytes
+            or record["payload_bytes"] != payload_bytes
+            or record["sha256"] != shard_digest
+            or 8 + record["header_bytes"] + record["payload_bytes"] != size
+        ):
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} shard identity is invalid for {name!r}"
+            )
+        seen_shards.add(name)
+        shard_details[name] = {**record, "size": size}
+    if seen_shards != set(expected_shards):
+        missing = sorted(set(expected_shards) - seen_shards)
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} is missing shards {missing!r}"
+        )
+    if [record["name"] for record in shards] != sorted(expected_shards):
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} shard records are not in canonical order"
+        )
+
+    if len(tensors) != _QWEN_INVENTORY_COUNTS["tensor_count"]:
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} tensor record count is invalid"
+        )
+    tensor_by_name: dict[str, dict[str, Any]] = {}
+    spans_by_shard: dict[str, list[tuple[int, int, str]]] = {
+        name: [] for name in expected_shards
+    }
+    language_model_count = 0
+    vision_count = 0
+    payload_bytes_total = 0
+    for record in tensors:
+        if not isinstance(record, dict):
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} contains a malformed tensor record"
+            )
+        if set(record) != _QWEN_INVENTORY_TENSOR_FIELDS:
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} tensor records must use exactly "
+                "the schema-v2 six fields"
+            )
+        name = record["name"]
+        shard_name = record["shard"]
+        dtype = record["dtype"]
+        shape = record["shape"]
+        start = record["data_offset_start"]
+        end = record["data_offset_end"]
+        if (
+            not isinstance(name, str)
+            or not name
+            or name == "__metadata__"
+            or name in tensor_by_name
+            or not (
+                name.startswith(_LANGUAGE_MODEL_PREFIX)
+                or name.startswith(_VISION_TOWER_PREFIX)
+            )
+            or not isinstance(shard_name, str)
+            or shard_name not in expected_shards
+            or not isinstance(dtype, str)
+            or dtype not in _SAFETENSORS_DTYPE_BYTES
+            or not isinstance(shape, list)
+            or any(
+                type(dimension) is not int or dimension <= 0
+                for dimension in shape
+            )
+            or type(start) is not int
+            or type(end) is not int
+            or start < 0
+            or end <= start
+            or end > expected_shards[shard_name][2]
+        ):
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} contains an invalid tensor record "
+                f"for {name!r}"
+            )
+        expected_bytes = _SAFETENSORS_DTYPE_BYTES[dtype]
+        for dimension in shape:
+            expected_bytes *= dimension
+        if end - start != expected_bytes:
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} tensor span does not match "
+                f"{dtype} shape for {name!r}"
+            )
+        tensor_by_name[name] = record
+        spans_by_shard[shard_name].append((start, end, name))
+        payload_bytes_total += end - start
+        if name.startswith(_LANGUAGE_MODEL_PREFIX):
+            language_model_count += 1
+        else:
+            vision_count += 1
+    if language_model_count != _QWEN_INVENTORY_COUNTS["language_model_tensor_count"]:
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} language-model tensor count is invalid"
+        )
+    if vision_count != _QWEN_INVENTORY_COUNTS["vision_tensor_count"]:
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} vision tensor count is invalid"
+        )
+    if payload_bytes_total != _QWEN_INVENTORY_COUNTS["tensor_payload_bytes"]:
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} tensor payload byte count is invalid"
+        )
+    if tensors != sorted(
+        tensors,
+        key=lambda tensor: (
+            tensor["name"],
+            tensor["shard"],
+            tensor["data_offset_start"],
+            tensor["data_offset_end"],
+        ),
+    ):
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} tensor records are not in canonical order"
+        )
+    for shard_name, spans in spans_by_shard.items():
+        previous_end = 0
+        previous_name = ""
+        for start, end, name in sorted(spans, key=lambda item: (item[0], item[1], item[2])):
+            if start < previous_end:
+                raise QwenTextIndexError(
+                    f"Qwen inventory {source!r} tensor spans overlap in "
+                    f"{shard_name!r}: {previous_name!r} and {name!r}"
+                )
+            previous_end = end
+            previous_name = name
+
+    if len(affine_classification) != _QWEN_INVENTORY_COUNTS["affine_stem_count"]:
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} affine stem count is invalid"
+        )
+    affine_by_stem: dict[str, dict[str, Any]] = {}
+    for record in affine_classification:
+        if not isinstance(record, dict) or set(record) != _QWEN_INVENTORY_AFFINE_FIELDS:
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} affine classification records are malformed"
+            )
+        stem = record["stem"]
+        if (
+            not isinstance(stem, str)
+            or not stem.startswith(_LANGUAGE_MODEL_PREFIX)
+            or stem in affine_by_stem
+            or record["mode"] != "affine"
+            or type(record["bits"]) is not int
+            or record["bits"] != _EXPECTED_QUANTIZATION["bits"]
+            or type(record["group_size"]) is not int
+            or record["group_size"] != _EXPECTED_QUANTIZATION["group_size"]
+        ):
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} contains an invalid affine classification"
+            )
+        affine_by_stem[stem] = record
+    if affine_classification != sorted(
+        affine_classification, key=lambda record: record["stem"]
+    ):
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} affine classification is not in canonical order"
+        )
+    candidate_stems: dict[str, set[str]] = {}
+    for name in tensor_by_name:
+        if not name.startswith(_LANGUAGE_MODEL_PREFIX):
+            continue
+        stem, separator, suffix = name.rpartition(".")
+        if separator and suffix in _AFFINE_SUFFIXES:
+            candidate_stems.setdefault(stem, set()).add(suffix)
+    expected_suffixes = set(_AFFINE_SUFFIXES)
+    for stem, suffixes in candidate_stems.items():
+        if suffixes == {"weight"}:
+            continue
+        if suffixes != expected_suffixes:
+            raise QwenTextIndexError(
+                f"Qwen inventory {source!r} has an incomplete affine triplet "
+                f"for {stem!r}"
+            )
+    if set(affine_by_stem) != {
+        stem for stem, suffixes in candidate_stems.items() if suffixes != {"weight"}
+    }:
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} affine classification does not match tensors"
+        )
+    if len(affine_by_stem) * len(_AFFINE_SUFFIXES) != _QWEN_INVENTORY_COUNTS[
+        "affine_entry_count"
+    ]:
+        raise QwenTextIndexError(
+            f"Qwen inventory {source!r} affine entry count is invalid"
+        )
+
+    return {
+        **raw,
+        "_tensor_by_name": tensor_by_name,
+        "_shard_by_name": shard_details,
+    }
+
 
 def build_qwen_tensor_inventory(
     model_dir: str | Path, *, source_pin_report: str | Path
@@ -985,6 +1388,8 @@ def build_qwen_tensor_inventory(
     inventory = {
         "schema_version": 2,
         "kind": "qwen_tensor_inventory",
+        "producer_kind": "cpu_reference",
+        "native_evidence": False,
         "model_fingerprint": model_fingerprint,
         "header_only": True,
         "tensor_count": len(tensors),
