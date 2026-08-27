@@ -167,7 +167,7 @@ Rollback and Release pass only with `{resource_generation:uint64,state:"released
 
 ## F2
 
-**F2 physical WMMA layout proof (task set 3-owned; required before task set 4):**
+**F2 physical WMMA layout proof (task set 3B-owned; consumes task set 3A inputs and is required before task set 4):**
 
 ```sh
 /bin/bash -o pipefail -c '
@@ -607,7 +607,7 @@ The F2 G0 publication command is copied verbatim below. P3 adds no CLI defaults,
 
 P3 pack-consumption observations (the only additions to the copied F2 command contract):
 
-- Offline validation consumes the accepted task-set-2/3 generated record and the immutable `.superpowers/swarm/reports/g0-wmma-conformance.md` record. It records the exact F2 names `f2-linear-wmma-f16-v1`, `f2-linear-gate-up-f16-v1`, `linear_wmma_f16`, `linear_wmma_f16.image`, `linear_wmma_f16.json`, `F2_WMMA_FP16_FP32_ACC_SINGLE_CAST_V1`, and `f2-wmma-64x64-m-tail-v1`, together with the exact image/source/digest, descriptor/resource, shape/tail, numerical, ISA, and hardware evidence; the physical layout record is `record_kind: offline_review`, `evidence_slot: layout_proof`; it does not regenerate the lane map/image or alter tolerance/results, and it does not emit/admit the reserved `f2-wmma-physical-tile-v1` without that resolved layout record.
+- Offline validation consumes the accepted task-set-2 lane-map and task-set-3B generated/admission record plus the immutable `.superpowers/swarm/reports/g0-wmma-conformance.md` record. It records the exact F2 names `f2-linear-wmma-f16-v1`, `f2-linear-gate-up-f16-v1`, `linear_wmma_f16`, `linear_wmma_f16.image`, `linear_wmma_f16.json`, `F2_WMMA_FP16_FP32_ACC_SINGLE_CAST_V1`, and `f2-wmma-64x64-m-tail-v1`, together with exact image/source/digest, descriptor/resource, shape/tail, numerical, ISA, hardware, and accepted task-set-3B physical-layout evidence.
 - The P3 pack-consumption output identifies the selected pack name/version, canonical `pack_sha256` preimage digest, imported image SHA-256, exact G0 record ID, `target: gfx1201`, entry symbol, and the resolved `EvidenceRef` IDs/digests. It records `pack_validation: pass`, `pack_consumption: pass`, `load_status: pass`, `dispatch_status: pass`, finite output/tail comparison within the immutable G0 policy, and process `exit_status: 0`.
 - The hardware run is request-bound native evidence (`record_kind: native_run`, `evidence_slot: native_run`, `producer_kind: r9700_native`) with the resolved scalar-native/NumPy input binding; the scalar projection is `record_kind: target_conformance`, `evidence_slot: scalar_native_projection`, `producer_kind: r9700_native`; the NumPy reference is `record_kind: offline_oracle`, `evidence_slot: numpy_oracle`, `producer_kind: cpu_reference`, with target/image/pack/tool fields exactly empty. Any pack/image/G0 mismatch, missing evidence, or nonzero load/dispatch status blocks migration and returns to F2; it is not repaired by selecting another version.
 

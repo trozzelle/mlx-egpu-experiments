@@ -76,8 +76,8 @@ Agents update only their row and append evidence/notes as work completes.
 
 ### Acceptance
 
-- One model fingerprint binds upstream revision, converted model revision, the explicit unavailable base revision marker, and local shards; Q1 remains Needs review while the marker is unresolved.
-- No floating branch/model directory or unchecked local weight is accepted; task sets 2 and 3 may implement after supervisor review because the remaining base gap is scoped to promotion, not implementation.
+- One accepted oracle fingerprint binds upstream revision, converted-model revision, the explicit unavailable base-revision marker, and local shards; task sets 1–6 are Done, while promotion remains blocked on task set 7.
+- No floating branch/model directory or unchecked local weight is accepted. Only task set 7 provenance closure is ready; completed tensor/cache/oracle implementation lanes do not reopen.
 - Active ledger contains `Q1 tensor inventory`, `Q1 hybrid-state capture/restore`, `Q1 oracle fixtures`, `Q1 oracle parity`, and `Q1 package review` exact commands, including the inventory identity comparison.
 
 ### Validation
@@ -318,10 +318,10 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
   tests/native_r9700/test_qwen_native_stage_sources.py -v
 ```
 
-Q1 completion also requires deterministic fixture regeneration, final review, source/model pin verification, and `git diff --check`. No hardware run is required or accepted as Q1 scope.
+Q1 oracle-package completion evidence includes deterministic fixture regeneration, final review, source/model pin verification, and `git diff --check`. No hardware run is required or accepted. Task set 7 is the remaining provenance-promotion gate.
 
-The base-model provenance marker is intentionally unresolved: Q1 implementation lanes may proceed only after supervisor re-review of the correction pass, while Q1 Done/F6 promotion remain blocked until exact base revision/license provenance is recorded or explicitly accepted by a human.
-Task-set ownership remains disjoint: task set 3 owns `qwen_hybrid_cache.py` capture/restore and executable MLX reconstruction, task set 4 solely owns `qwen_parity.py` fixture/comparison integration, and task set 6 is review/package-only.
+The base-model provenance marker remains unresolved solely as task set 7. Q1 implementation tasks 1–6 and their review gates are complete; Q1/F6 promotion waits for exact base revision/license provenance or a separately recorded human decision.
+Completed task-set ownership remains immutable: task set 3 owns hybrid-cache capture/restore and MLX reconstruction, task set 4 owns parity fixture/comparison integration, and task set 6 is review/package-only.
 
 ## Handoff notes
 

@@ -125,7 +125,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 ### Source refs
 
 - Task set 1 stable-operation map and P1 ABI.
-- Local `device_memory.*`, HSA loader/assets/catalog, accepted P1 host-visible buffer and executable handles.
+- Local `device_memory.*`, HSA loader/assets/catalog, accepted P1 host-visible buffer handles, and local accepted executable admission. TinyGPU executable-handle binding remains deferred until P1 task set 4.
 - `docs/DESIGN.md` HAL copy/executable semantics.
 
 ### Target

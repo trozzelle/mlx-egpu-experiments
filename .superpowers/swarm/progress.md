@@ -78,7 +78,7 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 - Wave A is closed as the foundation wave: F1 promoted; F2/P1/P3/Q1 completed the reachable source/contract work recorded below.
 - Wave B0 starts five independent unblockers now: F2 task set 3A, P1 task sets 1A and 2A, Q1 task set 7, and P2 task set 1.
 - Wave B1 consumes local freezes: F2 3B→4/5→6, P1 2B/3, and parallel P2 task sets 2/3A. Q1 provenance remains independent.
-- Wave B2 starts G0 consumers: F3 and P3 task set 5 in parallel; P2 3B/4 consume accepted P1 extensions.
+- Wave B2 starts F3 and P3 task set 5 as G0 consumers. Independently, P2 task sets 3B/4 consume accepted P1 extensions and do not wait for G0 to implement; P2 promotion still waits for P1 and G0.
 - Wave C1 runs F4, P2 command/backend completion, and P3 promotion after their direct dependencies. Wave C2 is the serialized P4 convergence boundary.
 - Wave D starts F5 after F4; F6 starts only after F4 plus Q1 task 7. P5 waits for P4 and a measured human-approved need.
 - P1 task sets 1A/2A may research concurrently, but one P1↔P2 contract owner serializes edits to the P1/P2 packets and active validation ledger. One upstream-manifest owner serializes F2/P1/Q1 provenance changes after their disjoint reports are ready.
