@@ -21,7 +21,7 @@ No production DEXT file, user-client selector, conformance client, queue/fence i
 
 ## Contract boundary
 
-The tests establish the smallest wished host seams for the next GREEN implementation. They intentionally include headers and source names that are absent from the current in-repository source tree:
+The missing-seam observation below was recorded before the 2026-08-27 in-repository migration checkpoint `9d83a0a`, in the former external TinyGPU checkout: the tests intentionally included headers and source names absent from that former checkout at contract-authoring time. It is historical and does not describe the current products source.
 
 - `TinyGPUDriverExtension/TGPUBufferRequestValidator.h`
 - `TinyGPUDriverExtension/TGPUBufferRequestValidator.cpp`
@@ -29,6 +29,10 @@ The tests establish the smallest wished host seams for the next GREEN implementa
 - `TinyGPUDriverExtension/TinyGPUBufferOwner.cpp`
 
 The validator is a pure typed-request boundary. It runs after the common DriverKit transport/header boundary and before any table, provider, descriptor, or output mutation. The owner is not a HAL: it owns one `TinyGPUResourceTable` and a bounded provider, and returns only the frozen opaque buffer/mapping responses.
+
+### Current in-repository outcome
+
+After the 2026-08-27 migration checkpoint `9d83a0a`, `TGPUBufferRequestValidator.{h,cpp}` and `TinyGPUBufferOwner.{h,cpp}` are present under `tinygpu/TinyGPUDriverExtension/`. The named resource-table, buffer-validator, and buffer-owner host contracts compiled from `tinygpu/` and exited `0` in the recorded Task 3 verification under the selected Xcode 26.6 build `17F113` / DriverKit SDK `25.5` source gate. The RED commands below remain historical contract commands and were not rerun by this report. Import/private-VA completion, hardware VM mapping, and hardware acceptance remain externally blocked; the structured import/map behavior remains fail-closed.
 
 ### Wished validator API
 
@@ -187,13 +191,13 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 /tmp/tgpu_buffer_owner_contract
 ```
 
-## Expected current RED failures
+## Historical expected RED failures (former checkout)
 
-These are expected missing-seam failures and were not executed by this agent:
+These expected missing-seam failures were recorded before the 2026-08-27 in-repository migration checkpoint `9d83a0a` and were not executed by this agent:
 
-- The validator command cannot find `TGPUBufferRequestValidator.h` (and has no `TGPUBufferRequestValidator.cpp`) in the current checkout.
-- The owner command cannot find `TinyGPUBufferOwner.h` (and has no `TinyGPUBufferOwner.cpp`) in the current checkout.
-- Once the headers/sources exist, the same commands are the focused RED/GREEN gates. The tests must first fail on the missing seam, then fail on the first unimplemented ownership/lifetime behavior, and finally exit `0` only after the owner/validator implementation satisfies this matrix.
-- If an owner implementation pins before checking the owned-buffer range or access subset, the owner command is expected to fail the new ordering cases: `RANGE` must win over configured unpin failure, and `PERMISSION_DENIED` must win over configured pin failure; both cases must leave zero bindings and a retryable buffer.
+- In the former checkout, the validator command could not find `TGPUBufferRequestValidator.h` (and had no `TGPUBufferRequestValidator.cpp`).
+- In the former checkout, the owner command could not find `TinyGPUBufferOwner.h` (and had no `TinyGPUBufferOwner.cpp`).
+- The historical RED sequence required the commands to fail first on the missing seam, then on the first unimplemented ownership/lifetime behavior, and finally exit `0` only after the owner/validator implementation satisfied this matrix. Current products outcomes are recorded above.
+- The ordering cases remain the contract: if an owner implementation pins before checking the owned-buffer range or access subset, `RANGE` must win over configured unpin failure and `PERMISSION_DENIED` must win over configured pin failure; both cases must leave zero bindings and a retryable buffer.
 
 **Validation record:** no compile, run, test, build, lint, formatter, package-manager, install/signing, git, or hardware command was run for this RED contract.

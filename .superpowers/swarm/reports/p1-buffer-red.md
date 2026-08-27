@@ -15,10 +15,14 @@ No DriverKit, user-client, runtime, packaging, conformance-client, or existing `
 
 ## Required narrow production seam
 
-The test intentionally includes the task-set-3 DEXT-owned helper that does not exist in the current in-repository source tree:
+The initial RED observation was recorded before the 2026-08-27 in-repository migration checkpoint `9d83a0a`, in the former external TinyGPU checkout described above: the test intentionally included DEXT-owned helpers that were absent from that former checkout at contract-authoring time. That missing-seam result is historical and does not describe the current products source.
 
 - `TinyGPUDriverExtension/TinyGPUResourceTable.h`
 - `TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
+
+## Current in-repository outcome
+
+As recorded after the 2026-08-27 migration checkpoint `9d83a0a`, `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.h` and `.cpp` are present on the products branch. The named resource-table host contract, along with the other eight named host C++ contracts, compiled from `tinygpu/` and exited `0` in the recorded Task 3 verification under the selected Xcode 26.6 build `17F113` / DriverKit SDK `25.5` source gate. The RED command above remains a historical contract command and was not rerun by this report. Import/private-VA completion and hardware acceptance remain blocked; no hardware success claim is made.
 
 The smallest seam required by the test is a global TinyGPU helper with the following vocabulary and behavior (the return type may be the frozen `TGPUStatus` enum or its `uint32_t` underlying value):
 
@@ -85,4 +89,4 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 /tmp/tgpu_resource_table_contract
 ```
 
-The current checkout has neither the requested header nor source, so the initial RED is the explicitly accepted missing-seam failure (missing `TinyGPUResourceTable.h` / `TinyGPUResourceTable.cpp`), not a fixture or syntax assertion. Once the smallest seam exists, the same command must compile and then fail only on the first unimplemented ownership/lifetime behavior; after the task-set-3 implementation, it must exit `0`. This agent did **not** execute the command or any tests/builds/linters/package/install/hardware command.
+Historical RED observation (former external TinyGPU checkout, before the 2026-08-27 in-repository migration checkpoint `9d83a0a`): that checkout had neither requested file, so the initial RED was the accepted missing-seam failure (`TinyGPUResourceTable.h` / `TinyGPUResourceTable.cpp`), not a fixture or syntax assertion. Current products source contains the seam and the named host contracts pass from `tinygpu/`, as recorded above. The command remains a historical contract command and was not rerun by this report; import/private-VA completion and hardware acceptance remain blocked. This agent did **not** execute the command or any tests/builds/linters/package/install/hardware command.

@@ -906,7 +906,7 @@ Close is idempotent and ordered: mark the connection closing and reject new call
 | `TinyGPUDriverExtension/Info.plist` | Existing personality matches display-class PCI devices generally and has one generic user-client class. | Release personality must match only AMD `1002:7551` and expose separate inference/recovery/diagnostic user-client classes with exact role authorization. A class-wide or vendor-wide Release personality is forbidden. |
 ### Required source/package cutover before any install
 
-The current source still contains a buildable legacy path (`TinyGPUDriverExtension.xcodeproj/project.pbxproj` includes `server.c` in the app Sources phase) and the current app CLI still exposes `server <path>`. The quarantine is therefore an owned source cutover, not a prose exception. **P1 task set 2 owns this cutover in the in-repository `tinygpu/` source tree before any P1 install or cold validation:**
+Historical pre-cutover observation (former external TinyGPU checkout, recorded before the 2026-08-27 in-repository migration checkpoint `9d83a0a`): that source contained a buildable legacy path (`TinyGPUDriverExtension.xcodeproj/project.pbxproj` included `server.c` in the app Sources phase) and its app CLI exposed `server <path>`. The quarantine was therefore an owned source cutover, not a prose exception. **Current in-repository outcome (recorded after `9d83a0a`):** the `tinygpu/` project has no `server.c` target/source-phase reference, the app CLI has no `server` branch or socket-path usage, and the app describes the DriverKit controller. The proxy cutover is complete; retained `tinygpu/Shared/server.c` is quarantine material only and is not compiled, linked, launched, or used for inference/acceptance. The current source/package gates pass; hardware and firmware blockers remain.**
 
 | Exact path/symbol | Required cutover and acceptance check |
 |---|---|
@@ -986,7 +986,7 @@ xcodebuild -project TinyGPUDriverExtension.xcodeproj \
 ./install_nosip.sh
 ```
 
-The currently verified preflight result is blocked: active developer directory is CommandLineTools, DriverKit SDK version is unavailable, and full Xcode is absent. After full Xcode is installed/selected, the first command must print the selected developer directory and the second must print an exact DriverKit SDK version; that version is recorded before any source build. The local installer may use only the NoSIP development entitlement. No command in this section launches or links `Shared/server.c`.
+Historical toolchain observation (former preflight state, recorded before the 2026-08-26 toolchain selection): the active developer directory was CommandLineTools, the DriverKit SDK version was unavailable, and full Xcode was absent. **Current toolchain/source outcome:** the supervisor selected Xcode 26.6 build `17F113` with DriverKit SDK `25.5` on 2026-08-26; the selected SDK path is recorded above, and the current in-repository TinyGPU source gates passed in the recorded Task 3 verification. The local installer may use only the NoSIP development entitlement. No command in this section launches or links `Shared/server.c`; cold hardware/firmware acceptance remains blocked.
 
 ### P1 cold lifecycle
 

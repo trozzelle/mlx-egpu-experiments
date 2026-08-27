@@ -5,9 +5,9 @@
 - DriverKit import transport: `agent://P1DescriptorResearch`
 - AMD private-VM mapping reuse: `agent://P1PrivateVMResearch`
 - Installed toolchain: Xcode 26.6 build `17F113`, DriverKit SDK 25.5, macOS SDK 26.5
-- Current source checkpoints:
-  - TinyGPU `277b96282`
-  - Products/evidence `8aa993c`
+- Import provenance: the standalone TinyGPU installer was imported from former source checkpoint `f18261437` (`extra/usbgpu/tbgpu/installer/`); that checkpoint is provenance, not the current source authority.
+- Historical execution checkpoints (not current authority): TinyGPU `277b96282` and products/evidence `8aa993c`. These identify former execution snapshots only.
+- Current sole source/evidence authority: products checkout branch `feature/r9700-products-wave-a` at migration checkpoint `9d83a0a`. The current branch history records `3752504` (migration design), `2ca0a0a` (migration plan), `3b6d1f6` (in-repository import), `60d9955` (products source authority), `47c80c7` (execution provenance), and `9d83a0a` (historical provenance labels). Documentation corrections after that checkpoint are working-tree edits in this fix wave; no uncommitted hash is asserted.
 
 ## Descriptor import contract
 
