@@ -2,17 +2,18 @@
 
 **Status:** Implemented; supervisor verification pending
 
-**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
 
 **Evidence worktree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
 
 ## Scope
 
-Only these source files were changed in the in-repository `tinygpu/` source tree:
+Historical changed-file paths from the former TinyGPU source tree:
 
-- `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.h`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUResourceTable.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp`
 
 This report is the only evidence-worktree file created for this correction. No tests, user-client integration, Xcode project/package/client files, or cold-stage logic were changed.
 

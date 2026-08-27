@@ -4,20 +4,21 @@
 
 **Owner:** `P1BufferIntegrationCore`
 
-**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
 
 **Evidence worktree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
 
 ## Changed files
 
-The implementation adds the four requested validator/owner production seams in the TinyGPU in-repository source tree, public fail-closed readiness predicates for the resource table and buffer owner, and the minimal non-mutating map-preflight method plus shared mintable-slot scan to the already accepted resource table. This report is the only evidence-worktree change:
+The historical changed-file paths below record the four requested validator/owner production seams formerly added in the TinyGPU source tree, public fail-closed readiness predicates for the resource table and buffer owner, and the minimal non-mutating map-preflight method plus shared mintable-slot scan to the already accepted resource table. This report is the only evidence-worktree change:
 
-- `tinygpu/TinyGPUDriverExtension/TGPUBufferRequestValidator.h`
-- `tinygpu/TinyGPUDriverExtension/TGPUBufferRequestValidator.cpp`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUBufferOwner.h`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUBufferOwner.cpp`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.h`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUBufferRequestValidator.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUBufferRequestValidator.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUBufferOwner.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUBufferOwner.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUResourceTable.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
 - `.superpowers/swarm/reports/p1-buffer-integration-core.md`
 
 The three `TinyGPUResourceTable` changes are limited to `PreflightMap(...)`, `IsReady()`, and a shared `FindMintableSlot()` scan used by allocation/import/map paths. The scan skips live slots and free slots whose private generation has reached its bounded maximum, so preflight and commit report `TGPU_STATUS_RESOURCE_EXHAUSTED` without invoking a provider or consuming stale capacity. `IsReady()` additionally requires a representable epoch/capacity, allocated slot storage, and a usable private token namespace, and remains false after cleanup. `TinyGPUBufferOwner::IsReady()` requires the composed table, matching limits epoch, representable record capacity, both record arrays, storage completion, and an open owner. Existing table token, metadata, and cleanup semantics remain compatible. `TGPUABI.h`, task-set-2 source, `.iig` declarations, Xcode project files, user-client selectors, the conformance client, and existing tests were not changed by this implementation.

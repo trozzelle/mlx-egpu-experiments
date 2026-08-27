@@ -13,18 +13,19 @@
 
 **Owner:** P1 DriverKit integration review
 
-**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
 
 **Evidence checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
 
 ## Changed files
 
-The in-repository source tree contains only conformance contracts for this review slice:
+Historical changed-file paths from the former TinyGPU source tree contain only conformance contracts for this review slice:
 
-- `tinygpu/Conformance/tests/test_tgpu_fixed_transport_contract.cpp`
-- `tinygpu/Conformance/tests/test_tgpu_response_validator_contract.cpp`
-- `tinygpu/Conformance/tests/test_tgpu_buffer_owner_contract.cpp` (readiness assertions only)
-- `tinygpu/Conformance/tests/tgpu_resource_table_contract.cpp` (readiness assertions only)
+- `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_fixed_transport_contract.cpp`
+- `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_response_validator_contract.cpp`
+- `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_buffer_owner_contract.cpp` (readiness assertions only)
+- `extra/usbgpu/tbgpu/installer/Conformance/tests/tgpu_resource_table_contract.cpp` (readiness assertions only)
 
 The evidence checkout contains this report only. No DriverKit/user-client implementation, ABI declaration, provider, owner/resource production file, conformance process, IOKit object, DriverKit object, or test double was changed.
 

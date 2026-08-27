@@ -4,23 +4,24 @@
 
 **Owner:** `P1TransportFix`
 
-**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
 
 **Evidence checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
 
 ## Changed source and package files
 
-- `tinygpu/TinyGPUDriverExtension/TGPUFixedTransport.h`
-- `tinygpu/TinyGPUDriverExtension/TGPUFixedTransport.cpp`
-- `tinygpu/TinyGPUDriverExtension/TGPUResponseValidator.h`
-- `tinygpu/TinyGPUDriverExtension/TGPUResponseValidator.cpp`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.iig`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.cpp`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverBackingProvider.h`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverBackingProvider.cpp`
-- `tinygpu/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
-- `tinygpu/Conformance/tgpu_conformance_client.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUFixedTransport.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUFixedTransport.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUResponseValidator.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUResponseValidator.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.iig`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverBackingProvider.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverBackingProvider.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
+- `extra/usbgpu/tbgpu/installer/Conformance/tgpu_conformance_client.cpp`
 
 The accepted `TGPUBufferRequestValidator.*`, `TinyGPUBufferOwner.*`, and `TinyGPUResourceTable.*` core was preserved. The four transport/response helper source files have unique PBX file/build IDs: fixed transport is a `TinyGPUDriver` source, and response validation is a `TGPUConformanceClient` source; all four helper files are present in the extension group. No public ABI declaration, raw control, BAR mapping, address/segment field, socket path, fallback, or task-set-4 command was added.
 

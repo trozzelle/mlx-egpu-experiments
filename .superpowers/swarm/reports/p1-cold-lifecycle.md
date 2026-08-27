@@ -1,33 +1,34 @@
 # P1 task set 2 cold lifecycle implementation
 
 **Owner:** `P1ColdLifecycle`  
-**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
 **Evidence checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)  
 **Scope:** task-set-2 cold lifecycle, structured capabilities/health boundary, source/package cutover, and the first common conformance client.  
 **Validation status:** no build, test, formatter, linter, package-manager, install, signing, or hardware command was run by this agent.
 
 ## Changed files
 
-In the TinyGPU in-repository source tree:
+Historical changed-file paths from the former TinyGPU source tree:
 
-- `tinygpu/TinyGPUDriverExtension/TGPUColdLifecycle.h`
-- `tinygpu/TinyGPUDriverExtension/TGPUColdLifecycle.cpp`
-- `tinygpu/TinyGPUDriverExtension/TGPUABI.h`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.iig`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.cpp`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverUserClient.iig`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
-- `tinygpu/TinyGPUDriverExtension/Info.plist`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.entitlements`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.Release.entitlements`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.NV.Release.entitlements` (removed)
-- `tinygpu/build_and_sign_nv.sh` (removed)
-- `tinygpu/Shared/TinyGPUCLIRunner.swift`
-- `tinygpu/Shared/TinyGPUApp.swift`
-- `tinygpu/Shared/TinyGPU-Bridging-Header.h`
-- `tinygpu/macOS/macOS.entitlements`
-- `tinygpu/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
-- `tinygpu/Conformance/tgpu_conformance_client.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUColdLifecycle.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUColdLifecycle.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUABI.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.iig`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverUserClient.iig`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/Info.plist`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.entitlements`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.Release.entitlements`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.NV.Release.entitlements` (removed)
+- `extra/usbgpu/tbgpu/installer/build_and_sign_nv.sh` (removed)
+- `extra/usbgpu/tbgpu/installer/Shared/TinyGPUCLIRunner.swift`
+- `extra/usbgpu/tbgpu/installer/Shared/TinyGPUApp.swift`
+- `extra/usbgpu/tbgpu/installer/Shared/TinyGPU-Bridging-Header.h`
+- `extra/usbgpu/tbgpu/installer/macOS/macOS.entitlements`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
+- `extra/usbgpu/tbgpu/installer/Conformance/tgpu_conformance_client.cpp`
 
 The retained `Shared/server.c` file is historical quarantine material. It has no project file reference, no Sources-phase entry, no bridge declaration, no CLI branch, and no product launch path.
 

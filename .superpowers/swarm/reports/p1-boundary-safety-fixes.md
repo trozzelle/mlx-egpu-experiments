@@ -2,7 +2,8 @@
 
 **Status:** Implemented; supervisor verification pending
 
-**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
 
 **Evidence worktree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
 
@@ -12,22 +13,22 @@ This correction owns the public user-client boundary, role/package cutover, dire
 
 ## Changed source/package files
 
-In the TinyGPU in-repository source tree:
+Historical changed-file paths from the former TinyGPU source tree:
 
-- `tinygpu/TinyGPUDriverExtension/TGPUHealthRequestValidator.h`
-- `tinygpu/TinyGPUDriverExtension/TGPUHealthRequestValidator.cpp`
-- `tinygpu/TinyGPUDriverExtension/TGPUEvidenceLog.h`
-- `tinygpu/TinyGPUDriverExtension/TGPUEvidenceLog.cpp`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUInferenceUserClient.iig`
-- `tinygpu/TinyGPUDriverExtension/TinyGPURecoveryUserClient.iig`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDiagnosticUserClient.iig`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.cpp`
-- `tinygpu/TinyGPUDriverExtension/Info.plist`
-- `tinygpu/Conformance/tgpu_conformance_client.cpp`
-- `tinygpu/Conformance/TGPUConformanceClient.entitlements`
-- `tinygpu/Shared/TinyGPUCLIRunner.swift`
-- `tinygpu/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUHealthRequestValidator.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUHealthRequestValidator.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUEvidenceLog.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUEvidenceLog.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUInferenceUserClient.iig`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPURecoveryUserClient.iig`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDiagnosticUserClient.iig`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/Info.plist`
+- `extra/usbgpu/tbgpu/installer/Conformance/tgpu_conformance_client.cpp`
+- `extra/usbgpu/tbgpu/installer/Conformance/TGPUConformanceClient.entitlements`
+- `extra/usbgpu/tbgpu/installer/Shared/TinyGPUCLIRunner.swift`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
 
 This report is the only products-worktree file created for this correction. Shared ledgers, task packets, and validation documents were not edited.
 

@@ -8,7 +8,8 @@
 - No user-client, resource-table, package, app, client, ledger, task-packet, or validation-document changes were made.
 - The only project-file exception was the explicitly authorized source integration: one `TGPUFramebufferDecoder.cpp` file reference/build-file entry and one TinyGPUDriver target Sources entry in `TinyGPUDriverExtension.xcodeproj/project.pbxproj`.
 - Supervisor project parse/build checks found the initial decoder PBXBuildFile identifier (`...0D`) collided with the existing `Conformance` PBXGroup, then the replacements (`...0E` and `...0F`) collided with existing `Debug` and `Release` `XCBuildConfiguration` objects. The final decoder file reference is `...10` and its PBXBuildFile/Sources identifier is `...11`; no configuration identifier was changed.
-- Cold boundary files addressed in the in-repository source tree: `TinyGPUDriver.cpp`, `TGPUColdLifecycle.h`, `TGPUColdLifecycle.cpp`, `TGPUFramebufferDecoder.h`, and `TGPUFramebufferDecoder.cpp`.
+- Historical changed files: the cold boundary files were addressed in former checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; this execution path is provenance only.
+- Current source authority and reproduction root: active implementation and reproduction use `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`.
 
 ## Implemented safety behavior
 

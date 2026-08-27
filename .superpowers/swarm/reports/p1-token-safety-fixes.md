@@ -4,12 +4,13 @@
 
 P1A-TOKEN-001 / P1-BUFFER-001 is fixed in the DEXT-owned resource-table seam. The authoritative RED case was the epoch-1/nonce-1 versus epoch-2/nonce-2 replay: XOR token inputs could be equal, allowing the epoch-one token to resolve in the epoch-two table. No BO/VA operation, user-client selector, queue resource, package, or client file was changed.
 
-In-repository source tree: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`).
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
 
 Changed source files:
 
-- `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.h`
-- `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUResourceTable.h`
+- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
 
 The existing `Conformance/tests/tgpu_resource_table_contract.cpp` already contains the explicit cross-epoch replay assertion, so it was not changed. This report is the only products-worktree change for this lane.
 
