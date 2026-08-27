@@ -7,7 +7,7 @@
 - Installed toolchain: Xcode 26.6 build `17F113`, DriverKit SDK 25.5, macOS SDK 26.5
 - Import provenance: the standalone TinyGPU installer was imported from former source checkpoint `f18261437` (`extra/usbgpu/tbgpu/installer/`); that checkpoint is provenance, not the current source authority.
 - Historical execution checkpoints (not current authority): TinyGPU `277b96282` and products/evidence `8aa993c`. These identify former execution snapshots only.
-- Current sole source/evidence authority: products checkout branch `feature/r9700-products-wave-a` at migration checkpoint `9d83a0a`. The current branch history records `3752504` (migration design), `2ca0a0a` (migration plan), `3b6d1f6` (in-repository import), `60d9955` (products source authority), `47c80c7` (execution provenance), and `9d83a0a` (historical provenance labels). Documentation corrections after that checkpoint are working-tree edits in this fix wave; no uncommitted hash is asserted.
+- Current sole source/evidence authority: products checkout branch `feature/r9700-products-wave-a`. Its immutable migration/documentation history is recorded through `58d354c`: `3752504` (migration design), `2ca0a0a` (migration plan), `3b6d1f6` (in-repository import), `60d9955` (products source authority), `47c80c7` (execution provenance), `9d83a0a` (historical provenance labels), and `58d354c` (final-review documentation fixes).
 
 ## Descriptor import contract
 
