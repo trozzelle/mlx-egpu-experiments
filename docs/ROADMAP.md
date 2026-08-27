@@ -298,7 +298,7 @@ The P1 implementation boundary is `tinygpu/` in the products worktree. Every Tin
 - P1 stable device-owner operations.
 - `DESIGN.md` HAL semantics.
 - IREE and PJRT as Pattern references only.
-- P2 may begin after P1 ABI freeze; P2 promotion requires Gate G0 rather than a duplicate HAL-specific WMMA proof.
+- P2 task set 1 may begin now because the stable P1 ABI subset is frozen. Portable/mock and stable host-visible/executable backend work may proceed before P1 completion; import/device-local/private-VM work waits for the reviewed P1 amendment. P2 promotion requires accepted P1 plus Gate G0 rather than a duplicate HAL-specific proof.
 
 ### Promotion gate
 

@@ -5,7 +5,7 @@
 - `docs/ROADMAP.md` §Phase Q1: Qwen contract and oracle package.
 - `docs/IMPLEMENTATION_PLAN.md` §Q1 — Contract and oracle package.
 - `docs/DESIGN.md` §Qwen parallel research contract and Canonical KV Description.
-- `.superpowers/swarm/progress.md` Q1 row: Ready.
+- `.superpowers/swarm/progress.md` Q1 row: implementation complete; provenance-closure task set 7 is Ready.
 - Existing `native_r9700/qwen_*` modules and focused Qwen tests.
 - `docs/REFERENCES.md` MLX-VLM Qwen3.5 implementation and Qwen3.8-27B-4bit model (Normative), mlx-lm cache (Normative), AITER quantized sources/configs (supporting).
 - Manifest IDs: `mlx-vlm-qwen3-5`, `qwen3-8-27b-4bit-model`, `mlx-lm-cache`, `aiter-gfx1201`.
@@ -19,7 +19,7 @@ Produce a deterministic, implementation-plan-ready Qwen3.8-27B text-only package
 
 - B0 is Done for evidence-labeling/fail-closed rules only.
 - F2–F4 are not required for Q1 research.
-- F6 is blocked until Q1 is Done and consumes Q1 without editing oracle truth.
+- F6 is blocked until Q1 provenance task set 7 is Done and consumes Q1 without editing oracle truth.
 - Q1 must not depend on Llama cache geometry, model graph, or acceptance thresholds.
 
 ## Reference resources
@@ -31,10 +31,10 @@ Produce a deterministic, implementation-plan-ready Qwen3.8-27B text-only package
 
 ## Orchestration map
 
-- Sequential blockers: task set 1 freezes model/tensor/source/command identity. After supervisor re-review of the correction pass, task sets 2 and 3 may implement concurrently against the exact converted snapshot and verified source-pin identity; the unavailable base revision remains a promotion-only blocker. Task set 4 waits for tasks 2–3. Task set 5 may run beside task set 4 after task set 1 and consumes task-set-2 shapes when ready. Task set 6 waits for tasks 2–5 and may only review/package, never edit parity or cache code.
-- Parallelizable task sets: quantized tensor/binder inventory (2) and hybrid cache/recurrence (3); oracle fixtures (4) and native shape mapping (5) after their inputs freeze.
-- Shared contracts/artifacts: converted model revision, explicit `base_model_revision=unavailable_in_pinned_conversion_metadata` marker, local shard digests, schema-v2 tensor inventory and affine classification digest, affine bits/group/scales/biases, runtime layer order, state component IDs/shapes/dtypes/owners/updates/offsets, oracle fixture schema, F6 corpus.
-- Coordination risks/ownership: `qwen_text_adapter.py`/binder files and metadata/inventory CLI belong to task 2; task-set-1 source-pin streams full shard bytes only for identity; `qwen_hybrid_cache.py`/spill plus capture/restore CLI and executable MLX restore belong to task 3; fixture catalog/files and `qwen_parity.py` fixture/comparison integration belong solely to task 4; task 6 is review/package-only and must not edit parity or cache code.
+- Sequential blockers: task sets 1–6 are Done. Task set 7 is a standalone provenance-closure lane and must not edit oracle/cache/parity behavior unless a newly established immutable identity requires fixture regeneration.
+- Parallelizable work: task set 7 runs independently beside F2/P1/P2 lanes. F6 remains blocked on task set 7 plus its F2–F4 prerequisites.
+- Shared contracts/artifacts: existing model fingerprint, converted snapshot/shard digests, literal unavailable base-revision marker, applicable base-license record, and the accepted 259-test oracle package.
+- Coordination risks/ownership: task set 7 owns source-pin/license/provenance records and any identity-only fixture regeneration; it must not reinterpret model tensors, recurrence, cache ownership, or parity thresholds.
 
 ## Progress ledger
 
@@ -46,6 +46,7 @@ Produce a deterministic, implementation-plan-ready Qwen3.8-27B text-only package
 | 4. CPU/MLX oracle fixtures | Done | Q1OracleFixtures | Five deterministic bounded fixtures regenerated with pinned mlx-lm 0.32.0 / MLX 0.32.1; full shard/runtime binding and model-bound parity pass. |
 | 5. Shared versus Qwen-specific native shape map | Done | Q1ShapeMap | Read-only map complete in `.superpowers/swarm/reports/q1-native-shape-map.md`; no native/performance claim. |
 | 6. F6 acceptance package and Q1 review | Done | Q1Acceptance | Pinned generation/parity and the 259-test package gate pass; exact oracle-only identity projection is complete. Q1/F6 promotion remains blocked only by unavailable immutable base-model revision/license provenance. |
+| 7. Resolve immutable base revision and license provenance | Ready | Unassigned | Establish source-verified base identity/license, update the source pin, and rerun the accepted package without native/performance claims. |
 
 Agents update only their row and append evidence/notes as work completes.
 
@@ -264,6 +265,45 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 ```
 
 Supervisor runs exact `Q1 package review` command/check from task set 1.
+
+## Task set 7: Close base-model revision and license provenance
+
+### Target
+
+- Inspect the converted snapshot metadata, upstream model repository/history, conversion records, tokenizer/config/index identity, and applicable model license.
+- Produce `.superpowers/swarm/reports/q1-provenance-closure.md` plus ready-to-apply source-pin and upstream-manifest deltas.
+- The named upstream-manifest owner applies the manifest delta after review; this lane does not race F2/P1 provenance edits.
+- Non-goals: infer a revision, change tensor/cache/oracle semantics, implement native kernels, or relax F6 acceptance.
+
+### Change
+
+1. Establish an immutable source-verified base-model revision or record the exact authoritative evidence that no recoverable revision exists.
+2. Bind the applicable base-model license/SPDX status, source URL, revision/path scope, and redistribution conditions.
+3. Update the model fingerprint/source pin only when the verified identity changes; regenerate fixtures only when their bound identity requires it.
+4. Rerun source-pin, tensor, hybrid-state, oracle parity, and package-review gates; preserve `producer_kind: cpu_reference` and no-native labels.
+
+### Acceptance
+
+- No unavailable/floating base identity remains in a promoted Q1 record.
+- Every model component has a reviewed license/provenance record.
+- The accepted package remains deterministic and model-bound; no native/performance claim is introduced.
+- F6 receives one immutable Q1 package or remains explicitly blocked with source evidence.
+
+### Validation
+
+```sh
+${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+  tests/native_r9700/test_qwen_text_adapter.py \
+  tests/native_r9700/test_qwen_hybrid_state_spill.py \
+  tests/native_r9700/test_qwen_layer_executor.py \
+  tests/native_r9700/test_qwen_layer_executor_contract.py \
+  tests/native_r9700/test_qwen_parity.py \
+  tests/native_r9700/test_ref_fixtures.py \
+  tests/native_r9700/test_fixture_catalog.py -v
+git diff --check docs/upstream-reference-manifest.yaml \
+  docs/tasks/r9700-products/phase-q1-qwen-contract-oracle.md \
+  .superpowers/swarm/reports/q1-provenance-closure.md
+```
 
 ## Phase validation
 

@@ -31,19 +31,19 @@
 |---|---|---|---|
 | B0 native Llama producer/serving baseline | Complete | C0 hardware proof; C1R prompt-0/16/64/128 exact; C2R no-fallback | Preserve as regression control. |
 | F1 persistent warm worker | Complete | Accepted producer/serving path; multi-PDB1 resident allocation; persistent private worker | Preserve the first authoritative cold/warm/GPU-compute baseline and no-reload service contract. |
-| F2 gfx1201 WMMA foundation | Ready | Scalar control, code-image admission, pinned WMMA/ISA sources | Lane-map proof plus admitted standalone WMMA GEMM and shared G0 record. |
-| P1 TinyGPU Device Owner hardening | Ready | ADR 0007; accepted TinyGPU/AMDev path; pinned lifecycle/DriverKit sources | Cold lifecycle, safe user-client ABI, reset/fault conformance, and G0 consumption. |
-| P3 first-class Kernel Packs | Ready | Existing HSA asset/catalog validation and upstream manifest | Concrete provenance/numerical/evidence records; migrate G0 WMMA artifact. |
-| Q1 Qwen contract/oracle package | Ready | Existing `native_r9700/qwen_*` controls plus pinned MLX-VLM/model sources | Deterministic hybrid-state ownership, fixtures, and native acceptance contract. |
-| F3 matrix projection graph | Blocked | Requires F1 model-handle/prepacking and F2 WMMA family | Gate/up → down → fused QKV → O promotion in profile order. |
-| P2 Inference HAL | Blocked | Requires P1 ABI freeze; G0 required for promotion | Portable copy/fill/dispatch/barrier/timestamp/fence/fault conformance. |
+| F2 gfx1201 WMMA foundation | Ready: task 3A | Tasks 1–2 Done; lane-map exact; offline admission contracts pass | Acquire pinned sources/select candidate image, then 3B admission→G0. |
+| P1 TinyGPU Device Owner hardening | Ready: tasks 1A and 2A | Stable ABI/source foundations reviewed; nine host contracts and Xcode builds pass | Import ABI amendment and cold-firmware provenance run concurrently. |
+| P2 Inference HAL | Ready: task 1 | Stable P1 ABI subset is Done; G0/P1 completion are promotion-only gates | Freeze portable/stable/deferred operation matrices, then run tasks 2/3A concurrently. |
+| P3 first-class Kernel Packs | Blocked on G0 | Tasks 1–4 Done; 13 scalar packs and RMSNorm hardware evidence accepted | Consume exact G0 in task 5, then final promotion. |
+| Q1 Qwen contract/oracle package | Ready: task 7 | Tasks 1–6 Done; deterministic 259-test oracle package | Close immutable base revision/license provenance. |
+| F3 matrix projection graph | Blocked | F1 model-handle/prepacking accepted; F2 WMMA/G0 missing | Start after accepted F2/G0; promote gate/up → down → fused QKV → O. |
 
 ## Guardrails
 
 - Stop at the first non-finite or out-of-tolerance stage.
 - CPU/NumPy is oracle evidence only; it cannot produce an accepted native artifact.
 - Preserve `S-1` cache semantics and final-token injection.
-- Q1 contract/oracle research may proceed in parallel; native Qwen performance acceptance waits for its selected F2–F4 prerequisites.
+- Q1 implementation is complete; task set 7 provenance closure may proceed independently, while native Qwen work remains downstream of F2–F4/F6.
 
 ## Launch/Transport Optimization (2026-08-24)
 
@@ -75,14 +75,15 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 
 ### Orchestration map
 
-- Wave A: F1, F2, P1, P3, and Q1 start independently. Each phase follows its internal task-set dependencies.
-- Wave B: G0 consumes F2's exact WMMA record; F3 waits for accepted F1/F2 contracts; P2 waits for P1 ABI freeze and consumes G0 before promotion.
-- Wave C: F4 waits for F3. P4 waits for F1, P2, P3, and the selected admitted graph.
-- Shared integration ownership: F2 owns WMMA-specific source/images; P3 owns generic Kernel Pack records/tooling; one supervisor-selected integration owner serializes `kernel_assets.cpp`, `kernel_catalog.cpp`, and generated catalogs.
-- Service ownership: F1 owns `model_service.py`, `service_protocol.py`, `native_worker.py`, and persistent service semantics. Q1 owns `qwen_*` modules and must not edit those service files.
-- Device ownership: P1 owns TinyGPU DEXT/user-client ABI plus local conformance clients; it must not change model/kernel code.
-- Verification: executors record focused commands but run no tests, hardware commands, formatters, package managers, or git. The supervisor runs RED/GREEN checks, phase commands, serialized hardware evidence, broad suites, and review gates.
-- Quality gate: correctness, maintainability, existing-architecture fit, and the simplest adequate design are all required; unnecessary abstraction blocks promotion.
+- Wave A is closed as the foundation wave: F1 promoted; F2/P1/P3/Q1 completed the reachable source/contract work recorded below.
+- Wave B0 starts five independent unblockers now: F2 task set 3A, P1 task sets 1A and 2A, Q1 task set 7, and P2 task set 1.
+- Wave B1 consumes local freezes: F2 3B→4/5→6, P1 2B/3, and parallel P2 task sets 2/3A. Q1 provenance remains independent.
+- Wave B2 starts G0 consumers: F3 and P3 task set 5 in parallel; P2 3B/4 consume accepted P1 extensions.
+- Wave C1 runs F4, P2 command/backend completion, and P3 promotion after their direct dependencies. Wave C2 is the serialized P4 convergence boundary.
+- Wave D starts F5 after F4; F6 starts only after F4 plus Q1 task 7. P5 waits for P4 and a measured human-approved need.
+- P1 task sets 1A/2A may research concurrently, but one P1↔P2 contract owner serializes edits to the P1/P2 packets and active validation ledger. One upstream-manifest owner serializes F2/P1/Q1 provenance changes after their disjoint reports are ready.
+- Source/research lanes may run concurrently; every shared-file integration, DEXT install, and R9700 hardware command serializes through its named owner/lock.
+- Verification and quality: executors record focused commands but run no project-wide/hardware/git work. Supervisor owns RED/GREEN, hardware evidence, broad suites, review gates, commits, and strict no-substitute promotion.
 
 | Task | Status | Owner | Dependencies | Report | Evidence | Blocker |
 |---|---|---|---|---|---|---|
@@ -92,8 +93,20 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 | Wave A / P1 TinyGPU Device Owner | Blocked | Supervisor / P1 source integration | B0, ADR 0007 | `p1-abi-freeze.md`; `p1-xcode-resume.md`; P1 RED/fix/review/integration reports; `p1-remaining-blockers.md` | Task set 1 Done. Reviewed task-set-2 safe source/package/common-client and task-set-3 bounded ownership plus real host-visible allocate/release/client-death source are checkpointed. Nine host contracts and both unsigned Xcode targets pass; task-set-3 controls: 62 passed; final focused reviews have zero Critical/Important findings. | Task set 2 lacks provenance-bound PSP/SOS/TMR transitions and signed install/hardware evidence. Task set 3's frozen 48-byte-plus-distinct-descriptor import is not representable by `IOConnectCall*`; device-local/private-VM PTE mapping waits for cold ownership. Tasks 4–6 remain downstream; task 6 also requires G0. |
 | Wave A / P3 Kernel Packs | Blocked | P3 runtime/offline integration | B0; G0 for final migration | `p3-contract-freeze.md`; `p3-scalar-migration.md`; P3 RED/GREEN reports | Task sets 1–4 complete. All 13 scalar packs are allocation-free, evidence-sealed, selectable through existing admission, and pass the 27-test gate; both fresh R9700 RMSNorm traces exit 0. | Task set 5 and final P3 promotion require the blocked F2/G0 WMMA artifact. |
 | Wave A / Q1 Qwen contract/oracle | Blocked | Q1Acceptance | B0 | Q1 identity/tensor/hybrid/oracle/shape/acceptance reports | Task sets 1–6 implemented. Pinned mlx-lm 0.32.0 / MLX 0.32.1 regeneration and model-bound parity pass; package gate passes 259 tests with oracle-only evidence. | Hard provenance blocker: `base_model_revision=unavailable_in_pinned_conversion_metadata` and applicable base license provenance. No native/performance claim. |
-| Wave B / G0 conformance record | Blocked | Unassigned | F2 | integration-g0.md | — | Waiting for F2 accepted WMMA artifact. |
-| Wave B / F3 projection graph | Blocked | Unassigned | F1, F2 | phase F3 reports | — | Waiting for model-handle/prepacking and admitted WMMA contracts. |
-| Wave B / P2 Inference HAL | Blocked | Unassigned | P1 ABI; G0 for promotion | phase P2 reports | — | Waiting for P1 ABI freeze. |
-| Wave C / F4 tiled attention | Blocked | Unassigned | F3 | phase F4 reports | — | Waiting for F3. |
-| Wave C / P4 service platform adoption | Blocked | Unassigned | F1, P2, P3, selected graph | phase P4 reports | — | Waiting for Wave A/B contracts. |
+| Wave B0 / F2 task 3A source-image acquisition | Ready | Unassigned | F2 tasks 1–2 Done | `f2-source-image-selection.md` | Pinned revisions/ABI/lane map are frozen. | Acquire exact rocWMMA/AITER checkouts and select one candidate image; no hardware claim. |
+| Wave B0 / P1 task 1A import ABI re-freeze | Ready | Unassigned | P1 stable task 1 Done | `p1-import-abi-amendment.md` | Infeasible current transport and security constraints are documented. | Select one public-API-representable import design and pass focused security/architecture review. |
+| Wave B0 / P1 task 2A cold-firmware provenance | Ready | Unassigned | P1 stable task 1 Done | `p1-cold-firmware-provenance.md` | Cold stage/source blockers are isolated. | Bind exact firmware revisions, hashes, licenses, scope, and bundle/load policy. |
+| Wave B0 / Q1 task 7 provenance closure | Ready | Unassigned | Q1 tasks 1–6 Done | `q1-provenance-closure.md` | Deterministic oracle package and 259-test gate pass. | Resolve immutable base revision and applicable base license; no native claim. |
+| Wave B0 / P2 task 1 contract freeze | Ready | Unassigned | P1 stable ABI task 1 Done | `p2-contract-freeze.md` | Stable P1 operations are accepted; G0 blocks promotion only. | Freeze portable/stable/deferred operation matrices and exact commands. |
+| Wave B1 / F2 task 3B admission | Blocked | Unassigned | F2 task 3A | `f2-admission-*` reports | Offline admission tool passes 34 tests. | Waiting for selected real source/image inputs. |
+| Wave B1 / F2 tasks 4 and 5 | Blocked | Unassigned | F2 tasks 2 and 3B | WMMA source/numerical reports | Lane-map proof is accepted. | Task 4 starts after 3B; task 5 overlaps only after task-4 ABI freezes. |
+| Wave B1 / F2 task 6 G0 | Blocked | Unassigned | F2 tasks 2–5 | `.superpowers/swarm/reports/g0-wmma-conformance.md` | — | Native benchmark/hardware publication serializes after all F2 gates. |
+| Wave B1 / P1 task 2B cold ownership | Blocked | Unassigned | P1 task 2A | P1 cold reports | Reviewed cold source boundary exists. | Waiting for firmware provenance/bundle contract plus signing/hardware inputs. |
+| Wave B1 / P1 task 3 mapping completion | Blocked | Unassigned | P1 task 1A and accepted 2B | P1 import/VM reports | Host-visible ownership source passes. | Waiting for import re-freeze and cold-owned device-local/private-VM mapping. |
+| Wave B1 / P2 tasks 2 and 3A | Blocked | Unassigned | P2 task 1 | HAL contract reports | Task sets own disjoint portable versus AMD-stable-subset files. | Start concurrently immediately after task-set-1 freeze. |
+| Wave B2 / F3 and P3 task 5 | Blocked | Unassigned | G0; F1 for F3 | F3/P3 reports | F1 and P3 foundations are ready. | Waiting for accepted G0; one F2→P3 catalog integration owner. |
+| Wave B2 / P2 task 3B | Blocked | Unassigned | P2 task 3A; accepted P1 import/mapping extension | P2 AMD-backend reports | — | Does not wait for G0 to implement; promotion still waits for P1/G0. |
+| Wave B2 / P2 task 4 | Blocked | Unassigned | P2 tasks 3A and 3B | P2 command/backend reports | — | Command/queue/fence work follows complete AMD memory/executable backend. |
+| Wave C1 / F4, P2 task 5, P3 promotion | Blocked | Unassigned | F3; P2 tasks 2–4 plus P1/G0; P3 task 5 | phase promotion reports | — | Direct dependencies and serialized hardware gates remain. |
+| Wave C2 / P4 service-platform convergence | Blocked | Unassigned | F1, accepted P2/P3, selected F2–F4 graph | P4 reports | — | Production cutover waits for accepted platform and graph contracts. |
+| Wave D / F5, F6, P5 | Blocked | Unassigned | F4 for F5; F4 plus Q1 task 7 for F6; P4 plus decision for P5 | downstream phase reports | — | F5 starts after F4; F6 starts only after F4 and Q1 provenance closure. |

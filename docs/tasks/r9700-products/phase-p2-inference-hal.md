@@ -16,9 +16,10 @@ Implement the minimal portable Device/Buffer/Executable/CommandBuffer/Queue/Fenc
 
 ## Dependencies
 
-- P1 user-client ABI freeze is required to start implementation.
+- P1 task set 1 froze the stable TGPU v1.0 user-client subset and is Done; P2 task set 1 is ready now.
+- The P1 import transport amendment blocks only HAL import/device-local/private-VM mapping semantics, not the portable interface, mock conformance, executable admission, or host-visible buffer work.
 - P1 must be Done before P2 promotion.
-- G0 blocks promotion, not interface/mock implementation.
+- G0 blocks promotion and direct/HAL equivalence, not interface/mock or stable-subset backend implementation.
 - P4 waits for P2 and P3.
 
 ## Reference resources
@@ -30,20 +31,21 @@ Implement the minimal portable Device/Buffer/Executable/CommandBuffer/Queue/Fenc
 
 ## Orchestration map
 
-- Sequential blockers: task set 1 freezes portable ABI, backend boundary, test matrix, and commands. Task sets 2 and 3 may run concurrently after freeze. Task set 4 waits for task set 3. Task set 5 waits for all and G0/P1 completion.
-- Parallelizable task sets: task set 2 owns `hal.h/.cpp` plus mock/portable tests; task set 3 owns `hal_amdev.h/.cpp` memory/executable portion and local backend tests. No shared file edits.
-- Shared contracts/artifacts: capabilities, memory domains, opaque objects/lifetimes, command types, waits/signals, error/status mapping, evidence fields, P1 ABI version, G0 identity.
-- Coordination risks: task sets 3–4 serialize on `hal_amdev.*`; P4 does not edit HAL files until P2 review; no model semantics enter portable headers.
+- Sequential blockers: task set 1 is ready and freezes the portable ABI, backend boundary, stable-versus-deferred P1 operation map, test matrix, and commands. Task sets 2 and 3A run concurrently after that freeze. Task set 3B waits for the P1 import ABI re-freeze and cold-owned device-local/private-VM mapping. Task set 4 waits for 3A and 3B; task set 5 waits for all, P1 completion, and G0.
+- Parallelizable task sets: task set 2 owns `hal.h/.cpp` plus mock/portable tests; task set 3A owns the stable `hal_amdev.h/.cpp` host-visible buffer/executable subset and local backend tests. No shared file edits. Task set 3B later extends the single-owner `hal_amdev.*` backend.
+- Shared contracts/artifacts: capabilities, memory domains, opaque objects/lifetimes, command types, waits/signals, error/status mapping, evidence fields, stable P1 ABI version/subset, deferred import-extension identity, and G0 identity.
+- Coordination risks: task sets 3A–4 serialize on `hal_amdev.*`; the task-set-1 freeze must not invent import semantics before P1 re-freezes them; P4 does not edit HAL files until P2 review; no model semantics enter portable headers.
 
 ## Progress ledger
 
 | Task set | Status | Owner | Notes |
 |---|---|---|---|
-| 1. Portable ABI/backend boundary/command freeze | Blocked | Unassigned | Waits for P1 ABI freeze. |
-| 2. Portable HAL objects and mock contracts | Blocked | Unassigned | Waits for task set 1; parallel with task set 3. |
-| 3. AMD memory/executable backend | Blocked | Unassigned | Waits for task set 1/P1; parallel with task set 2. |
-| 4. AMD command/queue/fence/timestamp/fault backend | Blocked | Unassigned | Waits for task set 3. |
-| 5. Direct/HAL conformance, G0 consumption, and review | Blocked | Unassigned | Waits for tasks 2–4, P1, and G0. |
+| 1. Portable ABI/backend boundary/command freeze | Ready | Unassigned | P1 task set 1 is Done. Freeze the stable operation subset now and mark import/device-local/private-VM operations deferred to task set 3B. |
+| 2. Portable HAL objects and mock contracts | Blocked | Unassigned | Waits only for task set 1; then parallel with task set 3A. |
+| 3A. AMD host-visible buffer and executable backend | Blocked | Unassigned | Waits only for task set 1; parallel with task set 2. Excludes import, device-local, and private-VM mapping. |
+| 3B. AMD import, device-local, and private-VM backend | Blocked | Unassigned | Waits for accepted task set 3A plus P1 import ABI re-freeze and cold-owned mapping contract. |
+| 4. AMD command/queue/fence/timestamp/fault backend | Blocked | Unassigned | Waits for accepted task sets 3A and 3B. |
+| 5. Direct/HAL conformance, G0 consumption, and review | Blocked | Unassigned | Waits for tasks 2–4, P1 completion, and G0. |
 
 Agents update only their row and append evidence/notes as work completes.
 
@@ -53,21 +55,21 @@ Agents update only their row and append evidence/notes as work completes.
 
 - `docs/IMPLEMENTATION_PLAN.md` P2 work package 1.
 - `docs/DESIGN.md` §Inference HAL contract.
-- P1 accepted ABI.
+- P1 accepted stable ABI subset plus the explicit import/device-local/private-VM amendment blocker.
 - IREE/PJRT Pattern references.
 
 ### Target
 
-- Inspect P1 ABI, local runtime/session/loader/tests, pinned reference interfaces.
-- Update this ledger and active validation ledger.
-- Write `.superpowers/swarm/reports/p2-contract-freeze.md`.
-- Non-goals: create HAL source, modify TinyGPU, adopt IREE/PJRT, add hypothetical backend features.
+- Inspect the accepted P1 stable ABI, local runtime/session/loader/tests, and pinned reference interfaces.
+- Produce `.superpowers/swarm/reports/p2-contract-freeze.md` plus ready-to-apply P2-packet and validation-ledger deltas.
+- The named P1↔P2 contract owner serializes those shared-file deltas against P1 task set 1A after both reports are reviewed.
+- Non-goals: create HAL source, modify TinyGPU, invent deferred import semantics, adopt IREE/PJRT, or add hypothetical backend features.
 
 ### Change
 
 1. Freeze exact `DeviceCapabilities`, `Device`, `Buffer`, `Executable`, `CommandBuffer`, `Queue`, `Fence`, and `TimestampQuery` C++ interfaces and ownership.
 2. Freeze commands: copy, fill, dispatch, barrier, timestamp, signal; wait/signal fence semantics and error mapping.
-3. Map every portable operation to one P1 ABI operation or a local composition; reject unmapped abstractions.
+3. Map every portable operation to one accepted P1 ABI operation, one local composition, or an explicitly deferred task-set-3B extension; reject invented mappings and unmapped abstractions.
 4. Freeze mock/portable and AMD conformance matrices, source/test ownership, ABI/version rules, and evidence fields.
 5. Record exact P2 build, mock conformance, direct/HAL side-by-side, error/reset, and G0 commands in the active ledger.
 
@@ -76,6 +78,7 @@ Agents update only their row and append evidence/notes as work completes.
 - Portable interfaces contain no PM4, SDMA, MQD/HQD, doorbell, register, physical address, or model/cache type.
 - Every object/command has lifetime/error/conformance semantics and one implementation owner.
 - Active ledger contains exact `P2 mock conformance`, `P2 AMD conformance`, and `P2 G0 equivalence` commands.
+- The freeze publishes a stable-operation matrix for task sets 2/3A and a separate deferred-operation matrix owned by P1 re-freeze plus task set 3B.
 
 ### Validation
 
@@ -117,30 +120,30 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
   tests/native_r9700/test_hal_contract.py -v
 ```
 
-## Task set 3: Implement AMD buffer and executable backend
+## Task set 3A: Implement stable AMD host-visible buffer and executable backend
 
 ### Source refs
 
-- Task set 1 mapping and P1 ABI.
-- Local `device_memory.*`, HSA loader/assets/catalog, P1 buffer/executable handles.
+- Task set 1 stable-operation map and P1 ABI.
+- Local `device_memory.*`, HSA loader/assets/catalog, accepted P1 host-visible buffer and executable handles.
 - `docs/DESIGN.md` HAL copy/executable semantics.
 
 ### Target
 
 - Create `native_r9700/hal_amdev.h` and `native_r9700/hal_amdev.cpp`.
 - Create `tests/native_r9700/test_hal_amdev_contract.py` and extend relevant loader/memory contracts.
-- Non-goals: command queue/fence implementation, model graph, TinyGPU ABI changes, duplicated AMDev allocator/loader.
+- Non-goals: import, device-local/private-VM mapping, command queue/fence implementation, model graph, TinyGPU ABI changes, duplicated AMDev allocator/loader.
 
 ### Change
 
-1. Add RED contracts mapping portable capabilities/memory domains/buffers/executables to P1 handles and local accepted implementations.
+1. Add RED contracts mapping portable capabilities, host-visible buffers, and executables to the stable P1 subset and local accepted implementations.
 2. Reuse `device_memory.*` and HSA admission; do not duplicate allocation or descriptor validation.
-3. Preserve opaque backend state and map P1 errors into frozen HAL errors.
-4. Reject incompatible target/features/entry points before command recording.
+3. Preserve opaque backend state and map stable P1 errors into frozen HAL errors.
+4. Reject import/device-local mapping as explicitly deferred, and reject incompatible target/features/entry points before command recording.
 
 ### Acceptance
 
-Buffer/executable operations match direct behavior/evidence and leak no AMD details through portable types.
+Host-visible buffer/executable operations match direct behavior/evidence, deferred operations fail explicitly, and no AMD details leak through portable types.
 
 ### Validation
 
@@ -151,11 +154,35 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
   tests/native_r9700/test_hsa_code_image_loader.py -v
 ```
 
+## Task set 3B: Add import, device-local, and private-VM mapping
+
+### Source refs
+
+- Accepted task set 3A.
+- P1 reviewed import ABI amendment and cold-owned device-local/private-VM mapping contract.
+- `tinygpu/` buffer/import/map/unmap conformance and local dynamic page-table controls.
+
+### Target
+
+- Extend `native_r9700/hal_amdev.h`, `native_r9700/hal_amdev.cpp`, and `tests/native_r9700/test_hal_amdev_contract.py` through one backend owner.
+- Non-goals: reopening P1 ABI inside P2, metadata-only GPU mapping, client-visible addresses, queue/fence implementation.
+
+### Change
+
+1. Add RED contracts for the amended opaque import capability and device-local/private-VM buffer lifecycle.
+2. Map only accepted P1 import/map/unmap operations; keep every backend address private.
+3. Preserve cleanup ordering, stale-handle rejection, and P1 error identity.
+4. Prove unavailable or mismatched import/mapping capabilities fail before command recording.
+
+### Acceptance
+
+Import and device-local/private-VM buffers match accepted P1 behavior/evidence without exposing AMD or DriverKit details.
+
 ## Task set 4: Implement AMD command, synchronization, timestamp, and fault backend
 
 ### Source refs
 
-- Accepted task set 3.
+- Accepted task sets 3A and 3B.
 - Task set 1 command/error map.
 - Local AMDev session/packets/timeline/timestamp/fault tests and P1 queue ABI.
 

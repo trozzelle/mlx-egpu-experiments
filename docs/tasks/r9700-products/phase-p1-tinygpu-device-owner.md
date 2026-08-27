@@ -6,7 +6,7 @@
 - `docs/IMPLEMENTATION_PLAN.md` §P1 — Harden TinyGPU device ownership and §In-repository TinyGPU product source.
 - `docs/DESIGN.md` §TinyGPU Device Owner contract, Device lifecycle, Platform conformance gates, Error domains, and Security/review gates.
 - ADR 0007 — TinyGPU remains device owner behind the Inference HAL.
-- `.superpowers/swarm/progress.md` P1 row: Blocked after reviewed source checkpoints. Task set 1 is accepted; task set 2 lacks provenance-bound cold firmware/transitions; task set 3's frozen import transport is infeasible as written and private-VM mapping waits for cold ownership; G0 still blocks task set 6/promotion.
+- `.superpowers/swarm/progress.md` P1 row: task set 1 and the reachable source foundations are complete; task sets 1A and 2A are ready unblockers; 2B/3–6 remain dependency-blocked.
 - `docs/REFERENCES.md` local TinyGPU/AMDev, mac-amdgpu, tinygrad TinyGPU/AMDev, Linux amdgpu, Apple DriverKit, linux-firmware.
 - Manifest IDs/documents: `mac-amdgpu`, `tinygrad-amdev`, `linux-amdgpu-gfx12`, `linux-firmware-r9700`, `apple-pcidriverkit-iopcidevice`, `apple-driverkit-user-client-sample`.
 
@@ -17,8 +17,9 @@ Make the existing TinyGPU DriverKit extension the production-safe sole R9700 dev
 ## Dependencies
 
 - B0 and ADR 0007 are accepted.
-- Task set 1 reviewed/froze the ABI and security boundary. Xcode 26.6 with DriverKit SDK 25.5 clears the source/build toolchain gate, but does not clear the independent cold-firmware, import-contract, private-VM, signing, hardware, or G0 gates recorded below.
-- P2 waits for P1 user-client ABI freeze and cannot promote before P1.
+- Task set 1 reviewed/froze the stable ABI and security boundary. Xcode 26.6 with DriverKit SDK 25.5 clears the source/build toolchain gate.
+- Task set 1A is ready to amend the infeasible import transport; task set 2A is independently ready to bind cold-firmware provenance. The cold implementation, private-VM, signing, hardware, and G0 gates remain downstream.
+- P2 task set 1 may start against the accepted stable ABI subset now; P2 promotion and its import/device-local/private-VM extension wait for P1 completion.
 - All P1 implementation, build, and task ownership is in this products worktree: `tinygpu/` on `feature/r9700-products-wave-a`; the products docs and ledgers hold orchestration/evidence. Upstream Tinygrad is read-only Port/Adapt provenance. The legacy `tinygpu/Shared/server.c` proxy is quarantined and not a dependency.
 
 ## Reference resources
@@ -30,30 +31,32 @@ Make the existing TinyGPU DriverKit extension the production-safe sole R9700 dev
 
 ## Orchestration map
 
-- Sequential blockers: task set 1 freezes ABI/security/entitlement and exact future conformance-client commands. Task sets 2–4 cannot start until focused security re-review is clear and full Xcode with a selected DriverKit SDK is available. Task set 2 owns the source/package cutover and creates the common conformance client plus `cold-lifecycle`; task set 3 adds `client-death`; task set 4 adds malformed/queue/fault/G0 commands; task set 5 adds device recovery and integrates cleanup hooks. Task set 6 waits for all and G0.
-- Parallelizable task sets after those gates: cold lifecycle/firmware (task 2) and buffer/VA/client ownership (task 3) are disjoint in DEXT code, but the single conformance-client source is extended sequentially in task order. Task set 4 consumes task set 3 resources.
-- Shared contracts/artifacts: ABI major/minor/`struct_size`, canonical declaration sizes/offsets, opaque generational handle namespaces, device capabilities, buffer/queue/executable/fence lifetimes, cold stage/register snapshots, firmware manifest, entitlement scope, fault/reset evidence, fixed conformance client, and G0 record.
-- Coordination risks: `tinygpu/` `.iig` files and shared request/response structs have one ABI owner; DEXT build/install/hardware runs serialize; the quarantined `tinygpu/Shared/server.c` proxy is not a product or validation dependency; local `amdev_session.*` remains acceptance control and is not edited by DEXT agents.
+- Sequential blockers: task set 1 is Done. Task set 1A import research and task set 2A firmware research run concurrently and produce disjoint reports/deltas. One named P1↔P2 contract owner serializes P1/P2 packet plus validation-ledger integration after P1 1A and P2 1 reports are reviewed; one upstream-manifest owner serializes P1 2A with F2/Q1 provenance deltas. Task set 2B resumes after 2A; task set 3 waits for 1A and 2B; task set 4 waits for 3; task set 5 waits for 2B/4; task set 6 waits for all and G0.
+- Parallelizable task sets: P1 1A, P1 2A, and P2 task set 1 may research concurrently, but none edits shared packet/ledger/manifest files directly before its named integration owner applies reviewed deltas.
+- Shared contracts/artifacts: ABI major/minor/`struct_size`, amended import transport identity, canonical declaration sizes/offsets, opaque generational handles, cold firmware manifest, device capabilities, buffer/queue/executable/fence lifetimes, cold stage/register snapshots, entitlement scope, fault/reset evidence, fixed conformance client, and G0 record.
+- Coordination risks: `tinygpu/` `.iig` files and shared request/response structs have one ABI owner; no source implements the import amendment before 1A security review; DEXT build/install/hardware runs serialize; the quarantined proxy is not a dependency; local `amdev_session.*` remains acceptance control.
 
 ## Progress ledger
 
 | Task set | Status | Owner | Notes |
 |---|---|---|---|
-| 1. ABI, security, entitlement, and command freeze | Done | P1ABI | Frozen in `.superpowers/swarm/reports/p1-abi-freeze.md`; focused security re-review found zero remaining Critical/Important issues. TGPU ABI v1.0, concrete layouts, least-privilege ownership, R9700-only Release scope, proxy quarantine, and exact future CLIs are accepted.
-| 2. Cold lifecycle and firmware adaptation | Blocked | P1ColdLifecycle / P1ColdSafety / P1BoundarySafety | Source/package/common-client boundary is reviewed and compiles with zero Critical/Important findings. Hardware acceptance is blocked because no approved provenance-bound PSP/SOS/TMR firmware/transition input exists; the DEXT therefore fails non-ready at `PspSosTmr` rather than accepting pre-warmed state. Signed install/profile evidence is also pending.
-| 3. Buffer/VA and per-client ownership | Blocked | P1BufferIntegration | Reviewed cores plus real type-0 OSData transport, host-visible allocation/release, ordered close cleanup, and exact `client-death` source are checkpointed. Completion is blocked: the frozen 48-byte request plus distinct `structureInputDescriptor` sideband is not representable by `IOConnectCall*`; device-local/private-VA PTE mapping waits for task-set-2 cold ownership. All unavailable operations remain structured `UNSUPPORTED`.
-| 4. Queue/executable/fence/fault boundary | Blocked | Unassigned | SDK and common-client source gates are clear; waits for task-set-3 real import/private-VA mappings before queue bindings can be safe.
-| 5. Reset/recovery/client-death cleanup | Blocked | Unassigned | Waits for tasks 2 and 4; integrates the task-set-3/4 idempotent cleanup hooks and adds the fixed `device-recovery` CLI extension, but does not defer resource cleanup to this task. |
-| 6. Cold end-to-end conformance and G0 consumption | Blocked | Unassigned | Waits for task sets 2–5 and G0. |
+| 1. Stable ABI, security, entitlement, and command freeze | Done | P1ABI | Stable TGPU v1.0 subset, concrete layouts, least-privilege ownership, R9700-only Release scope, proxy quarantine, and future CLIs are accepted. |
+| 1A. Import transport ABI re-freeze | Ready | Unassigned | Choose and review one representable DriverKit import transport; update ABI/security/commands before import source work. |
+| 2A. Cold firmware provenance and bundle decision | Ready | Unassigned | Bind exact PSP/SOS/TMR and later transition inputs to revisions, hashes, WHENCE/license, ASIC/IP scope, and approved DEXT bundle/load path. |
+| 2B. Cold lifecycle implementation and hardware evidence | Blocked | P1ColdLifecycle / P1ColdSafety / P1BoundarySafety | Reviewed source/package/common-client boundary compiles; waits for task set 2A, signed install/profile, and physical cold evidence. |
+| 3. Buffer/VA and per-client ownership | Blocked | P1BufferIntegration | Host-visible source is checkpointed; completion waits for task sets 1A and 2B before import/device-local/private-VM map/unmap. |
+| 4. Queue/executable/fence/fault boundary | Blocked | Unassigned | Waits for task-set-3 real import/private-VA mappings before queue bindings can be safe. |
+| 5. Reset/recovery/client-death cleanup | Blocked | Unassigned | Waits for task sets 2B and 4; integrates existing resource hooks and adds `device-recovery`. |
+| 6. Cold end-to-end conformance and G0 consumption | Blocked | Unassigned | Waits for task sets 1A–5 and G0. |
 
 ### Task set 1 evidence/notes
 
 - 2026-08-25: P1ABI read the current TinyGPU `.iig`/C++/shared client structures, installer/Xcode/signing files, and the Apple DriverKit/ADR records. Task set 1 edited only this packet and `.superpowers/swarm/reports/p1-abi-freeze.md`; TinyGPU source and shared validation ledger remain unchanged.
 - 2026-08-25 security re-review: all findings from `agent://P1SecurityReview` are mapped and closed; final spot re-review found zero remaining Critical/Important issues. The legacy raw socket/proxy is quarantined; executable binding, driver-owned controls, mandatory generational handles, role/entitlement reset authority, concrete ABI layouts, R9700-only Release scope, fence semantics, ownership hooks, exact source/package cutover, and exact future client CLI split are frozen.
 - SDK gate cleared 2026-08-26: supervisor verified `/Applications/Xcode.app/Contents/Developer`, Xcode 26.6 build `17F113`, DriverKit SDK `25.5`, and SDK path `/Applications/Xcode.app/Contents/Developer/Platforms/DriverKit.platform/Developer/SDKs/DriverKit25.5.sdk`. Distribution signing remains a separate promotion gate.
-- The report's recorded commands point only to the in-repository `tinygpu/` source tree and never launch or link `tinygpu/Shared/server.c`. The conformance client source is extended in order by task sets 2–5: common/cold, client-death, malformed/queue/fault/G0, then recovery. Agents update only their row and append evidence/notes as work completes.
+- The report's recorded commands point only to the in-repository `tinygpu/` source tree and never launch or link `tinygpu/Shared/server.c`. The conformance client source is extended in order by task sets 2B–5: common/cold, client-death, malformed/queue/fault/G0, then recovery. Agents update only their row and append evidence/notes as work completes.
 
-### Task sets 2–3 source-foundation evidence
+### Task sets 2B–3 source-foundation evidence
 
 - The direct preinstall `cold-lifecycle` and `client-death` commands fail closed with `exit_status=1`, create their requested bounded eight-line logs, and use no proxy/fallback route.
 - Nine host contracts pass under `-Wall -Wextra -Werror`: cold ordering, framebuffer decode, health request, evidence log, resource/token lifetime, buffer request, buffer owner/backing lifetime, fixed transport, and response validation.
@@ -94,7 +97,7 @@ Make the existing TinyGPU DriverKit extension the production-safe sole R9700 dev
 - One products worktree contains the concrete ABI definition, `tinygpu/` file ownership map, validation ledger, and evidence reports.
 - No physical addresses, unrestricted register operations, raw proxy transport, client-mutable hardware controls, or unbound executable resources appear in normal client methods.
 - The active validation ledger has exact `tinygpu/` source/build/install, cold lifecycle, malformed/stale/reset/fault/recovery, and G0 binding commands; no command launches `tinygpu/Shared/server.c`.
-- Focused security re-review has zero Critical/Important issues before task sets 2–4 begin; task sets 2–4 additionally require full Xcode with a selected DriverKit SDK.
+- Focused security review has zero Critical/Important issues for the stable subset; task set 1A requires a new focused security/architecture review before amended import source work.
 
 ### Validation
 
@@ -104,7 +107,70 @@ git diff --check docs/tasks/r9700-products/phase-p1-tinygpu-device-owner.md \
   .superpowers/swarm/reports/p1-abi-freeze.md
 ```
 
-## Task set 2: Port/adapt cold lifecycle and firmware stages
+## Task set 1A: Re-freeze the DriverKit import transport
+
+### Target
+
+- Produce `.superpowers/swarm/reports/p1-import-abi-amendment.md` and ready-to-apply P1/P2 packet plus validation-ledger deltas.
+- One named P1↔P2 contract owner applies the shared-file deltas only after the report and review are complete.
+- Non-goals: implement import source, expose pointers/ports/addresses, use the legacy proxy, or alter unrelated selectors.
+
+### Change
+
+1. Compare the two safe representable designs: one large descriptor input with fixed request-prefix/payload semantics, or a separate registration selector returning an opaque per-client import capability.
+2. Select one design with exact structure sizes, versioning, ownership, lifetime, replay, cleanup, entitlement, and malformed-input behavior.
+3. Update the ABI layout assertions, user/client command contract, security model, exact RED/GREEN conformance commands, and P2 deferred-operation mapping.
+4. Run focused security/architecture review; zero Critical/Important findings are required before source implementation.
+
+### Acceptance
+
+- Public structures contain no pointer, Mach port, physical address, bus segment, GPU VA, or client-selected mapping address.
+- The selected user-space call is representable by public `IOConnectCall*` and has one unambiguous descriptor/capability lifetime.
+- Import remains structured `UNSUPPORTED` until this amendment is accepted and implemented.
+
+### Validation
+
+```sh
+git diff --check docs/tasks/r9700-products/phase-p1-tinygpu-device-owner.md \
+  docs/tasks/r9700-products/phase-p2-inference-hal.md \
+  docs/tasks/native-r9700-producer/validation-commands.md \
+  .superpowers/swarm/reports/p1-abi-freeze.md \
+  .superpowers/swarm/reports/p1-import-abi-amendment.md
+```
+
+## Task set 2A: Bind cold-firmware provenance and bundle policy
+
+### Target
+
+- Inspect the pinned linux-firmware, Tinygrad, mac-amdgpu, board/VBIOS, and existing local firmware sources without changing DEXT behavior.
+- Produce `.superpowers/swarm/reports/p1-cold-firmware-provenance.md`, exact ready-to-run commands, and a ready-to-apply upstream-manifest delta.
+- The named upstream-manifest owner applies that delta after review; this lane does not race F2/Q1 manifest edits.
+- Non-goals: guess firmware revisions, copy opaque packages, load firmware, warm the device through another owner, or claim cold acceptance.
+
+### Change
+
+1. Identify every required PSP/SOS/TMR and later SMU/IMU/RLC/CP/MES/GFX/SDMA input.
+2. Record immutable source revision, path, SHA-256, WHENCE/license, ASIC/IP applicability, unchanged/modified status, and redistribution/bundle constraints.
+3. Freeze the DEXT bundle/resource layout and load ordering, including missing-input failure stages and redacted evidence fields.
+4. Record exact offline provenance validation and later signed cold-run commands.
+
+### Acceptance
+
+- Every required firmware input is immutable, licensed, hash-bound, and applicable to `1002:7551`/`gfx1201`, or the task remains explicitly blocked on the missing item.
+- No pre-warmed state or alternate owner is accepted as cold provenance.
+- Task set 2B receives one reviewable bundle/load contract without source ambiguity.
+
+### Validation
+
+```sh
+git diff --check docs/tasks/r9700-products/phase-p1-tinygpu-device-owner.md \
+  docs/upstream-reference-manifest.yaml \
+  docs/tasks/native-r9700-producer/validation-commands.md \
+  .superpowers/swarm/reports/p1-cold-firmware-provenance.md
+```
+
+## Task set 2B: Port/adapt cold lifecycle and firmware stages
+
 
 ### Source refs
 
@@ -247,13 +313,13 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
   tests/native_r9700/test_runtime_protocol.py -v
 ```
 
-Supervisor runs the exact `P1 fault/reset` command from task set 1.
+Supervisor runs the exact `P1 malformed submission, stale/client-death, queue reset, and bounded fault query` and `P1 device recovery` commands from the active validation ledger.
 
 ## Task set 6: Run cold end-to-end conformance and consume G0
 
 ### Source refs
 
-- Accepted task sets 2–5.
+- Accepted task sets 1A–5.
 - F2/G0 record and `integration-gates.md` G0.
 - `docs/ROADMAP.md` P1 promotion gate.
 
@@ -277,7 +343,7 @@ Run fresh power-on → TinyGPU cold initialization → BO/VA → SDMA → consta
 
 ### Validation
 
-Supervisor runs exact `P1 TinyGPU build/install`, `P1 cold lifecycle`, `P1 fault/reset`, and `P1 G0 conformance` commands from task set 1.
+Supervisor runs exact `SDK/build/install preflight and local install`, `P1 cold lifecycle`, `P1 malformed submission, stale/client-death, queue reset, and bounded fault query`, `P1 device recovery`, and `P1 exact G0 binding` commands from the active validation ledger.
 
 ## Phase validation
 

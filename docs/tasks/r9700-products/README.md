@@ -56,12 +56,14 @@ flowchart LR
   B0 --> F1
   B0 --> F2
   B0 --> P1
+  B0 --> P1ABI["P1 stable ABI Done"]
   B0 --> P3
   B0 --> Q1
   F2 --> G0
   F1 --> F3
   F2 --> F3
-  P1 --> P2
+  P1ABI --> P2
+  P1 -. promotion .-> P2
   G0 -. promotion .-> P1
   G0 -. promotion .-> P2
   G0 -. promotion .-> P3
@@ -78,40 +80,56 @@ flowchart LR
   P5 --> G3
 ```
 
-### Wave A — parallel-ready
+### Wave B0 — immediate parallel unblockers
 
-F1, F2, P1, P3, and Q1 may start concurrently because their primary ownership is disjoint:
+Dispatch five independent lanes:
 
-- F1: service/process/model lifetime.
-- F2: WMMA source, generated image, and standalone evidence.
-- P1: in-repository `tinygpu/` DriverKit/user-client boundary plus local conformance.
-- P3: Kernel Pack types, offline manifest/tooling, and migration rules.
-- Q1: Qwen model/cache/oracle contracts.
+- F2 task set 3A: pinned source checkout and candidate image selection.
+- P1 task set 1A: import transport ABI re-freeze.
+- P1 task set 2A: cold-firmware provenance/bundle policy.
+- Q1 task set 7: base revision and license provenance closure.
+- P2 task set 1: portable ABI/backend/command freeze against the accepted stable P1 subset.
 
-Shared-file constraints:
+Ownership constraints:
 
-- F2 owns new WMMA source/images and artifact-local metadata. P3 owns generic Kernel Pack schema/types. One integration owner serializes changes to `kernel_assets.cpp`, `kernel_catalog.cpp`, and shared generated catalogs.
-- F1 owns `model_service.py`, `service_protocol.py`, `native_worker.py`, and persistent-service semantics. Q1 must not change those files; it owns `qwen_*` modules and Qwen tests.
-- P1 does not change local model/kernel code. It owns the TinyGPU DEXT/user-client files and local conformance clients.
+- F2 owns source/image selection and does not edit generic P3 catalogs.
+- P1 1A and 2A may research concurrently, but one P1↔P2 contract owner serializes the P1/P2 packet and validation-ledger edits.
+- One upstream-manifest owner serializes F2/P1/Q1 provenance changes after each lane's disjoint report is ready.
+- Q1 provenance owns identity/license records only; oracle/cache/parity behavior is immutable.
+- P2 task set 1 owns its contract/report inputs and does not create HAL source.
+- No B0 lane runs hardware.
 
-### Wave B — after first contracts freeze
+### Wave B1 — implementation after local freezes
 
-- F3 starts after F1's model-handle/prepacking contract and F2's admitted WMMA family.
-- P2 starts after P1 freezes the user-client ABI. P2 may implement before G0 but cannot promote without consuming G0.
-- P3 consumes G0 after F2 publishes it; manifest/tool work may precede that handoff.
-- Q1 oracle/fixture work may continue in parallel with F3/P2.
+- F2 task set 3B consumes 3A; task sets 4 and the frozen part of 5 may then overlap. Task set 6 serializes hardware/G0.
+- P1 task set 2B consumes 2A; task set 3 waits for both 1A and 2B.
+- P2 task sets 2 and 3A run concurrently after task set 1 because they own disjoint portable versus AMD-stable-subset files.
+- Q1 task set 7 may continue independently.
 
-### Wave C — product/platform convergence
+### Wave B2 — G0 consumers and backend completion
 
-- F4 starts after F3.
-- P4 preparation may start after F1/P2/P3, but production cutover serializes against the selected F2–F4 graph state and Gate G1.
-- F4 and P4 must nominate one owner for `llama_layer_executor.*`, runtime submission, and service evidence integration.
+- F3 and P3 task set 5 start concurrently after accepted G0.
+- P2 task set 3B waits for the accepted P1 import/device-local/private-VM contract; task set 4 follows accepted 3A/3B.
+- One F2→P3 integration owner serializes `kernel_assets.cpp`, `kernel_catalog.cpp`, and generated catalogs.
+- F3 owns projection graph files and consumes F1's promoted model-handle/prepacking contract.
 
-### Wave D — downstream options
+### Wave C1 — graph and platform completion
 
-- F5 and F6 may investigate in parallel after F4; final integration serializes where both touch Kernel Packs, model residency, or Engine Adapters.
-- P5 begins only after P4 and a measured need. Its prototype task remains blocked on a human-approved candidate.
-- Gates G2 and G3 serialize direct-transport or backend ownership decisions.
+- F4 tiled attention starts after F3.
+- P2 command/queue/fence work and P3 final promotion may proceed beside F4 after their own dependencies.
+- Source work may overlap; all DEXT install and R9700 hardware commands serialize through the hardware lock.
+
+### Wave C2 — product/platform convergence
+
+- P4 preparation may begin after P2/P3 contracts, but production migration waits for their acceptance and the selected F2–F4 graph.
+- F4 and P4 nominate one owner for shared graph/runtime/service-evidence files; no concurrent edits cross that boundary.
+
+### Wave D — downstream measured options
+
+- F5 may begin after F4.
+- F6 may begin only after F4 and Q1 task set 7; once both prerequisites hold, F5/F6 may investigate concurrently with serialized shared integration.
+- P5 begins only after P4 and a measured, human-approved need.
+- Gates G2/G3 serialize direct-transport or backend ownership decisions.
 
 ## Shared contracts and artifacts
 

@@ -30,10 +30,10 @@ Admit and execute a reusable gfx1201 wave32 FP16 WMMA linear family with FP32 ac
 
 ## Orchestration map
 
-- Sequential blockers: task set 1 freezes source pins, lane-map expectations, manifest-equivalent fields, file ownership, and hardware commands. After task set 1 review, task sets 2 and 3 may proceed in parallel; task set 4 is blocked until **both accepted task set 2 lane-map evidence and accepted task set 3 ISA/resource plus physical-layout evidence** exist. Task set 6 waits for task sets 2–5.
-- Parallelizable task sets: after task set 1, task set 2 (lane-map probe) and task set 3 (offline ISA/resource admission plus the task-set-3-owned physical-layout proof) may run concurrently. Task set 4 begins only after accepted task sets 2 and 3; task set 5 can develop numerical harnesses beside task set 4 after its ABI is frozen.
-- Shared contracts/artifacts: `gfx1201`, wave32, `16×16×16` atom, packing version, first shape family, kernarg order, numerical policy, source/image digests, G0 record.
-- Coordination risks: one owner integrates `kernel_assets.cpp`/`kernel_catalog.cpp`; P3 owns generic `kernel_pack.*`; generated asset directories are single-owner; hardware runs serialize.
+- Sequential blockers: task sets 1 and 2 are Done. Task set 3A is ready to acquire/verify the pinned source checkouts and select one candidate image. Task set 3B then binds real ISA/resource/physical-layout evidence. Task set 4 waits for accepted task sets 2 and 3B; task set 6 waits for task sets 2–5.
+- Parallelizable work: task set 3A runs independently beside P1/Q1/P2 unblocker lanes. After 3B freezes the real image/ABI, task set 5 may develop numerical/tail harnesses beside task set 4. Hardware executions remain serialized.
+- Shared contracts/artifacts: `gfx1201`, wave32, `16×16×16` atom, immutable source checkouts, selected image digest, packing version, first shape family, kernarg order, numerical policy, ISA/resource/layout evidence, and G0 record.
+- Coordination risks: task set 3A owns source/image selection but not generic catalogs; one owner integrates `kernel_assets.cpp`/`kernel_catalog.cpp`; P3 owns generic `kernel_pack.*`; generated asset directories are single-owner; hardware runs serialize.
 
 ## Progress ledger
 
@@ -41,9 +41,10 @@ Admit and execute a reusable gfx1201 wave32 FP16 WMMA linear family with FP32 ac
 |---|---|---|---|
 | 1. Source/ABI/validation freeze | Done | F2Contract | Frozen in `.superpowers/swarm/reports/f2-contract-freeze.md`; final review closed the EvidenceRef matrix, physical-layout gate, pack digest preimage, G0 independence, and command-ledger reconciliation.
 | 2. Independent lane-map hardware proof | Done | F2LaneRed / Supervisor | Fresh R9700/gfx1201 lane-map hardware and comparator evidence is exact; focused gate: 22 passed. |
-| 3. Offline ISA/resource and physical-layout admission | Blocked | F2AdmissionRed | The offline proof tool and fail-closed contracts pass 34 tests. Real acceptance requires unavailable pinned rocWMMA/AITER checkouts plus a selected linear WMMA image and bound ISA/resource/layout reports. |
-| 4. FP16 WMMA linear source and asset | Blocked | Unassigned | Waits for accepted task sets 2 and 3: lane-map evidence plus ISA/resource and physical-layout admission. |
-| 5. Numerical/tail/performance harness | Blocked | Unassigned | Waits for task-set-4 ABI; may overlap implementation. |
+| 3A. Acquire pinned sources and select candidate image | Ready | Unassigned | Obtain exact rocWMMA/AITER revisions, verify licenses/source digests, and select one real gfx1201 FP16 linear image without claiming admission. |
+| 3B. Real ISA/resource and physical-layout admission | Blocked | F2AdmissionRed | Offline tool/contracts pass 34 tests; waits for task set 3A checkouts/image, then emits bound ISA/resource/layout reports. |
+| 4. FP16 WMMA linear source and asset | Blocked | Unassigned | Waits for accepted task sets 2 and 3B. |
+| 5. Numerical/tail/performance harness | Blocked | Unassigned | Waits for task-set-4 ABI; may overlap task-set-4 implementation after the real image contract freezes. |
 | 6. Hardware benchmark and G0 publication | Blocked | Unassigned | Waits for task sets 2–5 and review. |
 
 Agents update only their row and append evidence/notes as work completes.
@@ -60,8 +61,8 @@ Agents update only their row and append evidence/notes as work completes.
   - `target_conformance/{scalar_native_projection,conformance}` and `native_run/native_run` require path/ID/digest, target/image/pack/producer/input/output digests, exactly `producer_kind: r9700_native`, and exactly empty `tool_digest`; `native_run` remains a distinct request-bound kind/slot, not a collapse into `target_conformance`.
   - `benchmark/benchmark` requires path/ID/digest, target/image/pack/producer/input/output/tool digests; promoted performance uses `producer_kind: r9700_native`, while correctness-control packs omit the benchmark reference and use a nonempty `benchmark_not_applicable_reason`. Every other kind/slot combination rejects.
   - `pack_sha256` is exactly SHA-256 of UTF-8 RFC8785 JCS for `{ "domain":"r9700-kernel-pack-identity-v1", "pack": <the normalized complete pack record with the top-level `evidence` object and every `pack_sha256` and `record_sha256` field removed> }`; complete identity/provenance/license/image/build/entry/kernarg/resource/geometry/compatibility/numerical fields, declared paths, and semantic evidence IDs/input/output digests remain included. Non-finite numbers reject; removing both binding digests prevents a recursive file-digest cycle.
-- WMMA-specific `rsrc1/2/3`, SGPR/VGPR, and static LDS values are intentionally unresolved until generated-image/IsaDecoder/RGA evidence; missing values fail closed. F2 task set 3 also owns `tools/f2-wmma-layout-proof`, its pinned rocWMMA/AITER/calculator/local-header inputs, task-3-owned physical layout spec and inverse fixture, and must produce/accept the `record_kind: offline_review`, `evidence_slot: layout_proof` EvidenceRef before task set 4. Current scalar gate/up resources are baseline only and are not copied. After task-set-1 review, task sets 2 and 3 are ready to proceed in parallel; task set 4+ remains blocked on accepted lane-map and physical-layout proof.
-- F2 G0 publication is independent of P3 implementation and runs only F2/HSA/asset/catalog/numerical/evidence gates; P3 later consumes the immutable exact G0 record without regeneration. Shared validation ledger was not edited. Exact ready-to-insert named sections are `F2 physical WMMA layout proof`, `F2 lane-map proof`, `F2 standalone WMMA`, and `F2 G0 publication`; the task-set-3-owned physical-layout proof is the precondition immediately before those sections under `## Active validation ledger insertion`. No tests, hardware commands, formatters, package managers, or git commands were run.
+- WMMA-specific `rsrc1/2/3`, SGPR/VGPR, and static LDS values are intentionally unresolved until generated-image/IsaDecoder/RGA evidence; missing values fail closed. F2 task set 3B owns `tools/f2-wmma-layout-proof`, its task-set-3A rocWMMA/AITER inputs, calculator/local-header inputs, physical-layout spec, and inverse fixture, and must accept the layout EvidenceRef before task set 4.
+- F2 G0 publication is independent of P3 implementation. Exact ledger sections are `F2 physical WMMA layout proof`, `F2 lane-map proof`, `F2 standalone WMMA`, and `F2 G0 publication`; the task-set-3B layout proof immediately precedes implementation/promotion work.
 
 ## Task set 1: Freeze source, ABI, ownership, and validation
 
@@ -86,7 +87,7 @@ Agents update only their row and append evidence/notes as work completes.
 2. Generate and record the expected gfx1201 WMMA operand/result lane/register layout with the pinned calculator; label it expected, not accepted hardware evidence.
 3. Freeze first family: `M=128, K=2048, N=8192` with runtime `1<=M<=128`, FP16 inputs/output, FP32 accumulation, wave32, `tail_policy: masked/padded`, `geometry_rule: f2-wmma-64x64-m-tail-v1`, `weight_packing_version: f2-wmma-physical-tile-v1`, kernarg order/alignment, and LDS/private limits.
 4. Assign F2 versus P3 ownership; nominate one catalog/generated-asset integration owner.
-5. Discover and record exact physical-layout proof, lane-map proof, standalone GEMM hardware, ISA/RGA, and performance commands in the active validation ledger with concrete outputs/log paths. The task-set-3 layout command must name `tools/f2-wmma-layout-proof`, the versioned layout spec, and inverse fixture; the G0 block must be one complete copyable invocation with no implicit defaults.
+5. Discover and record exact physical-layout proof, lane-map proof, standalone GEMM hardware, ISA/RGA, and performance commands. The task-set-3B layout command names `tools/f2-wmma-layout-proof`, the versioned spec, inverse fixture, and task-set-3A inputs.
 
 ### Acceptance
 
@@ -145,7 +146,38 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 
 Supervisor then runs the exact `F2 lane-map proof` command from the active ledger.
 
-## Task set 3: Extend offline ISA and resource admission
+## Task set 3A: Acquire pinned sources and select one real image
+
+### Target
+
+- Materialize the exact manifest-pinned rocWMMA and AITER revisions under ignored `build/upstream/` directories.
+- Produce `.superpowers/swarm/reports/f2-source-image-selection.md`, one candidate image/source entry, and any ready-to-apply upstream-manifest delta for task set 3B.
+- The named upstream-manifest owner applies that delta after review; this lane does not race P1/Q1 manifest edits.
+- Non-goals: use branch HEAD, synthesize admission reports, edit generic Kernel Pack catalogs, run hardware, or claim G0.
+
+### Change
+
+1. Verify checkout commit IDs against the manifest; record repository URL, revision, source paths, file SHA-256 values, and file-level license decisions.
+2. Identify the exact rocWMMA fragment/layout/sample and AITER gfx1201 sources used by the frozen `M,K,N` family.
+3. Select or generate one candidate image through the documented offline toolchain, recording source digest, build command/toolchain identity, image SHA-256, entry symbol, target, and wave mode.
+4. Record the complete task-set-3B input set: image, headers, calculator record, physical-layout spec/inverse fixture paths, ISA/resource tools, and expected output records.
+
+### Acceptance
+
+- Every source/input is immutable and license-reviewed; no floating branch, downloaded binary label, or filename-only target identity is accepted.
+- One candidate image and its exact source/build identity exist for offline admission.
+- The report makes no ISA/resource/layout, numerical, performance, or native acceptance claim.
+
+### Validation
+
+```sh
+git diff --check docs/upstream-reference-manifest.yaml \
+  docs/tasks/r9700-products/phase-f2-gfx1201-wmma-foundation.md \
+  .superpowers/swarm/reports/f2-source-image-selection.md
+```
+
+## Task set 3B: Extend offline ISA, resource, and physical-layout admission
+
 
 ### Source refs
 
@@ -169,14 +201,14 @@ Supervisor then runs the exact `F2 lane-map proof` command from the active ledge
 2. Link or ingest concrete offline analysis records without trusting filename/branch labels.
 3. Preserve existing scalar asset admission unchanged.
 4. Emit manifest-equivalent F2 evidence fields that P3 can later migrate exactly, including the closed `evidence_slot` and canonical pack-preimage digest.
-5. Run the exact `tools/f2-wmma-layout-proof` command from the active ledger against the pinned headers, AITER/calculator/local inputs, task-set-3-owned layout spec, and inverse fixture; prove the source-to-byte/tile/LDS mapping and round-trip the inverse fixture, then emit the digest-bound `record_kind: offline_review`, `evidence_slot: layout_proof` record. Missing, contradictory, or non-round-tripping layout evidence rejects task set 3.
+5. Run the exact layout-proof command against task-set-3A source/image inputs, pinned headers, calculator/local inputs, the task-set-3B layout spec, and inverse fixture. Missing or non-round-tripping evidence rejects task set 3B.
 
 ### Acceptance
 
 - Malformed or non-WMMA images are rejected before allocation/submission.
 - Accepted probe/linear images bind exact target, descriptors, resources, ISA evidence, and hashes.
 - No P3 generic interface is invented inside F2.
-- Task set 3 cannot complete without the accepted physical-layout proof: the tool, versioned spec, inverse fixture, concrete `record_kind: offline_review`, `evidence_slot: layout_proof` record, nonempty target/image/pack/tool/input/output and record/path/spec/fixture digests, exactly empty `producer_kind`, exact mapping, canonical pack-preimage digest, and successful inverse/conformance result are all present.
+- Task set 3B cannot complete without the accepted physical-layout proof and complete digest-bound ISA/resource/layout EvidenceRefs.
 - Any missing or contradictory ISA/resource/layout field, absent fixture/spec, failed round-trip, or filename-only evidence rejects before allocation/submission; the reserved `f2-wmma-physical-tile-v1` pack remains unadmitted.
 
 ### Validation
@@ -189,14 +221,14 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
   tests/native_r9700/test_kernel_assets.py \
   tests/native_r9700/test_kernel_catalog.py -v
 ```
-Supervisor then runs the exact `F2 physical WMMA layout proof` command from the active ledger and accepts its `offline_review` record before marking task set 3 complete.
+Supervisor accepts the physical-layout `offline_review` record before marking task set 3B complete.
 
 ## Task set 4: Implement first FP16 WMMA linear family
 
 ### Source refs
 
 - Accepted task set 2 lane-map evidence.
-- Accepted task set 3 physical-layout and ISA/resource EvidenceRefs, including the task-set-3-owned `offline_review` layout record and inverse fixture result.
+- Accepted task set 3B physical-layout and ISA/resource EvidenceRefs, including its `offline_review` layout record and inverse fixture result.
 - Task set 1 family/packing/numerical contract.
 - `docs/DESIGN.md` linear family requirements.
 - rocWMMA Port/Adapt and hipBLASLt Pattern sources.
@@ -207,7 +239,7 @@ Supervisor then runs the exact `F2 physical WMMA layout proof` command from the 
 - Add its generated HSA asset directory.
 - Add artifact-specific catalog/asset records through the integration owner.
 - Create `tests/native_r9700/test_linear_wmma_f16_asset.py`.
-- Consume only the accepted task-set-2 lane-map result and accepted task-set-3 ISA/resource plus physical-layout records; do not derive or compensate for an unproved physical packing.
+- Consume only accepted task-set-2 lane-map and task-set-3B ISA/resource/layout records.
 - Non-goals: gate/up/QKV fusion, arbitrary N/K generic kernel, autotuner, quantization, model selection.
 
 ### Change
@@ -217,11 +249,12 @@ Supervisor then runs the exact `F2 physical WMMA layout proof` command from the 
 3. Generate and admit the image with exact metadata/provenance.
 4. Keep optional epilogues disabled unless task set 1 explicitly included one in the first family.
 
-5. Start source/image implementation only after accepted task sets 2 and 3; bind the admitted image to the accepted physical-layout `offline_review` record and exact source/image/resource digests.
+5. Start implementation only after accepted task sets 2 and 3B; bind the image to the accepted layout record and exact source/image/resource digests.
+
 ### Acceptance
 
 - Source and admitted image match the frozen family; no scalar/GEMV substitution passes.
-- Implementation starts only after **accepted task sets 2 and 3** (independent lane-map proof plus task-set-3 ISA/resource and physical-layout admission); no source/image may consume an unproved packing.
+- Implementation starts only after accepted task sets 2 and 3B.
 - Full-tile and tail dispatch are bounded and deterministic.
 - Catalog exposes the family without selecting it in the Llama graph.
 
@@ -233,7 +266,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
   tests/native_r9700/test_kernel_assets.py \
   tests/native_r9700/test_kernel_catalog.py -v
 ```
-Supervisor runs the exact standalone/G0 commands only after the task-set-2 and task-set-3 acceptance gates are recorded.
+Supervisor runs standalone/G0 commands only after task-set-2 and task-set-3B acceptance gates are recorded.
 
 ## Task set 5: Prove numerics, tails, and matrix utilization
 
