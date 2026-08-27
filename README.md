@@ -17,21 +17,13 @@ The accepted baseline includes native R9700 kernel/transfer/resident-VRAM proof,
 
 See `CONTEXT.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, and `docs/ROADMAP.md` for the current domain language and capability gates.
 
-## TinyGPU license and provenance
+## TinyGPU license
 
-The code under `tinygpu/` is a vendored and locally modified derivative of the TinyGPU installer subtree from [`tinygrad/tinygrad`](https://github.com/tinygrad/tinygrad):
+`tinygpu/` is a locally modified derivative of [`tinygrad/tinygrad`](https://github.com/tinygrad/tinygrad), whose upstream code is MIT-licensed. The required notice is in [`tinygpu/LICENSE`](tinygpu/LICENSE).
 
-- Upstream revision: `12addee14f1d728793648ceca307a5fde2b24cea`
-- Upstream path: `extra/usbgpu/tbgpu/installer`
-- Local import checkpoint: `f18261437`
-- Upstream license: **MIT**
-- Required copyright and permission notice: [`tinygpu/LICENSE`](tinygpu/LICENSE)
+Detailed source provenance and the local modification record are in [`docs/upstream-reference-manifest.yaml`](docs/upstream-reference-manifest.yaml).
 
-Local changes include the structured TGPU v1.0 ABI, separate inference/recovery/diagnostic roles, R9700-only package scope, legacy proxy quarantine, fail-closed cold lifecycle and evidence, bounded resource ownership, host-visible allocation, client-death cleanup, response-payload preservation, and conformance contracts.
-
-The machine-readable provenance, source-tree digest, file-level license review, target scope, modification record, image status, and linked conformance evidence are recorded as `tinygpu-device-owner-vendor` in `docs/upstream-reference-manifest.yaml`. Tinygrad AMDev source used as a differential oracle is read-only reference material and is not vendored into this repository.
-
-**The TinyGPU MIT license does not implicitly license the rest of this repository.** This repository currently does not declare one project-wide license; do not assume that files outside `tinygpu/` are MIT-licensed unless a file or component explicitly says so.
+The MIT notice applies to the TinyGPU-derived code under `tinygpu/`; this repository does not currently declare a project-wide license.
 
 ## Development checks
 
