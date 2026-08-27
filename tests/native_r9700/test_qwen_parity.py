@@ -119,6 +119,13 @@ def test_rejects_non_qwen_language_cache_before_generation(
 QWEN_PROBE_TOKEN_IDS = (760, 6511, 314, 9338, 369)
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _QWEN_MODEL_REVISION = "3e6447f082e89cc7f0bc6e5441afd38dfce760ff"
+_QWEN_INVENTORY_FIXTURE = (
+    _REPO_ROOT
+    / "tests"
+    / "native_r9700"
+    / "baselines"
+    / "qwen_tensor_inventory.json"
+)
 
 
 def test_qwen_parity_uses_task3_mlx_restore_and_final_token_only(
@@ -202,7 +209,7 @@ def test_qwen_parity_rejects_expected_basename_with_mismatched_source_identity(
         qwen_parity.compare_qwen_fixtures(
             _REPO_ROOT / "tests" / "native_r9700" / "fixtures",
             model_dir=model_dir,
-            inventory=_REPO_ROOT / "logs" / "q1-qwen-tensor-inventory.json",
+            inventory=_QWEN_INVENTORY_FIXTURE,
             token_ids=QWEN_PROBE_TOKEN_IDS,
         )
 
@@ -216,7 +223,7 @@ def test_qwen_parity_rejects_inventory_structure_drift_with_frozen_scalar_identi
 ) -> None:
     """Inventory contents and CPU provenance are bound, not just scalar digests."""
     schema_path = _REPO_ROOT / "tests" / "native_r9700" / "fixtures" / "qwen_fixtures_schema.json"
-    inventory_path = _REPO_ROOT / "logs" / "q1-qwen-tensor-inventory.json"
+    inventory_path = _QWEN_INVENTORY_FIXTURE
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
 
@@ -299,6 +306,6 @@ def test_qwen_parity_rejects_self_consistent_empty_required_fixture_arrays(
     ):
         qwen_parity.compare_qwen_fixtures(
             fixture_dir,
-            inventory=_REPO_ROOT / "logs" / "q1-qwen-tensor-inventory.json",
+            inventory=_QWEN_INVENTORY_FIXTURE,
             token_ids=QWEN_PROBE_TOKEN_IDS,
         )

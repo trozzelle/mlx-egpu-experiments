@@ -34,6 +34,7 @@ import pytest
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _FIXTURES_DIR = os.path.join(_REPO_ROOT, "tests", "native_r9700", "fixtures")
+_BASELINES_DIR = os.path.join(_REPO_ROOT, "tests", "native_r9700", "baselines")
 
 from native_r9700 import ref_fixtures as rf  # noqa: E402
 
@@ -4212,7 +4213,7 @@ def test_generate_qwen_fixtures_verifies_runtime_before_model_oracle_reads(
     assert calls == []
 
 def test_qwen_generation_report_binds_exact_oracle_runtime() -> None:
-    report_path = Path(_REPO_ROOT) / "logs" / "q1-qwen-oracle-fixtures.json"
+    report_path = Path(_BASELINES_DIR) / "qwen_oracle_fixtures_report.json"
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["oracle_runtime"] == _QWEN_ORACLE_RUNTIME_RECORD
 
