@@ -8,8 +8,8 @@ No validation command, test, build, formatter, linter, package-manager, Xcode, i
 
 ## Changed files
 
-- TinyGPU source worktree, `feature/r9700-device-owner`:
-  - `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_cold_lifecycle.cpp`
+- TinyGPU in-repository source tree, `feature/r9700-products-wave-a`:
+  - `tinygpu/Conformance/tests/test_tgpu_cold_lifecycle.cpp`
 - Orchestration/evidence worktree, `feature/r9700-products-wave-a`:
   - `.superpowers/swarm/reports/p1-cold-red.md`
 
@@ -17,7 +17,7 @@ No production file, project file, entitlement, installer, common client, ledger,
 
 ## Required production seam
 
-The current TinyGPU checkout has no host-testable cold-stage coordinator or installer/DEXT test target. The smallest seam required by this contract is a DriverKit-independent production coordinator adjacent to the DEXT sources:
+The current in-repository TinyGPU source tree has no host-testable cold-stage coordinator or installer/DEXT test target. The smallest seam required by this contract is a DriverKit-independent production coordinator adjacent to the DEXT sources:
 
 - `TinyGPUDriverExtension/TGPUColdLifecycle.h`
 - `TinyGPUDriverExtension/TGPUColdLifecycle.cpp`
@@ -52,7 +52,7 @@ The test does not assert fake calls as a substitute for behavior: the observable
 Run from the TinyGPU installer directory (do not run this command in the products worktree):
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   TinyGPUDriverExtension/TGPUColdLifecycle.cpp \
   Conformance/tests/test_tgpu_cold_lifecycle.cpp \

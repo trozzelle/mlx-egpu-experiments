@@ -7,6 +7,7 @@ This roadmap sequences capabilities for `ARCHITECTURE.md` and `DESIGN.md`. It is
 - The R9700 Prefill Service and Portable Inference Device Platform are co-equal products with independent tracks (ADR 0006).
 - Current native C1R/C2R correctness is the baseline; future phases must not relabel completed acceptance as unfinished work.
 - Prefill optimization continues on the proven TinyGPU/AMDev path while platform contracts mature.
+- Active TinyGPU source/build/task authority is the in-repository `tinygpu/` tree on `feature/r9700-products-wave-a`; upstream Tinygrad remains read-only Port/Adapt provenance only.
 - Cross-track adoption occurs only through explicit integration gates.
 - Warm prefill is the primary product performance metric; cold process and GPU compute remain separate evidence scopes.
 - Final decoded tokens remain exact. Optimized intermediate K/V and logits use reviewed Kernel Pack tolerances.
@@ -248,6 +249,8 @@ The 2026-08-25 diagnosis reports 18.012 seconds / 7.11 prefix tok/s for prompt-1
 ## Phase P1: Harden TinyGPU device ownership
 
 **Outcome:** TinyGPU provides the production-safe device lifecycle and user-client authority required by independent inference clients.
+
+The P1 implementation boundary is `tinygpu/` in the products worktree. Every TinyGPU Xcode/build/install/conformance command runs from that tree and writes local binaries under `tinygpu/build/`; no external TinyGPU checkout or branch is an active source authority.
 
 ### Capabilities
 

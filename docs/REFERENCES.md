@@ -77,7 +77,7 @@ Use for PSP/SOS/TMR firmware lifecycle, SMU mailbox, IMU, RLC, CP/MES/GFX/SDMA i
 
 ### P0 — [`tinygrad/tinygrad` TinyGPU and AMDev](https://github.com/tinygrad/tinygrad/tree/d851aca9ae1faf4210cc0da4508bead7da57d7ee) — Port/Adapt and differential oracle
 
-`extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/` is the current device-owner source: `TinyGPUDriver.cpp`, `TinyGPUDriver.iig`, `TinyGPUDriverUserClient.cpp`, and `TinyGPUDriverUserClient.iig`. `tinygrad/runtime/support/am/amdev.py` and `ip.py` compactly model full/partial boot, reset, IP discovery, PSP/SMU/GMC/IH/GFX/SDMA, firmware, VMID/page tables, queues, and recovery. Harden the DEXT/user-client boundary and compare translated lifecycle stages against AMDev snapshots; do not retain a tinygrad Python runtime dependency in either product.
+`tinygpu/TinyGPUDriverExtension/` is the current in-repository device-owner source: `TinyGPUDriver.cpp`, `TinyGPUDriver.iig`, `TinyGPUDriverUserClient.cpp`, and `TinyGPUDriverUserClient.iig`. The pinned tinygrad revision supplies `tinygrad/runtime/support/am/amdev.py` and `ip.py` as read-only Port/Adapt and differential provenance for full/partial boot, reset, IP discovery, PSP/SMU/GMC/IH/GFX/SDMA, firmware, VMID/page tables, queues, and recovery. Harden the DEXT/user-client boundary and compare translated lifecycle stages against AMDev snapshots; do not retain a tinygrad Python runtime dependency in either product.
 
 ### P0 — [Linux amdgpu gfx12/gmc12/sdma7/VM](https://github.com/torvalds/linux/tree/73ae59e975966d24e32926247ddb45a537ebe184/drivers/gpu/drm/amd/amdgpu) — Normative and Port/Adapt
 

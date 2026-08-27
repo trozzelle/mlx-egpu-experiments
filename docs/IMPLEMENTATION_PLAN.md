@@ -12,6 +12,8 @@
 
 - Target hardware: AMD Radeon AI PRO R9700, PCI `1002:7551`, RDNA4 `gfx1201`, 32 GB, Apple Silicon macOS over Thunderbolt.
 - TinyGPU remains the sole production device owner.
+- TinyGPU source, build, and task authority is the in-repository `tinygpu/` tree on `feature/r9700-products-wave-a`; no external TinyGPU checkout or branch is writable.
+- Upstream Tinygrad is read-only Port/Adapt provenance and never an active implementation source.
 - The native producer path remains tinygrad-free; tinygrad is a reference/differential oracle only.
 - Preserve `S-1` prompt-cache semantics and final-token injection for mlx-lm.
 - Producer KV is authoritative until handoff; consumer fallback is legal only before cache acceptance.
@@ -96,16 +98,16 @@ New focused modules are justified only at clear ownership boundaries:
 
 Do not create these modules as scaffolds. Each appears only in the task set that delivers working behavior and focused tests.
 
-### TinyGPU source repository
+### In-repository TinyGPU product source
 
-Device-owner work belongs in the existing TinyGPU DEXT source, not a new DEXT:
+`tinygpu/` is the sole writable TinyGPU source, build, and task authority on branch `feature/r9700-products-wave-a`. Upstream Tinygrad remains read-only Port/Adapt provenance only. Device-owner work belongs in this in-repository TinyGPU DEXT source, not a separate checkout or new DEXT:
 
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp`
-- `TinyGPUDriver.iig`
-- `TinyGPUDriverUserClient.cpp`
-- `TinyGPUDriverUserClient.iig`
+- `tinygpu/TinyGPUDriverExtension/`
+- `tinygpu/Conformance/`
+- `tinygpu/Shared/`
+- `tinygpu/TinyGPUDriverExtension.xcodeproj/`
 
-The `egpu` repository owns conformance clients, integration, and accepted inference evidence. TinyGPU owns DriverKit lifecycle, resource, user-client, and security behavior. Cross-repository task documents must freeze request/response structures before either side implements against them.
+The products worktree owns phase/task ledgers, validation commands, and accepted inference evidence. `tinygpu/` owns DriverKit lifecycle, resource, user-client, conformance-client, packaging, and security behavior. All TinyGPU Xcode/build/install commands run from `tinygpu/` and write binaries under `tinygpu/build/`; in-repository task documents must freeze request/response structures before implementation.
 
 ### Read-only/adaptation references
 

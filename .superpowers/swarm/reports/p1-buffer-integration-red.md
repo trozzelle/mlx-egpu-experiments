@@ -4,7 +4,7 @@
 
 **Owner:** `P1BufferIntegrationRed`
 
-**Source worktree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` (`feature/r9700-device-owner`)
+**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
 
 **Evidence worktree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
 
@@ -12,15 +12,15 @@
 
 Only the two new host contracts and this report are in scope:
 
-- `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_buffer_request_validator_contract.cpp`
-- `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_buffer_owner_contract.cpp`
+- `tinygpu/Conformance/tests/test_tgpu_buffer_request_validator_contract.cpp`
+- `tinygpu/Conformance/tests/test_tgpu_buffer_owner_contract.cpp`
 - `.superpowers/swarm/reports/p1-buffer-integration-red.md`
 
 No production DEXT file, user-client selector, conformance client, queue/fence implementation, hardware VM path, or accepted `tgpu_resource_table_contract.cpp` test was changed. The existing `TinyGPUResourceTable` remains the accepted metadata/token core; the owner contract composes it rather than duplicating or replacing it.
 
 ## Contract boundary
 
-The tests establish the smallest wished host seams for the next GREEN implementation. They intentionally include headers and source names that are absent from the current source checkout:
+The tests establish the smallest wished host seams for the next GREEN implementation. They intentionally include headers and source names that are absent from the current in-repository source tree:
 
 - `TinyGPUDriverExtension/TGPUBufferRequestValidator.h`
 - `TinyGPUDriverExtension/TGPUBufferRequestValidator.cpp`
@@ -151,7 +151,7 @@ The supervisor should run these only from the TinyGPU installer directory after 
 ### Resource-table generation scan
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TinyGPUResourceTable.cpp \
@@ -163,7 +163,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 ### Typed validator
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUBufferRequestValidator.cpp \
@@ -175,7 +175,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 ### Owner/provider integration
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUBufferRequestValidator.cpp \

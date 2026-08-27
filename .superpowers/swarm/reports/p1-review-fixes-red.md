@@ -8,11 +8,11 @@ No validation command, test, build, formatter, linter, package-manager, install/
 
 ## Changed files
 
-- TinyGPU source worktree, `feature/r9700-device-owner`:
-  - `extra/usbgpu/tbgpu/installer/Conformance/tests/tgpu_resource_table_contract.cpp`
-  - `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_framebuffer_contract.cpp`
-  - `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_health_request_contract.cpp`
-  - `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_evidence_log_contract.cpp`
+- TinyGPU in-repository source tree, `feature/r9700-products-wave-a`:
+  - `tinygpu/Conformance/tests/tgpu_resource_table_contract.cpp`
+  - `tinygpu/Conformance/tests/test_tgpu_framebuffer_contract.cpp`
+  - `tinygpu/Conformance/tests/test_tgpu_health_request_contract.cpp`
+  - `tinygpu/Conformance/tests/test_tgpu_evidence_log_contract.cpp`
 - Evidence worktree, `feature/r9700-products-wave-a`:
   - `.superpowers/swarm/reports/p1-review-fixes-red.md`
 
@@ -97,7 +97,7 @@ Run each command from the TinyGPU installer directory, not the products worktree
 ### Token replay contract
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TinyGPUResourceTable.cpp \
@@ -115,7 +115,7 @@ FAIL: epoch-one token remains invalid in epoch-two namespace (observed=0 expecte
 ### Framebuffer decoder contract
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUFramebufferDecoder.cpp \
@@ -129,7 +129,7 @@ Expected current result (not executed here): compilation stops before the run be
 ### Inference health validator contract
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUHealthRequestValidator.cpp \
@@ -143,7 +143,7 @@ Expected current result (not executed here): compilation stops before the run be
 ### Evidence-log contract
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUEvidenceLog.cpp \

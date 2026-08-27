@@ -2,17 +2,17 @@
 
 **Status:** Implemented; supervisor verification pending
 
-**Source worktree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` (`feature/r9700-device-owner`)
+**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
 
 **Evidence worktree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
 
 ## Scope
 
-Only these source files were changed in the TinyGPU worktree:
+Only these source files were changed in the in-repository `tinygpu/` source tree:
 
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUResourceTable.h`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.h`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.cpp`
 
 This report is the only evidence-worktree file created for this correction. No tests, user-client integration, Xcode project/package/client files, or cold-stage logic were changed.
 
@@ -43,7 +43,7 @@ DriverKit 25.5 declares `IOPCIDevice::MemoryRead32` and `MemoryWrite32` as `void
 Run from the TinyGPU installer directory:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TinyGPUResourceTable.cpp \
@@ -59,7 +59,7 @@ This is the host RED/GREEN contract; it must compile against the production head
 Run from the same installer directory with the selected Xcode/DriverKit 25.5 toolchain:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcodebuild clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -alltargets -configuration Debug build
 ```
 

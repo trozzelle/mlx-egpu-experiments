@@ -30,8 +30,8 @@
 ## Shared work boundary
 
 - Orchestration/evidence checkout: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a`, branch `feature/r9700-products-wave-a`.
-- P1 TinyGPU source checkout: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner`, branch `feature/r9700-device-owner`.
-- Both are existing dedicated feature worktrees. Every P1 executor/reviewer must use these exact paths and branches; no agent may create another branch or worktree.
+- P1 TinyGPU in-repository source tree: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu`, branch `feature/r9700-products-wave-a`.
+- The products checkout is the sole P1 worktree; `tinygpu/` is its in-repository source tree. Every P1 executor/reviewer uses this checkout and branch; no agent may create another TinyGPU branch or worktree.
 
 ## Wave P1-A: lifecycle and ownership foundations
 

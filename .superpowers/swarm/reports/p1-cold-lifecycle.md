@@ -1,33 +1,33 @@
 # P1 task set 2 cold lifecycle implementation
 
 **Owner:** `P1ColdLifecycle`  
-**Source checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` (`feature/r9700-device-owner`)  
+**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
 **Evidence checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)  
 **Scope:** task-set-2 cold lifecycle, structured capabilities/health boundary, source/package cutover, and the first common conformance client.  
 **Validation status:** no build, test, formatter, linter, package-manager, install, signing, or hardware command was run by this agent.
 
 ## Changed files
 
-In the TinyGPU source checkout:
+In the TinyGPU in-repository source tree:
 
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUColdLifecycle.h`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUColdLifecycle.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUABI.h`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.iig`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverUserClient.iig`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/Info.plist`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.entitlements`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.Release.entitlements`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.NV.Release.entitlements` (removed)
-- `extra/usbgpu/tbgpu/installer/build_and_sign_nv.sh` (removed)
-- `extra/usbgpu/tbgpu/installer/Shared/TinyGPUCLIRunner.swift`
-- `extra/usbgpu/tbgpu/installer/Shared/TinyGPUApp.swift`
-- `extra/usbgpu/tbgpu/installer/Shared/TinyGPU-Bridging-Header.h`
-- `extra/usbgpu/tbgpu/installer/macOS/macOS.entitlements`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
-- `extra/usbgpu/tbgpu/installer/Conformance/tgpu_conformance_client.cpp`
+- `tinygpu/TinyGPUDriverExtension/TGPUColdLifecycle.h`
+- `tinygpu/TinyGPUDriverExtension/TGPUColdLifecycle.cpp`
+- `tinygpu/TinyGPUDriverExtension/TGPUABI.h`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.iig`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.cpp`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverUserClient.iig`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
+- `tinygpu/TinyGPUDriverExtension/Info.plist`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.entitlements`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.Release.entitlements`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.NV.Release.entitlements` (removed)
+- `tinygpu/build_and_sign_nv.sh` (removed)
+- `tinygpu/Shared/TinyGPUCLIRunner.swift`
+- `tinygpu/Shared/TinyGPUApp.swift`
+- `tinygpu/Shared/TinyGPU-Bridging-Header.h`
+- `tinygpu/macOS/macOS.entitlements`
+- `tinygpu/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
+- `tinygpu/Conformance/tgpu_conformance_client.cpp`
 
 The retained `Shared/server.c` file is historical quarantine material. It has no project file reference, no Sources-phase entry, no bridge declaration, no CLI branch, and no product launch path.
 
@@ -104,7 +104,7 @@ The baseline `NewUserClient` analyzer finding is addressed using the DriverKit o
 Supervisor should run the frozen host coordinator contract from the TinyGPU installer directory:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   TinyGPUDriverExtension/TGPUColdLifecycle.cpp \
   Conformance/tests/test_tgpu_cold_lifecycle.cpp \
@@ -118,17 +118,17 @@ The selected toolchain/build/install gate and fixed target are:
 ```sh
 xcode-select -p
 xcrun --sdk driverkit --show-sdk-version
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TGPUConformanceClient -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug
+  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
 ./install_nosip.sh
 ```
 
 The direct cold command is:
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   cold-lifecycle --service org.tinygrad.tinygpu.driver2 \
   --pci-id 1002:7551 --architecture gfx1201 \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/cold-lifecycle.log
@@ -139,6 +139,6 @@ The supervisor must inspect the bounded log and verify fresh DEXT attach, all si
 ## Remaining blockers and deferred ownership
 
 - No physical DEXT install or R9700 cold run was performed here. Full Xcode 26.6 build `17F113`, DriverKit SDK `25.5`, SIP-disabled local install, user approval, Thunderbolt/PCI attachment, approved firmware/VBIOS state, and external Release signing credentials remain supervisor/promotion prerequisites.
-- The source checkout contains no approved firmware blobs or firmware bundle manifest. Until that bundle path is supplied, the real PSP/SOS/TMR checks intentionally fail at the first unavailable hardware stage rather than fabricating firmware success.
+- The in-repository source tree contains no approved firmware blobs or firmware bundle manifest. Until that bundle path is supplied, the real PSP/SOS/TMR checks intentionally fail at the first unavailable hardware stage rather than fabricating firmware success.
 - This wave exposes only the normal inference class and the two read-only cold/health selectors. Buffer/import/mapping integration belongs to P1 task set 3; queue/executable/submit/fence/fault/reset integration and recovery/diagnostic roles remain later task sets. The fixed conformance source is intentionally only `cold-lifecycle` until those sequential owners release their client extensions.
 - `TGPUConformanceClient` is a host macOS tool and still requires the app's approved DriverKit user-client entitlement in the signed profile. No NoSIP wildcard or historical proxy output is accepted as Release or hardware evidence.

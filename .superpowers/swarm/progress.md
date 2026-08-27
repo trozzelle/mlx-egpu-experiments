@@ -69,7 +69,8 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 - Checkout: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a`
 - Branch: `feature/r9700-products-wave-a`
 - Boundary kind: fallback linked worktree created from `main`; every executor/reviewer uses this checkout and branch.
-- Cross-repository P1 boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on TinyGPU branch `feature/r9700-device-owner`; only P1 executors may edit it, after task set 1 review.
+- TinyGPU source, build, and task authority is the in-repository `tinygpu/` tree on this branch; upstream Tinygrad is read-only Port/Adapt provenance only, and no external TinyGPU checkout or branch is active.
+- P1 executors may edit only `tinygpu/` after task set 1 review; all validation/build/install commands use that tree and emit binaries under `tinygpu/build/`.
 - Agents never run git. The supervisor validates, reviews, updates ledgers/reports, and makes local checkpoint commits. Push and PR work remain user-owned unless separately requested.
 
 ### Orchestration map

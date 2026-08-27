@@ -4,23 +4,23 @@
 
 **Owner:** `P1TransportFix`
 
-**Source checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` (`feature/r9700-device-owner`)
+**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
 
 **Evidence checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
 
 ## Changed source and package files
 
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUFixedTransport.h`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUFixedTransport.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUResponseValidator.h`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUResponseValidator.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.iig`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverBackingProvider.h`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverBackingProvider.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
-- `extra/usbgpu/tbgpu/installer/Conformance/tgpu_conformance_client.cpp`
+- `tinygpu/TinyGPUDriverExtension/TGPUFixedTransport.h`
+- `tinygpu/TinyGPUDriverExtension/TGPUFixedTransport.cpp`
+- `tinygpu/TinyGPUDriverExtension/TGPUResponseValidator.h`
+- `tinygpu/TinyGPUDriverExtension/TGPUResponseValidator.cpp`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.iig`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.cpp`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverBackingProvider.h`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverBackingProvider.cpp`
+- `tinygpu/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
+- `tinygpu/Conformance/tgpu_conformance_client.cpp`
 
 The accepted `TGPUBufferRequestValidator.*`, `TinyGPUBufferOwner.*`, and `TinyGPUResourceTable.*` core was preserved. The four transport/response helper source files have unique PBX file/build IDs: fixed transport is a `TinyGPUDriver` source, and response validation is a `TGPUConformanceClient` source; all four helper files are present in the extension group. No public ABI declaration, raw control, BAR mapping, address/segment field, socket path, fallback, or task-set-4 command was added.
 
@@ -82,7 +82,7 @@ Inference IVars retain the typed `TinyGPUDriver`, a fresh provider, the accepted
 The existing common `TGPUConformanceClient` source now accepts exactly the frozen task-set-3 extension and no task-set-4 commands:
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   client-death --service org.tinygrad.tinygpu.driver2 \
   --close-with-live-resources --reopen --replay-handles \
   --expect-status TGPU_STATUS_INVALID_HANDLE \
@@ -99,7 +99,7 @@ For the positive path, a child opens a fresh direct type-0 connection, allocates
 Supervisor should first run the new transport/response contracts from the installer directory:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUFixedTransport.cpp \
@@ -118,7 +118,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 Then run the accepted host contracts:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUBufferRequestValidator.cpp \
@@ -141,13 +141,13 @@ The selected Xcode/DriverKit source gate and unsigned target build are superviso
 ```sh
 xcode-select -p
 xcrun --sdk driverkit --show-sdk-version
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TinyGPUDriver -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug
+  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TGPUConformanceClient -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug
+  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
 ```
 
 After the unsigned compile gate, supervisor may perform the existing local NoSIP install and then the direct command above. Any missing DriverKit SDK, unavailable DEXT, absent entitlement/profile, missing signed install, unavailable/faulted R9700, missing approved cold firmware state, or failed physical attachment is an explicit blocker. No legacy proxy or fake mapping path is an alternative.

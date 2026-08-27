@@ -4,12 +4,12 @@
 
 P1A-TOKEN-001 / P1-BUFFER-001 is fixed in the DEXT-owned resource-table seam. The authoritative RED case was the epoch-1/nonce-1 versus epoch-2/nonce-2 replay: XOR token inputs could be equal, allowing the epoch-one token to resolve in the epoch-two table. No BO/VA operation, user-client selector, queue resource, package, or client file was changed.
 
-Source worktree: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` (`feature/r9700-device-owner`).
+In-repository source tree: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`).
 
 Changed source files:
 
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUResourceTable.h`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.h`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUResourceTable.cpp`
 
 The existing `Conformance/tests/tgpu_resource_table_contract.cpp` already contains the explicit cross-epoch replay assertion, so it was not changed. This report is the only products-worktree change for this lane.
 
@@ -54,7 +54,7 @@ Storage remains allocated once at construction and all operations use the bounde
 Run from the TinyGPU installer directory (supervisor-owned; not run by this agent):
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TinyGPUResourceTable.cpp \

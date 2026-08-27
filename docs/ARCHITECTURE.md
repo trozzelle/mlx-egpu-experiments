@@ -114,6 +114,8 @@ flowchart TB
 
 TinyGPU remains the sole macOS DriverKit authority. It owns attachment, power/cold lifecycle, firmware-facing lifecycle, BAR and protected device resources, buffer/VA authority, queue creation, validated submission, fences, interrupts/faults, reset, and per-client isolation.
 
+The active TinyGPU source/build/task authority is the in-repository `tinygpu/` tree on `feature/r9700-products-wave-a`. Xcode, build, install, and conformance-client commands run from `tinygpu/` and write local binaries under `tinygpu/build/`; no external TinyGPU checkout or branch is an implementation authority. Upstream Tinygrad remains read-only Port/Adapt provenance.
+
 Inference clients do not receive unrestricted PCI/MMIO access. Raw register operations remain diagnostic-only. `mac-amdgpu`, tinygrad AMDev, and Linux amdgpu are reference sources for sequences and invariants; they do not create a second production device owner.
 
 ### Inference HAL

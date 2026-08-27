@@ -5,7 +5,7 @@
 - Code/architecture review: `agent://P1CodeReview`
 - Focused security review: `agent://P1SecurityReview-2`
 - Frozen contract: `.superpowers/swarm/reports/p1-abi-freeze.md`
-- Current source boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner`, branch `feature/r9700-device-owner`
+- Current source boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu`, branch `feature/r9700-products-wave-a`
 
 ## Supervisor evaluation
 

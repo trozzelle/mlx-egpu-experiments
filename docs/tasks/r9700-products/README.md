@@ -15,6 +15,8 @@ This directory converts `docs/IMPLEMENTATION_PLAN.md` and `docs/ROADMAP.md` into
 
 Archived C0–C3 and Qwen-N1 packets under `docs/archive/` are evidence only. Do not reactivate or edit them in place.
 
+TinyGPU source, build, and task authority is the in-repository `tinygpu/` tree on `feature/r9700-products-wave-a`. Upstream Tinygrad is read-only Port/Adapt provenance only. P1 source edits, Xcode/build/install commands, and conformance-client binaries use `tinygpu/`; no external TinyGPU checkout or branch is an active authority.
+
 ## Global execution policy
 
 - A supervisor owns phase status, validation, hardware serialization, review gates, and commits.
@@ -82,7 +84,7 @@ F1, F2, P1, P3, and Q1 may start concurrently because their primary ownership is
 
 - F1: service/process/model lifetime.
 - F2: WMMA source, generated image, and standalone evidence.
-- P1: TinyGPU DriverKit/user-client boundary in the TinyGPU repository plus local conformance.
+- P1: in-repository `tinygpu/` DriverKit/user-client boundary plus local conformance.
 - P3: Kernel Pack types, offline manifest/tooling, and migration rules.
 - Q1: Qwen model/cache/oracle contracts.
 

@@ -13,24 +13,24 @@
 
 **Owner:** P1 DriverKit integration review
 
-**Source checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` (`feature/r9700-device-owner`)
+**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
 
 **Evidence checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
 
 ## Changed files
 
-The source checkout contains only conformance contracts for this review slice:
+The in-repository source tree contains only conformance contracts for this review slice:
 
-- `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_fixed_transport_contract.cpp`
-- `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_response_validator_contract.cpp`
-- `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_buffer_owner_contract.cpp` (readiness assertions only)
-- `extra/usbgpu/tbgpu/installer/Conformance/tests/tgpu_resource_table_contract.cpp` (readiness assertions only)
+- `tinygpu/Conformance/tests/test_tgpu_fixed_transport_contract.cpp`
+- `tinygpu/Conformance/tests/test_tgpu_response_validator_contract.cpp`
+- `tinygpu/Conformance/tests/test_tgpu_buffer_owner_contract.cpp` (readiness assertions only)
+- `tinygpu/Conformance/tests/tgpu_resource_table_contract.cpp` (readiness assertions only)
 
 The evidence checkout contains this report only. No DriverKit/user-client implementation, ABI declaration, provider, owner/resource production file, conformance process, IOKit object, DriverKit object, or test double was changed.
 
 ## Wished pure seams
 
-The contracts intentionally include two headers that are absent from the current source checkout. They are narrow host-testable seams, not public ABI or generic serialization layers.
+The contracts intentionally include two headers that are absent from the current in-repository source tree. They are narrow host-testable seams, not public ABI or generic serialization layers.
 
 ### `TGPUFixedTransport.*`
 
@@ -138,7 +138,7 @@ The readiness assertions do not add allocation-failure injection hooks. Existing
 Run from the installer directory after the source seam is intentionally supplied or to capture the expected missing-seam RED:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUFixedTransport.cpp \
@@ -150,7 +150,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 Expected current RED: compilation stops because `TinyGPUDriverExtension/TGPUFixedTransport.cpp` and `TGPUFixedTransport.h` do not exist. No operation or provider state is reached.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUResponseValidator.cpp \
@@ -162,7 +162,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 Expected current RED: compilation stops because `TinyGPUDriverExtension/TGPUResponseValidator.cpp` and `TGPUResponseValidator.h` do not exist.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TinyGPUResourceTable.cpp \
@@ -174,7 +174,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 Expected current RED: after the existing table implementation is found, compilation stops at the new `TinyGPUResourceTable::IsReady()` calls because the public readiness method is absent.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUBufferRequestValidator.cpp \

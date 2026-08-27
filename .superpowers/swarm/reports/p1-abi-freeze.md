@@ -5,13 +5,13 @@
 **Owner:** `P1ABI`  
 **Report:** `.superpowers/swarm/reports/p1-abi-freeze.md`  
 **Review date:** 2026-08-25  
-**Implementation boundary:** This report freezes the contract only. It does not edit the TinyGPU checkout, implement DEXT behavior, or edit the shared validation ledger. Later TinyGPU source implementation is isolated at `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`. The source checkout is read-only for this correction. No validation, build, install, hardware, or package-manager command was run.
+**Implementation boundary:** This report freezes the contract only. It does not edit the in-repository TinyGPU source tree, implement DEXT behavior, or edit the shared validation ledger. Later TinyGPU source implementation is isolated at `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`. The in-repository source tree is read-only for this correction. No validation, build, install, hardware, or package-manager command was run.
 
 ## Decision summary
 
 TinyGPU's public user-client contract is a fixed-width, little-endian, naturally 8-byte-aligned structured ABI named `TGPU`, **major 1, minor 0**. Every request and response starts with a common header. A driver validates the complete header, selector, structure size, reserved fields, counts, ranges, and checked arithmetic before reading an operation field or mutating hardware. Responses never contain a pointer, physical address, BAR mapping, GPU virtual address, raw register value, PM4 packet, doorbell, MQD, or HQD.
 
-The old `ReadCfg`/`WriteCfg`/`Reset`/`PrepareDMA` selector meanings are not compatibility aliases. The unauthenticated `extra/usbgpu/tbgpu/installer/Shared/server.c` socket/proxy is quarantined historical diagnostic source only: it is excluded from every P1 product, build, conformance, validation, and Release path, is never launched by a P1 command, and cannot be used as an inference or acceptance transport. Normal access is the entitlement-gated DriverKit user client. Any future diagnostic transport is a separate user-client class with a separate exact entitlement and authenticated owner policy; it is not the legacy proxy.
+The old `ReadCfg`/`WriteCfg`/`Reset`/`PrepareDMA` selector meanings are not compatibility aliases. The unauthenticated `tinygpu/Shared/server.c` socket/proxy is quarantined historical diagnostic source only: it is excluded from every P1 product, build, conformance, validation, and Release path, is never launched by a P1 command, and cannot be used as an inference or acceptance transport. Normal access is the entitlement-gated DriverKit user client. Any future diagnostic transport is a separate user-client class with a separate exact entitlement and authenticated owner policy; it is not the legacy proxy.
 
 Executable admission is authorized only for an entitled client role and an image digest recomputed by the driver from an immutable private image copy. The driver validates the complete closed code-object, descriptor, relocation, kernarg, wave, and resource set against the R9700 policy before admission and installs the executable in a per-client VM context. A client-supplied pack ID or digest is audit metadata and a consistency check only; it is never the authorization trust anchor. Kernel Pack/P3 records are not parsed in DriverKit.
 
@@ -904,7 +904,7 @@ Close is idempotent and ordered: mark the connection closing and reject new call
 | `TinyGPUDriverExtension/Info.plist` | Existing personality matches display-class PCI devices generally and has one generic user-client class. | Release personality must match only AMD `1002:7551` and expose separate inference/recovery/diagnostic user-client classes with exact role authorization. A class-wide or vendor-wide Release personality is forbidden. |
 ### Required source/package cutover before any install
 
-The current source still contains a buildable legacy path (`TinyGPUDriverExtension.xcodeproj/project.pbxproj` includes `server.c` in the app Sources phase) and the current app CLI still exposes `server <path>`. The quarantine is therefore an owned source cutover, not a prose exception. **P1 task set 2 owns this cutover in the later `r9700-tinygpu-device-owner` worktree before any P1 install or cold validation:**
+The current source still contains a buildable legacy path (`TinyGPUDriverExtension.xcodeproj/project.pbxproj` includes `server.c` in the app Sources phase) and the current app CLI still exposes `server <path>`. The quarantine is therefore an owned source cutover, not a prose exception. **P1 task set 2 owns this cutover in the in-repository `tinygpu/` source tree before any P1 install or cold validation:**
 
 | Exact path/symbol | Required cutover and acceptance check |
 |---|---|
@@ -932,7 +932,7 @@ The role is selected by the user-client class and signed code requirement, never
 
 The Release transport entitlement and Release personality both match exactly the PCI tuple `vendor_id=0x1002`, `device_id=0x7551` (`IOPCIPrimaryMatch` combined value `0x75511002&0xFFFFFFFF`, with no vendor-only mask). Release contains no `0xFFFFFFFF&0x00000000`, no `0x00001002&0x0000FFFF`, no `0x000010de&0x0000FFFF`, no wildcard class match, and no unrelated device match. The existing wildcard `TinyGPUDriver.NoSIP.entitlements` is explicitly local development only. Any retained wildcard default entitlement is also local-only and must not be selected by a Release configuration. A Release package check must inspect the signed entitlements and Info personality and fail closed on wildcard, NVIDIA, vendor-wide AMD, or display-class-only matching.
 
-Local development is separate: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/install_nosip.sh` may use SIP-disabled ad-hoc signing and NoSIP wildcard access solely for local development. It cannot launch the quarantined legacy proxy or be used as Release evidence. Apple PCI distribution entitlement, matching profiles, Developer ID/notarization credentials, and the approved external signing invocation remain a **promotion-only** blocker; they do not authorize broad device matching and do not block source implementation once the local SDK gate is satisfied.
+Local development is separate: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/install_nosip.sh` may use SIP-disabled ad-hoc signing and NoSIP wildcard access solely for local development. It cannot launch the quarantined legacy proxy or be used as Release evidence. Apple PCI distribution entitlement, matching profiles, Developer ID/notarization credentials, and the approved external signing invocation remain a **promotion-only** blocker; they do not authorize broad device matching and do not block source implementation once the local SDK gate is satisfied.
 
 ## SDK gate and implementation status
 
@@ -952,10 +952,10 @@ Later tasks may implement this contract but may not renumber selectors, change s
 | Owner/task | Exact files/symbols | Owns | Must not edit/claim |
 |---|---|---|---|
 | P1 task set 1 / ABI owner | TinyGPU declarations through the separately authorized source boundary; this report and the P1 ledger row | Canonical declarations, selector/status/role/handle values, layout assertions, version/bounds/security record, command contract, validation-client CLI freeze | TinyGPU implementation in this batch; shared validation ledger; service/model lifecycle |
-| P1 task set 2 | Later source worktree `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` (`feature/r9700-device-owner`), `TinyGPUDriver.cpp` `init`/`Start_Impl`/cold-stage helpers, packaging files named in the source cutover table, and `Conformance/tgpu_conformance_client.cpp`; P1 cold-lifecycle report | Cold lifecycle, firmware provenance, capability/health population, removal of `server.c` from all targets/CLI paths, exact R9700 Release Info/entitlement scope, common conformance-client transport/entry point, and the `cold-lifecycle` subcommand | `.iig` layout/selector changes; buffer/resource tables; queue/submit/reset policy; service/model files; any legacy proxy path |
-| P1 task set 3 | Same later source worktree/branch; TinyGPU buffer/VA owner helpers and `TinyGPUDriverUserClient.cpp` buffer selectors/resource tables; `Conformance/tgpu_conformance_client.cpp` client-death extension; named buffer tests | Buffer allocate/import/map/unmap/release, opaque mapping handles, per-client VM/range/alignment/permission checks, idempotent buffer/import/mapping client-death cleanup hooks, and the `client-death` subcommand | Cold stages/package cutover; queue/executable/submit/fence implementation; service/model; raw BAR/MMIO; deferring buffer cleanup to task 5 |
-| P1 task set 4 | Same later source worktree/branch; `TinyGPUDriverUserClient.cpp` queue/executable/submit/fence/timestamp/health cases and narrow owner helpers; sequential `Conformance/tgpu_conformance_client.cpp` extensions; named queue/executable tests | Driver-owned queue controls, executable admission and closed validation, binding snapshots/driver-built kernargs, submission, monotonic fences/timestamps, bounded fault attribution, idempotent queue/executable/submission/fence cleanup hooks, and `malformed-submit`, `queue-reset`, `fault-query`, and `g0-binding` subcommands | Buffer ABI/table changes; reset/recovery integration; portable HAL; raw PM4 from clients; deferring execution-resource cleanup to task 5 |
-| P1 task set 5 | Same later source worktree/branch; `ResetDevice`/recovery helpers, `TGPU_QUEUE_RESET`/`TGPU_DEVICE_RESET`, `Stop_Impl`/`free` orchestration, and sequential `Conformance/tgpu_conformance_client.cpp` extension | Integrate task-3 and task-4 cleanup hooks in close/reset order; queue/device reset, epoch invalidation, recovery/unavailable state, client-death sequencing, and the `device-recovery` subcommand | Selector/struct changes; replacing per-resource hooks; hidden retries; multi-client scheduler; P2 HAL reset policy; legacy proxy |
+| P1 task set 2 | Later in-repository source tree `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`), `TinyGPUDriver.cpp` `init`/`Start_Impl`/cold-stage helpers, packaging files named in the source cutover table, and `Conformance/tgpu_conformance_client.cpp`; P1 cold-lifecycle report | Cold lifecycle, firmware provenance, capability/health population, removal of `server.c` from all targets/CLI paths, exact R9700 Release Info/entitlement scope, common conformance-client transport/entry point, and the `cold-lifecycle` subcommand | `.iig` layout/selector changes; buffer/resource tables; queue/submit/reset policy; service/model files; any legacy proxy path |
+| P1 task set 3 | Same in-repository `tinygpu/` source tree/branch; TinyGPU buffer/VA owner helpers and `TinyGPUDriverUserClient.cpp` buffer selectors/resource tables; `Conformance/tgpu_conformance_client.cpp` client-death extension; named buffer tests | Buffer allocate/import/map/unmap/release, opaque mapping handles, per-client VM/range/alignment/permission checks, idempotent buffer/import/mapping client-death cleanup hooks, and the `client-death` subcommand | Cold stages/package cutover; queue/executable/submit/fence implementation; service/model; raw BAR/MMIO; deferring buffer cleanup to task 5 |
+| P1 task set 4 | Same in-repository `tinygpu/` source tree/branch; `TinyGPUDriverUserClient.cpp` queue/executable/submit/fence/timestamp/health cases and narrow owner helpers; sequential `Conformance/tgpu_conformance_client.cpp` extensions; named queue/executable tests | Driver-owned queue controls, executable admission and closed validation, binding snapshots/driver-built kernargs, submission, monotonic fences/timestamps, bounded fault attribution, idempotent queue/executable/submission/fence cleanup hooks, and `malformed-submit`, `queue-reset`, `fault-query`, and `g0-binding` subcommands | Buffer ABI/table changes; reset/recovery integration; portable HAL; raw PM4 from clients; deferring execution-resource cleanup to task 5 |
+| P1 task set 5 | Same in-repository `tinygpu/` source tree/branch; `ResetDevice`/recovery helpers, `TGPU_QUEUE_RESET`/`TGPU_DEVICE_RESET`, `Stop_Impl`/`free` orchestration, and sequential `Conformance/tgpu_conformance_client.cpp` extension | Integrate task-3 and task-4 cleanup hooks in close/reset order; queue/device reset, epoch invalidation, recovery/unavailable state, client-death sequencing, and the `device-recovery` subcommand | Selector/struct changes; replacing per-resource hooks; hidden retries; multi-client scheduler; P2 HAL reset policy; legacy proxy |
 | P1 task set 6 | `logs/p1-tinygpu-owner/`, promotion report, and task/ledger evidence | Fresh cold → BO/VA → TGPU queue → exact G0 → sustained inference → fault/reset evidence; G0 consumption | Regenerating G0; changing service/model; changing P1 ABI or launching legacy proxy |
 | P2 consumers | `native_r9700/hal.h`, `hal.cpp`, `hal_amdev.h`, `hal_amdev.cpp` and P2 tests | Portable Device/Buffer/Executable/Queue/Fence over TGPU with no AMD register leakage | TinyGPU source or TGPU selector/layout changes |
 | F1/Q1/F2/P3 owners | Their existing phase-owned source and artifact paths | Service/model, Qwen, WMMA/G0, and generic Kernel Pack records respectively | P1 selectors, handle ABI, or DriverKit parsing of P3 records |
@@ -966,9 +966,9 @@ The single `TGPUConformanceClient` target is intentionally sequential: task set 
 
 These commands are a recorded future contract, not executed by this task and not an assertion that the client or binary exists today. The single implementation target is:
 
-* source: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/Conformance/tgpu_conformance_client.cpp`;
+* source: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/Conformance/tgpu_conformance_client.cpp`;
 * Xcode target: `TGPUConformanceClient`;
-* binary: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client`.
+* binary: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client`.
 
 Task set 2 creates the common client target and `cold-lifecycle`; task sets 3–5 extend that same target with their assigned subcommands after their respective gates. A different executable, raw socket command, or placeholder shell fragment is not a substitute. Every invocation writes a bounded log containing `abi_major`, `abi_minor`, `selector`, `status`, `failure_stage`, `device_epoch`, and `exit_status`.
 
@@ -977,10 +977,10 @@ Task set 2 creates the common client target and `cold-lifecycle`; task sets 3–
 ```sh
 xcode-select -p
 xcrun --sdk driverkit --show-sdk-version
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TGPUConformanceClient -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug
+  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
 ./install_nosip.sh
 ```
 
@@ -989,7 +989,7 @@ The currently verified preflight result is blocked: active developer directory i
 ### P1 cold lifecycle
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   cold-lifecycle --service org.tinygrad.tinygpu.driver2 \
   --pci-id 1002:7551 --architecture gfx1201 \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/cold-lifecycle.log
@@ -1000,27 +1000,27 @@ Required observations are a fresh DEXT cold attach, ordered lifecycle stages, `T
 ### P1 malformed submission, stale/client-death, queue reset, and bounded fault query
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   malformed-submit --service org.tinygrad.tinygpu.driver2 \
   --cases wrong-record-size,absolute-address,unbound-binding,stale-handle \
   --expect-status TGPU_STATUS_SUBMISSION_REJECTED \
   --expect-no-queue-mutation \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/malformed-submit.log
 
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   client-death --service org.tinygrad.tinygpu.driver2 \
   --close-with-live-resources --reopen --replay-handles \
   --expect-status TGPU_STATUS_INVALID_HANDLE \
   --expect-empty-new-namespace \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/client-death.log
 
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   queue-reset --service org.tinygrad.tinygpu.driver2 \
   --owner-only --expect-pending-fence-status TGPU_STATUS_CANCELED \
   --expect-no-replay \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/queue-reset.log
 
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   fault-query --service org.tinygrad.tinygpu.driver2 \
   --scope client --max-text-bytes 192 --expect-redacted \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/fault-query.log
@@ -1031,7 +1031,7 @@ The malformed cases must return status 12 before queue mutation or signal alloca
 ### P1 device recovery
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   device-recovery --service org.tinygrad.tinygpu.driver2 \
   --recovery-service org.tinygrad.tinygpu.recovery \
   --preflight-normal-reset-denied --fault-source physical \
@@ -1044,7 +1044,7 @@ The fixed client first proves that a normal inference connection receives `TGPU_
 ### P1 exact G0 binding
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   g0-binding --service org.tinygrad.tinygpu.driver2 \
   --g0-report ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/.superpowers/swarm/reports/g0-wmma-conformance.md \
   --require-status-field g0_status=pass \
@@ -1078,7 +1078,7 @@ The following table maps every finding from `agent://P1SecurityReview` to the fr
 | `P1-AUTH-001` reset/fault authorization | Important | Roles/classes/entitlements are exact. Queue reset is owner-only. Device reset is recovery-role-only with `org.tinygrad.tinygpu.recovery`, serialized degraded/faulted preconditions, one-second rate limit, epoch invalidation, and bounded redacted output; inference clients cannot invoke it. |
 | `P1-ABI-001` prose-only operation ABI | Important | Every selector now has canonical fixed-width request/response declarations, command/wait/binding elements, numeric enums/masks, reserved fields, sizes, offsets, alignment, offset bases, static assertions, max counts, and v1.0 append-only minor rules. |
 | `P1-LIFE-001` cleanup assigned too late | Important | Task set 3 owns idempotent buffer/import/mapping client-death hooks; task set 4 owns queue/executable/submission/fence hooks; task set 5 only integrates their ordered close/reset calls and recovery. |
-| `P1-VAL-001` wrong checkout/placeholders | Important | Commands point to the `r9700-tinygpu-device-owner` worktree and one fixed `TGPUConformanceClient` source/binary whose ownership is sequential: task 2 common/cold, task 3 client-death, task 4 malformed/queue/fault/G0, task 5 recovery. Exact CLIs are recorded; no command launches the legacy proxy. Physical injection is explicitly blocked rather than replaced. |
+| `P1-VAL-001` wrong checkout/placeholders | Important | Commands point to the in-repository `tinygpu/` source tree and one fixed `TGPUConformanceClient` source/binary whose ownership is sequential: task 2 common/cold, task 3 client-death, task 4 malformed/queue/fault/G0, task 5 recovery. Exact CLIs are recorded; no command launches the legacy proxy. Physical injection is explicitly blocked rather than replaced. |
 | `P1-SIGN-001` broad Release PCI scope | Important | Task set 2 owns the pre-install package cutover; Release transport/personality is exactly AMD `1002:7551` (`0x75511002&0xFFFFFFFF`); wildcard, vendor-wide, NVIDIA, and class-wide matches are forbidden in Release. Wildcard/allow-any access is local NoSIP only. |
 | `P1-ABI-002` fence polling contradiction | Minor | `timeout_ns == 0` polls the requested `fence_value`; only timeout is capped. `fence_value == 0` is explicitly an immediate initial-state query and never a signal value. |
 | `P1-SDK-001` missing DriverKit SDK datum | Minor | Cleared 2026-08-26: Xcode 26.6 build `17F113`, DriverKit SDK `25.5`, and the exact selected SDK path are recorded before source/build work resumes. |

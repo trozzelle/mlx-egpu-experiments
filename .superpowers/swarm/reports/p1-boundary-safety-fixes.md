@@ -2,7 +2,7 @@
 
 **Status:** Implemented; supervisor verification pending
 
-**Source worktree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` (`feature/r9700-device-owner`)
+**In-repository source tree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
 
 **Evidence worktree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
 
@@ -12,22 +12,22 @@ This correction owns the public user-client boundary, role/package cutover, dire
 
 ## Changed source/package files
 
-In the TinyGPU source worktree:
+In the TinyGPU in-repository source tree:
 
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUHealthRequestValidator.h`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUHealthRequestValidator.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUEvidenceLog.h`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TGPUEvidenceLog.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUInferenceUserClient.iig`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPURecoveryUserClient.iig`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDiagnosticUserClient.iig`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/Info.plist`
-- `extra/usbgpu/tbgpu/installer/Conformance/tgpu_conformance_client.cpp`
-- `extra/usbgpu/tbgpu/installer/Conformance/TGPUConformanceClient.entitlements`
-- `extra/usbgpu/tbgpu/installer/Shared/TinyGPUCLIRunner.swift`
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
+- `tinygpu/TinyGPUDriverExtension/TGPUHealthRequestValidator.h`
+- `tinygpu/TinyGPUDriverExtension/TGPUHealthRequestValidator.cpp`
+- `tinygpu/TinyGPUDriverExtension/TGPUEvidenceLog.h`
+- `tinygpu/TinyGPUDriverExtension/TGPUEvidenceLog.cpp`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUInferenceUserClient.iig`
+- `tinygpu/TinyGPUDriverExtension/TinyGPURecoveryUserClient.iig`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDiagnosticUserClient.iig`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriverUserClient.cpp`
+- `tinygpu/TinyGPUDriverExtension/TinyGPUDriver.cpp`
+- `tinygpu/TinyGPUDriverExtension/Info.plist`
+- `tinygpu/Conformance/tgpu_conformance_client.cpp`
+- `tinygpu/Conformance/TGPUConformanceClient.entitlements`
+- `tinygpu/Shared/TinyGPUCLIRunner.swift`
+- `tinygpu/TinyGPUDriverExtension.xcodeproj/project.pbxproj`
 
 This report is the only products-worktree file created for this correction. Shared ledgers, task packets, and validation documents were not edited.
 
@@ -70,7 +70,7 @@ The project uses previously occupied IDs through `A10000010000000000000011`; the
 Run from the TinyGPU installer directory:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUHealthRequestValidator.cpp \
@@ -80,7 +80,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 ```
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUEvidenceLog.cpp \
@@ -90,23 +90,23 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 ```
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcodebuild clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -alltargets -configuration Debug build
 ```
 
 The fixed conformance-target build can also be run explicitly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TGPUConformanceClient -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug
+  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
 ```
 
 The required preinstall fail-closed smoke is:
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   cold-lifecycle --service org.tinygrad.tinygpu.driver2 \
   --pci-id 1002:7551 --architecture gfx1201 \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/cold-lifecycle.log

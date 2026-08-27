@@ -205,7 +205,7 @@ Rollback and Release pass only with `{resource_generation:uint64,state:"released
 '
 ```
 
-The required output is a concrete `EvidenceRef` with `record_kind: offline_review`, `evidence_slot: layout_proof`, `record_id: f2-wmma-physical-layout-proof-v1`, nonempty record/source/tool/spec/fixture/target/image/pack/input/output digests, and exactly empty `producer_kind`. It also requires nonempty `source_tensor_layout_version`, `physical_layout_version`, `layout_spec_path`, `layout_spec_sha256`, `inverse_fixture_path`, and `inverse_fixture_sha256`; exact source-element-to-physical-byte and 16x16 B-tile/LDS mapping; strides/alignment/padding/swizzle; `layout_origin: pinned_header|reviewed_local_v1`; inverse/conformance fixture input/output digests; and `layout_status: pass`, `failure_stage: none`, `exit_status: 0`, and `wrapper_exit_status: 0`. Its `tool_digest` identifies the exact review tool/version or signed manual-review record digest. A `reviewed_local_v1` origin carries the task-set-5 hardware numerical record key/digest before G0; a missing source checkout, absent or unreviewed spec, or failed inverse fixture rejects task set 3 and keeps task set 4 blocked.
+The required output is a concrete `EvidenceRef` with `record_kind: offline_review`, `evidence_slot: layout_proof`, `record_id: f2-wmma-physical-layout-proof-v1`, nonempty record/source/tool/spec/fixture/target/image/pack/input/output digests, and exactly empty `producer_kind`. It also requires nonempty `source_tensor_layout_version`, `physical_layout_version`, `layout_spec_path`, `layout_spec_sha256`, `inverse_fixture_path`, and `inverse_fixture_sha256`; exact source-element-to-physical-byte and 16x16 B-tile/LDS mapping; strides/alignment/padding/swizzle; `layout_origin: pinned_header|reviewed_local_v1`; inverse/conformance fixture input/output digests; and `layout_status: pass`, `failure_stage: none`, `exit_status: 0`, and `wrapper_exit_status: 0`. Its `tool_digest` identifies the exact review tool/version or signed manual-review record digest. A `reviewed_local_v1` origin carries the task-set-5 hardware numerical record key/digest before G0; a missing in-repository source tree, absent or unreviewed spec, or failed inverse fixture rejects task set 3 and keeps task set 4 blocked.
 
 ### F2 lane-map proof
 
@@ -391,26 +391,26 @@ Expected observations, all required: F2 HSA/asset/catalog/numerical/evidence gat
 
 ## P1
 
-The fixed downstream `TGPUConformanceClient` binary and subcommands below are the exact P1 CLI contract. Xcode 26.6 build `17F113` and DriverKit SDK 25.5 are selected; production distribution credentials remain a separate promotion blocker.
+The fixed downstream `TGPUConformanceClient` binary and subcommands below are the exact P1 CLI contract. `tinygpu/` is the sole writable TinyGPU source/build/task authority on branch `feature/r9700-products-wave-a`; upstream Tinygrad is read-only Port/Adapt provenance only. Xcode 26.6 build `17F113` and DriverKit SDK 25.5 are selected; production distribution credentials remain a separate promotion blocker.
 
 ### SDK/build/install preflight and local install
 
 ```sh
 xcode-select -p
 xcrun --sdk driverkit --show-sdk-version
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer
+cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TGPUConformanceClient -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug
+  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
 ./install_nosip.sh
 ```
 
-Verified preflight on 2026-08-26: active developer directory `/Applications/Xcode.app/Contents/Developer`; Xcode 26.6 build `17F113`; DriverKit SDK `25.5` at `/Applications/Xcode.app/Contents/Developer/Platforms/DriverKit.platform/Developer/SDKs/DriverKit25.5.sdk`. The local installer may use only the NoSIP development entitlement. No command in this section launches or links `Shared/server.c`. Apple PCI distribution entitlement, profiles, Developer ID/notarization credentials, and approved external signing invocation remain promotion-only inputs, separate from the cleared SDK gate.
+Verified preflight on 2026-08-26: active developer directory `/Applications/Xcode.app/Contents/Developer`; Xcode 26.6 build `17F113`; DriverKit SDK `25.5` at `/Applications/Xcode.app/Contents/Developer/Platforms/DriverKit.platform/Developer/SDKs/DriverKit25.5.sdk`. The local installer may use only the NoSIP development entitlement. No command in this section launches or links `tinygpu/Shared/server.c`. Apple PCI distribution entitlement, profiles, Developer ID/notarization credentials, and approved external signing invocation remain promotion-only inputs, separate from the cleared SDK gate.
 
 ### P1 cold lifecycle
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   cold-lifecycle --service org.tinygrad.tinygpu.driver2 \
   --pci-id 1002:7551 --architecture gfx1201 \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/cold-lifecycle.log
@@ -421,27 +421,27 @@ Required observations are a fresh DEXT cold attach, ordered lifecycle stages, `T
 ### P1 malformed submission, stale/client-death, queue reset, and bounded fault query
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   malformed-submit --service org.tinygrad.tinygpu.driver2 \
   --cases wrong-record-size,absolute-address,unbound-binding,stale-handle \
   --expect-status TGPU_STATUS_SUBMISSION_REJECTED \
   --expect-no-queue-mutation \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/malformed-submit.log
 
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   client-death --service org.tinygrad.tinygpu.driver2 \
   --close-with-live-resources --reopen --replay-handles \
   --expect-status TGPU_STATUS_INVALID_HANDLE \
   --expect-empty-new-namespace \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/client-death.log
 
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   queue-reset --service org.tinygrad.tinygpu.driver2 \
   --owner-only --expect-pending-fence-status TGPU_STATUS_CANCELED \
   --expect-no-replay \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/queue-reset.log
 
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   fault-query --service org.tinygrad.tinygpu.driver2 \
   --scope client --max-text-bytes 192 --expect-redacted \
   --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/fault-query.log
@@ -452,7 +452,7 @@ The malformed cases must return status 12 before queue mutation or signal alloca
 ### P1 device recovery
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   device-recovery --service org.tinygrad.tinygpu.driver2 \
   --recovery-service org.tinygrad.tinygpu.recovery \
   --preflight-normal-reset-denied --fault-source physical \
@@ -465,7 +465,7 @@ The fixed client first proves that a normal inference connection receives `TGPU_
 ### P1 exact G0 binding
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/build/Debug/tgpu-conformance-client \
+${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
   g0-binding --service org.tinygrad.tinygpu.driver2 \
   --g0-report ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/.superpowers/swarm/reports/g0-wmma-conformance.md \
   --require-status-field g0_status=pass \
