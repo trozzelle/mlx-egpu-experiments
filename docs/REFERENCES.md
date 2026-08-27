@@ -75,9 +75,15 @@ Closest cold-initialization reference: same PCI ID, gfx1201, Apple Silicon, Thun
 
 Use for PSP/SOS/TMR firmware lifecycle, SMU mailbox, IMU, RLC, CP/MES/GFX/SDMA initialization, GART/VM, DriverKit attachment, and checked user-client mechanics. TinyGPU remains device owner per ADR 0007; do not import mac-amdgpu as a second substrate or copy its development entitlements as product requirements.
 
-### P0 — [`tinygrad/tinygrad` TinyGPU and AMDev](https://github.com/tinygrad/tinygrad/tree/d851aca9ae1faf4210cc0da4508bead7da57d7ee) — Port/Adapt and differential oracle
+### P0 — vendored [`tinygrad/tinygrad` TinyGPU installer](https://github.com/tinygrad/tinygrad/tree/12addee14f1d728793648ceca307a5fde2b24cea/extra/usbgpu/tbgpu/installer) — MIT
 
-`tinygpu/TinyGPUDriverExtension/` is the current in-repository device-owner source: `TinyGPUDriver.cpp`, `TinyGPUDriver.iig`, `TinyGPUDriverUserClient.cpp`, and `TinyGPUDriverUserClient.iig`. The pinned tinygrad revision supplies `tinygrad/runtime/support/am/amdev.py` and `ip.py` as read-only Port/Adapt and differential provenance for full/partial boot, reset, IP discovery, PSP/SMU/GMC/IH/GFX/SDMA, firmware, VMID/page tables, queues, and recovery. Harden the DEXT/user-client boundary and compare translated lifecycle stages against AMDev snapshots; do not retain a tinygrad Python runtime dependency in either product.
+`tinygpu/` is the current in-repository device-owner source, imported from upstream revision `12addee14f1d728793648ceca307a5fde2b24cea` and local TinyGPU checkpoint `f18261437`. The imported subtree is published under the MIT License; the required upstream copyright and permission notice is retained verbatim at `tinygpu/LICENSE`.
+
+Local modifications include the structured TGPU v1.0 ABI, separate inference/recovery/diagnostic user-client roles, R9700-only package scope, legacy proxy quarantine, fail-closed cold lifecycle and evidence, bounded resource ownership, host-visible allocation, client-death cleanup, response-payload preservation, and conformance contracts. The exact provenance and modification record is `tinygpu-device-owner-vendor` in `upstream-reference-manifest.yaml`. No Tinygrad source outside `extra/usbgpu/tbgpu/installer` is vendored.
+
+### P0 — [`tinygrad/tinygrad` AMDev](https://github.com/tinygrad/tinygrad/tree/d851aca9ae1faf4210cc0da4508bead7da57d7ee) — Port/Adapt and differential oracle
+
+The separately pinned AMDev revision supplies `tinygrad/runtime/support/am/amdev.py` and `ip.py` as read-only Port/Adapt and differential provenance for full/partial boot, reset, IP discovery, PSP/SMU/GMC/IH/GFX/SDMA, firmware, VMID/page tables, queues, and recovery. Compare translated lifecycle stages against AMDev snapshots; do not retain a Tinygrad Python runtime dependency in either product.
 
 ### P0 — [Linux amdgpu gfx12/gmc12/sdma7/VM](https://github.com/torvalds/linux/tree/73ae59e975966d24e32926247ddb45a537ebe184/drivers/gpu/drm/amd/amdgpu) — Normative and Port/Adapt
 

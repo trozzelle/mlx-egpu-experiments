@@ -80,6 +80,31 @@ sources:
       - no tinygrad runtime dependency in product path
     prohibited_wholesale: tinygrad runtime dependency
 
+  - id: tinygpu-device-owner-vendor
+    priority: P0
+    reuse: vendored-and-locally-modified
+    upstream: https://github.com/tinygrad/tinygrad
+    revision: 12addee14f1d728793648ceca307a5fde2b24cea
+    paths:
+      - extra/usbgpu/tbgpu/installer
+    local_path: tinygpu
+    imported_checkpoint: f18261437
+    license: MIT
+    license_file: tinygpu/LICENSE
+    license_review: accepted
+    vendored: true
+    phases: [P1]
+    local_modifications:
+      - structured TGPU v1.0 ABI and separate inference, recovery, and diagnostic roles
+      - R9700-only package scope and legacy proxy quarantine
+      - fail-closed cold lifecycle, bounded evidence, and response-payload preservation
+      - bounded resource ownership, host-visible allocation, client-death cleanup, and conformance contracts
+    required_evidence:
+      - nine in-repository host conformance contracts
+      - unsigned TinyGPUDriver and TGPUConformanceClient Xcode builds
+      - full egpu regression suite
+    prohibited_wholesale: tinygrad source outside extra/usbgpu/tbgpu/installer
+
   - id: linux-amdgpu-gfx12
     priority: P0
     reuse: normative-and-port-adapt
