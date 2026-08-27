@@ -365,3 +365,240 @@ def test_kv_cache_cli_creates_log_parent_before_final_output(tmp_path):
     assert out_path.is_file(), completed.stdout + completed.stderr
     assert log_path.is_file(), completed.stdout + completed.stderr
     _assert_prompt_cache_header(out_path, expected_result)
+
+
+_TASK4_PRODUCER_FINGERPRINT = "sha256:" + "b" * 64
+_TASK4_MODEL_DIGEST = "sha256:" + "c" * 64
+_TASK4_REQUEST_ID = "task4-cache"
+
+
+def _task4_typed_metadata(n_prefix: int = _EXPECTED_N_PREFIX) -> dict[str, object]:
+    return {
+        "schema_version": "mlx_lm_prompt_cache_v1",
+        "producer_kind": "r9700_native",
+        "producer_fingerprint": _TASK4_PRODUCER_FINGERPRINT,
+        "model_digest": _TASK4_MODEL_DIGEST,
+        "request_id": _TASK4_REQUEST_ID,
+        "num_layers": _EXPECTED_NUM_LAYERS,
+        "batch": 1,
+        "n_kv_heads": _EXPECTED_N_KV_HEADS,
+        "sequence_length": n_prefix,
+        "head_dim": _EXPECTED_HEAD_DIM,
+        "absolute_start_position": 0,
+        "absolute_end_position": n_prefix,
+        "offset": n_prefix,
+        "rope_theta": 500000.0,
+        "rope_scaling": {
+            "rope_type": "llama3",
+            "factor": 32.0,
+            "high_freq_factor": 4.0,
+            "low_freq_factor": 1.0,
+            "original_max_position_embeddings": 8192,
+        },
+        "dtype": "float16",
+        "physical_layout": "B,H,S,D",
+        "cache_class": "KVCache",
+        "cache_variant": "llama3.2_1b_fp16",
+        "meta_state": ["" for _ in range(_EXPECTED_NUM_LAYERS)],
+    }
+
+
+def _task4_flat_metadata(n_prefix: int = _EXPECTED_N_PREFIX) -> dict[str, str]:
+    typed = _task4_typed_metadata(n_prefix)
+    flat = {
+        "1.schema_version": "mlx_lm_prompt_cache_v1",
+        "1.producer_kind": "r9700_native",
+        "1.producer_fingerprint": _TASK4_PRODUCER_FINGERPRINT,
+        "1.model_digest": _TASK4_MODEL_DIGEST,
+        "1.request_id": _TASK4_REQUEST_ID,
+        "1.num_layers": str(_EXPECTED_NUM_LAYERS),
+        "1.batch": "1",
+        "1.n_kv_heads": str(_EXPECTED_N_KV_HEADS),
+        "1.sequence_length": str(n_prefix),
+        "1.head_dim": str(_EXPECTED_HEAD_DIM),
+        "1.absolute_start_position": "0",
+        "1.absolute_end_position": str(n_prefix),
+        "1.offset": str(n_prefix),
+        "1.rope_theta": "500000",
+        "1.rope_scaling": (
+            '{"factor":32,"high_freq_factor":4,"low_freq_factor":1,'
+            '"original_max_position_embeddings":8192,"rope_type":"llama3"}'
+        ),
+        "1.dtype": "float16",
+        "1.physical_layout": "B,H,S,D",
+        "1.cache_class": "KVCache",
+        "1.cache_variant": "llama3.2_1b_fp16",
+    }
+    flat.update(
+        {f"0.{layer_index}": "" for layer_index in range(_EXPECTED_NUM_LAYERS)}
+    )
+    flat.update(
+        {
+            f"2.{layer_index}": "KVCache"
+            for layer_index in range(_EXPECTED_NUM_LAYERS)
+        }
+    )
+    assert all(isinstance(value, str) for value in flat.values())
+    assert typed["meta_state"] == ["" for _ in range(_EXPECTED_NUM_LAYERS)]
+    return flat
+
+
+def test_emit_prompt_cache_writes_exact_task4_flat_identity_metadata(tmp_path: Path) -> None:
+    """The typed descriptor is flattened without nested values or identity loss."""
+    kv_cache = _kv_cache_module()
+    result = _synthetic_prefill_result()
+    result["metadata"] = _task4_typed_metadata(result["n_prefix"])
+    out_path = tmp_path / "task4-prompt-cache.safetensors"
+
+    kv_cache.emit_prompt_cache(result, out_path)
+
+    _keys, metadata, _tensors = _safe_open_header(out_path)
+    assert metadata == _task4_flat_metadata(result["n_prefix"])
+    assert all(isinstance(key, str) for key in metadata)
+    assert all(isinstance(value, str) for value in metadata.values())
+    assert metadata["1.rope_theta"] == "500000"
+    assert metadata["1.rope_scaling"] == (
+        '{"factor":32,"high_freq_factor":4,"low_freq_factor":1,'
+        '"original_max_position_embeddings":8192,"rope_type":"llama3"}'
+    )
+    assert [metadata[f"0.{index}"] for index in range(_EXPECTED_NUM_LAYERS)] == [
+        "" for _ in range(_EXPECTED_NUM_LAYERS)
+    ]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        pytest.param(
+            lambda metadata: metadata["meta_state"].pop(),
+            id="missing-meta-state",
+        ),
+        pytest.param(
+            lambda metadata: metadata["meta_state"].__setitem__(0, "5"),
+            id="nonempty-meta-state",
+        ),
+        pytest.param(
+            lambda metadata: metadata["meta_state"].append(""),
+            id="extra-meta-state",
+        ),
+    ],
+)
+def test_emit_prompt_cache_rejects_any_non_exact_task4_meta_state(
+    tmp_path: Path, mutation
+) -> None:
+    """The pinned cache has exactly sixteen ordered empty per-layer states."""
+    kv_cache = _kv_cache_module()
+    result = _synthetic_prefill_result()
+    metadata = _task4_typed_metadata(result["n_prefix"])
+    mutation(metadata)
+    result["metadata"] = metadata
+    out_path = tmp_path / "invalid-task4-prompt-cache.safetensors"
+
+    with pytest.raises(ValueError, match="meta_state|metadata"):
+        kv_cache.emit_prompt_cache(result, out_path)
+
+    assert not out_path.exists()
+
+def _write_strict_native_npz(
+    path: Path,
+    *,
+    n_prefix: int = 0,
+    model: str = "synthetic-model",
+    producer_kind: str = "r9700_native",
+    num_layers: int = _EXPECTED_NUM_LAYERS,
+) -> None:
+    """Write the exact native NPZ schema, including an empty prefix."""
+    shape = (1, _EXPECTED_N_KV_HEADS, n_prefix, _EXPECTED_HEAD_DIM)
+    arrays: dict[str, object] = {
+        "model": np.asarray(model),
+        "producer_kind": np.asarray(producer_kind),
+        "num_layers": np.asarray(num_layers, dtype=np.int64),
+        "n_prefix": np.asarray(n_prefix, dtype=np.int64),
+    }
+    for layer_index in range(_EXPECTED_NUM_LAYERS):
+        arrays[f"layer{layer_index}_K"] = np.zeros(shape, dtype=np.float16)
+        arrays[f"layer{layer_index}_V"] = np.zeros(shape, dtype=np.float16)
+    np.savez(path, **arrays)
+
+
+def test_strict_native_zero_prefix_npz_emits_atomic_readable_mlx_cache(
+    tmp_path: Path,
+) -> None:
+    """Strict native S=1 input must produce a loadable empty prompt cache."""
+    kv_cache = _kv_cache_module()
+    prefill_npz = tmp_path / "zero-prefix-native.npz"
+    out_path = tmp_path / "zero-prefix-prompt-cache.safetensors"
+    _write_strict_native_npz(prefill_npz)
+
+    result = kv_cache.prefill_result_from_npz(
+        prefill_npz,
+        model="synthetic-model",
+        strict=True,
+    )
+    assert result["model"] == "synthetic-model"
+    assert result["producer_kind"] == "r9700_native"
+    assert result["n_prefix"] == 0
+    assert len(result["layers"]) == _EXPECTED_NUM_LAYERS
+    for layer in result["layers"]:
+        assert layer["K"].dtype == np.float16
+        assert layer["V"].dtype == np.float16
+        assert layer["K"].shape == (1, 8, 0, 64)
+        assert layer["V"].shape == (1, 8, 0, 64)
+
+    kv_cache.emit_prompt_cache(result, out_path)
+
+    assert out_path.is_file()
+    assert out_path.stat().st_size > 0
+    assert not any(
+        path.name.startswith(f".{out_path.name}.tmp.")
+        for path in tmp_path.iterdir()
+    )
+    keys, metadata, tensors = _safe_open_header(out_path)
+    expected_tensor_keys = {
+        f"{layer_index}.{suffix}"
+        for layer_index in range(_EXPECTED_NUM_LAYERS)
+        for suffix in (0, 1)
+    }
+    assert keys == expected_tensor_keys
+    assert metadata["1.offset"] == "0"
+    assert metadata["1.num_layers"] == "16"
+    assert metadata["1.n_kv_heads"] == "8"
+    assert metadata["1.head_dim"] == "64"
+    for tensor in tensors.values():
+        assert tensor.dtype == np.float16
+        assert tensor.shape == (1, 8, 0, 64)
+
+    loaded_cache, loaded_metadata = _load_prompt_cache_or_skip(out_path)
+    assert loaded_metadata["offset"] == "0"
+    assert loaded_metadata["num_layers"] == "16"
+    assert loaded_metadata["n_kv_heads"] == "8"
+    assert loaded_metadata["head_dim"] == "64"
+    assert len(loaded_cache) == _EXPECTED_NUM_LAYERS
+    for cache_layer in loaded_cache:
+        assert type(cache_layer).__name__ == "KVCache"
+        assert cache_layer.offset == 0
+        assert cache_layer.size() == 0
+        np.testing.assert_array_equal(
+            np.asarray(cache_layer.keys),
+            np.zeros((1, 8, 0, 64), dtype=np.float16),
+        )
+        np.testing.assert_array_equal(
+            np.asarray(cache_layer.values),
+            np.zeros((1, 8, 0, 64), dtype=np.float16),
+        )
+
+
+def test_strict_native_npz_keeps_num_layers_positive_validation(
+    tmp_path: Path,
+) -> None:
+    """Only the temporal prefix may be zero; fixed counts remain positive."""
+    kv_cache = _kv_cache_module()
+    prefill_npz = tmp_path / "zero-layer-native.npz"
+    _write_strict_native_npz(prefill_npz, num_layers=0)
+
+    with pytest.raises(ValueError, match=r"num_layers.*positive int"):
+        kv_cache.prefill_result_from_npz(
+            prefill_npz,
+            model="synthetic-model",
+            strict=True,
+        )

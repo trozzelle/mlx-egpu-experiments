@@ -80,6 +80,67 @@ sources:
       - no tinygrad runtime dependency in product path
     prohibited_wholesale: tinygrad runtime dependency
 
+  - id: tinygpu-device-owner-vendor
+    priority: P0
+    reuse: vendored-and-locally-modified
+    upstream: https://github.com/tinygrad/tinygrad
+    revision: 12addee14f1d728793648ceca307a5fde2b24cea
+    paths:
+      - extra/usbgpu/tbgpu/installer
+    local_path: tinygpu
+    imported_checkpoint: f18261437
+    source_tree:
+      hash_algorithm: sha256
+      hash_recipe: "sha256 over sorted records: <mode-octal> SP <relative-path> NUL <file-sha256> LF"
+      sha256: 2a08ba5b8f7d827963b73e1edcbe4ea685ab123d4be5c725c54e15f7b3325fab
+      file_count: 59
+      exclusions:
+        - tinygpu/build
+        - __pycache__
+    applicable_scope:
+      product: AMD Radeon AI PRO R9700
+      vendor_id: "0x1002"
+      device_id: "0x7551"
+      architecture: gfx1201
+    compiled_image:
+      status: none-promoted
+      sha256: "none"
+      reason: validation builds are ignored ephemeral output; no DEXT or client image is vendored or promoted
+    license: MIT
+    license_file: tinygpu/LICENSE
+    file_level_license_review:
+      scope: tinygpu/**
+      files_reviewed: 59
+      inventory_sha256: 2a08ba5b8f7d827963b73e1edcbe4ea685ab123d4be5c725c54e15f7b3325fab
+      spdx_expression: MIT
+      upstream_notice: tinygpu/LICENSE
+      review_id: p1-tinygpu-vendor-license-v1
+      status: accepted
+    vendored: true
+    phases: [P1]
+    local_modifications:
+      - structured TGPU v1.0 ABI and separate inference, recovery, and diagnostic roles
+      - R9700-only package scope and legacy proxy quarantine
+      - fail-closed cold lifecycle, bounded evidence, and response-payload preservation
+      - bounded resource ownership, host-visible allocation, client-death cleanup, and conformance contracts
+    required_evidence:
+      - nine in-repository host conformance contracts
+      - unsigned TinyGPUDriver and TGPUConformanceClient Xcode builds
+      - full egpu regression suite
+    conformance_evidence:
+      - tinygpu/Conformance/tests/test_tgpu_cold_lifecycle.cpp
+      - tinygpu/Conformance/tests/test_tgpu_framebuffer_contract.cpp
+      - tinygpu/Conformance/tests/test_tgpu_health_request_contract.cpp
+      - tinygpu/Conformance/tests/test_tgpu_evidence_log_contract.cpp
+      - tinygpu/Conformance/tests/tgpu_resource_table_contract.cpp
+      - tinygpu/Conformance/tests/test_tgpu_buffer_request_validator_contract.cpp
+      - tinygpu/Conformance/tests/test_tgpu_buffer_owner_contract.cpp
+      - tinygpu/Conformance/tests/test_tgpu_fixed_transport_contract.cpp
+      - tinygpu/Conformance/tests/test_tgpu_response_validator_contract.cpp
+      - .superpowers/swarm/reports/p1-xcode-resume.md
+      - docs/tasks/native-r9700-producer/validation-commands.md
+    prohibited_wholesale: tinygrad source outside extra/usbgpu/tbgpu/installer
+
   - id: linux-amdgpu-gfx12
     priority: P0
     reuse: normative-and-port-adapt

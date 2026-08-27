@@ -1277,7 +1277,7 @@ int RuntimeSession::transfer_round_trip_bytes(const std::vector<uint8_t>& input,
     std::vector<std::string> build_cmd = {
         "xcrun", "--sdk", "macosx", "clang++", "-std=c++17", "-O2", "-Wall", "-Wextra",
         source, "native_r9700/amdev_session.cpp", "native_r9700/amdev_packets.cpp",
-        "native_r9700/kernel_catalog.cpp", "-o", bridge_exe};
+        "native_r9700/kernel_catalog.cpp", "native_r9700/hardware_lock.cpp", "-o", bridge_exe};
     result->bridge_source = source;
     result->bridge_build_command = join_command_for_log(build_cmd);
     const ProcessResult build = run_process_capture(build_cmd);

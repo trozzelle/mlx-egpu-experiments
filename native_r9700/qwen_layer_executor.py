@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Sequence
 
 from native_r9700.qwen_hybrid_cache import QwenHybridCache, restore_qwen_hybrid_cache
-from native_r9700.qwen_spill import QwenHybridState
+from native_r9700.qwen_spill import QWEN_RUNTIME_LAYER_ORDER, QwenHybridState
 from native_r9700.qwen_text_adapter import QwenTextAdapter
 
 
@@ -37,6 +37,11 @@ def plan_qwen_text_stage(
         raise QwenLayerExecutorError("Qwen text layer index must be in [0, 64)")
     cache: QwenHybridCache = restore_qwen_hybrid_cache(state)
     entry = cache.entries[layer_index]
+    expected_class = QWEN_RUNTIME_LAYER_ORDER[layer_index]
+    if entry.class_name != expected_class:
+        raise QwenLayerExecutorError(
+            f"Qwen runtime layer {layer_index} must be {expected_class}, got {entry.class_name}"
+        )
     if entry.class_name == "ArraysCache":
         names = ("qwen_affine4_linear", "qwen_deltanet_state")
         roots = (

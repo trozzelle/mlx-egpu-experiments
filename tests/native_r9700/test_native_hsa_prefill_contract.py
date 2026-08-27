@@ -34,6 +34,7 @@ RUNNER_SOURCES = (
     Path("native_r9700/device_memory.cpp"),
     Path("native_r9700/hardware_lock.cpp"),
     Path("native_r9700/runtime.cpp"),
+    Path("native_r9700/native_resource_worker.cpp"),
     Path("native_r9700/runner.cpp"),
 )
 

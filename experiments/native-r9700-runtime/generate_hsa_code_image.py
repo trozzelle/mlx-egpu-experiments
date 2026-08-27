@@ -236,6 +236,20 @@ QWEN_FULL_ATTENTION_KERNARG_SCHEMA = {
     ],
 }
 
+WMMA_LANE_MAP_KERNEL_NAME = "wmma_lane_map_gfx1201"
+WMMA_LANE_MAP_KERNARG_SCHEMA = {
+    "name": "wmma-lane-map-gfx1201-v1",
+    "bytes": 32,
+    "fields": [
+        {"name": "a", "offset": 0, "type": "uint64"},
+        {"name": "b", "offset": 8, "type": "uint64"},
+        {"name": "c", "offset": 16, "type": "uint64"},
+        {"name": "observations", "offset": 24, "type": "uint64"},
+    ],
+}
+
+WMMA_LANE_MAP_SOURCE_PATH = Path("native_r9700/kernels/wmma_lane_map_gfx1201.cpp")
+
 ELFCLASS64 = 2
 ELFDATA2LSB = 1
 ET_DYN = 3
@@ -300,6 +314,7 @@ RMSNORM_ZERO_STORE_CANONICAL_SOURCE = (
 RMSNORM_EPSILON_ARITHMETIC_CANONICAL_SOURCE = (
     REPOSITORY_ROOT / RMSNORM_EPSILON_ARITHMETIC_CANONICAL_SOURCE_PATH
 )
+WMMA_LANE_MAP_SOURCE = REPOSITORY_ROOT / WMMA_LANE_MAP_SOURCE_PATH
 
 K_PROJECTION_CANONICAL_SOURCE = REPOSITORY_ROOT / K_PROJECTION_CANONICAL_SOURCE_PATH
 V_PROJECTION_CANONICAL_SOURCE = REPOSITORY_ROOT / V_PROJECTION_CANONICAL_SOURCE_PATH
@@ -315,6 +330,15 @@ MLP_DOWN_CANONICAL_SOURCE = REPOSITORY_ROOT / MLP_DOWN_CANONICAL_SOURCE_PATH
 QWEN_DELTANET_CANONICAL_SOURCE = REPOSITORY_ROOT / QWEN_DELTANET_CANONICAL_SOURCE_PATH
 QWEN_FULL_ATTENTION_CANONICAL_SOURCE = REPOSITORY_ROOT / QWEN_FULL_ATTENTION_CANONICAL_SOURCE_PATH
 REVIEWED_ASSETS = (
+    (
+        WMMA_LANE_MAP_SOURCE_PATH,
+        WMMA_LANE_MAP_SOURCE,
+        WMMA_LANE_MAP_KERNEL_NAME,
+        WMMA_LANE_MAP_KERNARG_SCHEMA,
+        ("a", "b", "c", "observations"),
+        (),
+        32,
+    ),
     (
         CANONICAL_SOURCE_PATH,
         CANONICAL_SOURCE,
@@ -567,6 +591,93 @@ def _expected_group_segment_bytes(kernel_name: str) -> int:
         if kernel_name == GATE_UP_PROJECTION_KERNEL_NAME
         else 0
     )
+def _wmma_manifest_metadata(kernel_name: str) -> dict[str, Any]:
+    if kernel_name != WMMA_LANE_MAP_KERNEL_NAME:
+        return {}
+    raw_word_order = [
+        "A0",
+        "A1",
+        "A2",
+        "A3",
+        "B0",
+        "B1",
+        "B2",
+        "B3",
+        "D0",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+    ]
+    return {
+        "schema_version": 1,
+        "instruction": "v_wmma_f32_16x16x16_f16",
+        "wave_size": 32,
+        "diagnostic_only": True,
+        "model_selectable": False,
+        "numerical_policy": "F2_WMMA_FP16_FP32_ACC_SINGLE_CAST_V1",
+        "kernarg_bytes": 32,
+        "kernarg_alignment": 8,
+        "kernarg_preload_bytes": 0,
+        "tail_padding_bytes": 0,
+        "workgroup_x": 32,
+        "workgroup_y": 1,
+        "workgroup_z": 1,
+        "global_x": 32,
+        "global_y": 1,
+        "global_z": 1,
+        "readback_bytes": 2048,
+        "raw_words_per_lane": 16,
+        "raw_word_order": raw_word_order,
+        "observation_cases": ["a_map", "b_map", "d_map"],
+        "expected_lane_map": {
+            "A": {
+                "register_count": 4,
+                "gpr_formula": "2*floor(k/8) + (floor(k/2) mod 2)",
+                "bits_formula": "[16*(k mod 2) + 15 : 16*(k mod 2)]",
+                "lane_formula": "16*(floor(k/4) mod 2) + i",
+            },
+            "B": {
+                "register_count": 4,
+                "gpr_formula": "2*floor(k/8) + (floor(k/2) mod 2)",
+                "bits_formula": "[16*(k mod 2) + 15 : 16*(k mod 2)]",
+                "lane_formula": "16*(floor(k/4) mod 2) + j",
+            },
+            "D": {
+                "register_count": 8,
+                "bits_formula": "[31:0]",
+                "gpr_formula": "i mod 8",
+                "lane_formula": "16*floor(i/8) + j",
+            },
+        },
+        "expected_lane_map_points": {
+            "A[0][0]": "v0{0}.[15:0]",
+            "A[0][1]": "v0{0}.[31:16]",
+            "A[0][4]": "v0{16}.[15:0]",
+            "A[0][8]": "v2{0}.[15:0]",
+            "B[0][0]": "v0{0}.[15:0]",
+            "B[1][0]": "v0{0}.[31:16]",
+            "B[4][0]": "v0{16}.[15:0]",
+            "B[8][0]": "v2{0}.[15:0]",
+            "D[0][0]": "v0{0}",
+            "D[8][0]": "v0{16}",
+            "D[15][15]": "v7{31}",
+        },
+        "result_register_mapping": {
+            "a_register_count": 4,
+            "b_register_count": 4,
+            "d_register_count": 8,
+            "words_per_lane": 16,
+            "word_bytes": 4,
+            "lane_stride_bytes": 64,
+            "readback_bytes": 2048,
+            "raw_word_order": raw_word_order,
+        },
+    }
+
 
 
 def validate_source_profile(
@@ -1016,6 +1127,7 @@ def _descriptor(
     compiler_kernarg_bytes: int,
     *,
     expected_group_segment_bytes: int = 0,
+    include_zero_resources: bool = False,
 ) -> dict[str, int]:
     if rodata.size != DESCRIPTOR_SIZE:
         raise GenerationError(".rodata must contain exactly one 64-byte AMDHSA kernel descriptor")
@@ -1055,7 +1167,7 @@ def _descriptor(
         "rsrc2": dispatch_rsrc2,
         "rsrc3": descriptor_rsrc3,
     }
-    if group:
+    if group or include_zero_resources:
         resources.update(
             {
                 "group_segment_bytes": group,
@@ -1384,6 +1496,7 @@ def generate(
         kernarg_schema,
         compiler_kernarg_bytes,
         expected_group_segment_bytes=expected_group_segment_bytes,
+        include_zero_resources=kernel_name == WMMA_LANE_MAP_KERNEL_NAME,
     )
 
     layout = [
@@ -1394,6 +1507,7 @@ def generate(
         "name": kernel_name,
         "target": TARGET,
         "kernarg_schema": kernarg_schema,
+        **_wmma_manifest_metadata(kernel_name),
         "image_path": f"{kernel_name}.image",
         "source_path": source_path.as_posix(),
         "source_sha256": hashlib.sha256(source_bytes).hexdigest(),

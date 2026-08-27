@@ -65,13 +65,14 @@ std::string npy_wrap(const std::string& descr, const std::string& shape,
   const size_t padding = (64 - ((preamble + dict.size() + 1) % 64)) % 64;
   const std::string header = dict + std::string(padding, ' ') + '\n';
   std::string out;
-  out.reserve(preamble + header.size() + data.size());
   out += "\x93NUMPY";
   out.push_back(static_cast<char>(1));
   out.push_back(static_cast<char>(0));
   append_u16_le(&out, static_cast<uint16_t>(header.size()));
   out += header;
-  out.append(reinterpret_cast<const char*>(data.data()), data.size());
+  if (!data.empty()) {
+    out.append(reinterpret_cast<const char*>(data.data()), data.size());
+  }
   return out;
 }
 
@@ -131,9 +132,9 @@ bool npy_unicode_scalar(const std::string& value, std::string* entry, std::strin
   return true;
 }
 
-// Slices the accepted (1, 8, n_prefix, 64) fp16 prefix out of one raw
-// head-major [kv_head][capacity][head_dim] cache buffer. Pure byte
-// permutation: out[h][t][d] = raw[(h * capacity + t) * 64 + d].
+// Slices the accepted (1, 8, n_prefix, 64) or empty (1, 8, 0, 64) prefix
+// out of one raw head-major [kv_head][capacity][head_dim] cache buffer.
+// Pure byte permutation: out[h][t][d] = raw[(h * capacity + t) * 64 + d].
 std::vector<uint8_t> prefix_slice_fp16(const std::vector<uint8_t>& raw, uint32_t n_prefix,
                                        uint32_t capacity) {
   std::vector<uint8_t> out(static_cast<uint64_t>(kKvHeads) * n_prefix * kHeadDim * 2);
@@ -241,11 +242,10 @@ bool write_stored_zip(const std::vector<ZipEntry>& entries, const std::string& o
 
 bool validate_native_prefill_kv_finite(
     const NativePrefillNpzPayload& payload, std::string* error_text) {
-  if (payload.n_prefix == 0 ||
-      payload.cache_capacity_tokens != kCacheCapacityTokens ||
+  if (payload.cache_capacity_tokens != kCacheCapacityTokens ||
       payload.n_prefix > payload.cache_capacity_tokens) {
     return fail(error_text,
-                "NPZ payload requires cache capacity 128 and a positive live prefix");
+                "NPZ payload requires cache capacity 128 and a live prefix");
   }
   if (payload.kv_readback_bytes.size() != 2U * kNumLayers) {
     return fail(error_text, "NPZ payload requires exactly 32 K/V readback buffers");
@@ -289,7 +289,6 @@ bool validate_native_prefill_kv_finite(
 bool write_native_prefill_npz(const NativePrefillNpzPayload& payload,
                               const std::string& out_path, std::string* error_text) {
   if (payload.model.empty()) return fail(error_text, "NPZ payload model must be non-empty");
-  if (payload.n_prefix == 0) return fail(error_text, "NPZ payload n_prefix must be positive");
   if (payload.cache_capacity_tokens == 0 ||
       payload.n_prefix > payload.cache_capacity_tokens) {
     return fail(error_text, "NPZ payload n_prefix must not exceed cache capacity");

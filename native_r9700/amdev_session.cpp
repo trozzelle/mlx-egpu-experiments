@@ -2253,10 +2253,10 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
                           &detail) || state.layout.large_bar) {
     return fail("vram_layout", detail.empty() ? "large BAR0 is unsupported" : detail);
   }
-  if (state.layout.page_table_pool_base == 0 || state.layout.page_table_pool_bytes == 0 ||
-      state.layout.resident_gpu_va_base >= kSmokePtbBoundaryGpuVa ||
-      state.layout.resident_gpu_va_limit < kSmokePtbBoundaryGpuVa + kPageSize) {
-    return fail("vram_layout", "resident window cannot host the dynamic HSA image table");
+  if (state.layout.page_table_pool_base == 0 ||
+      state.layout.page_table_pool_bytes == 0 ||
+      state.layout.resident_gpu_va_base >= state.layout.resident_gpu_va_limit) {
+    return fail("vram_layout", "resident or page-table window is invalid");
   }
   state.payload_allocator = std::make_unique<VramAllocator>(state.layout);
   VramLayout page_table_layout = state.layout;
@@ -2323,15 +2323,8 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
     state.pte_backend->begin_deferred_flushes();
     return true;
   };
-  const uint64_t boundary_bytes = kSmokePtbBoundaryGpuVa - state.layout.resident_gpu_va_base;
-  ResidentBuffer boundary_guard{};
   state.image_buffers.resize(source_images.size());
   state.buffers.resize(request.buffers.size());
-  if (!state.resident->allocate("resident-hsa-ptb-boundary", boundary_bytes, &boundary_guard,
-                                &detail)) {
-    return fail_after_resident("vram_allocation", detail);
-  }
-  if (!flush_mapping_batch()) return fail_after_resident("gc_tlb_flush", detail);
   for (size_t index = 0; index < source_images.size(); ++index) {
     if (!state.resident->allocate("resident-hsa-image-" + std::to_string(index),
                                   source_images[index]->image.size(), &state.image_buffers[index],
@@ -2351,9 +2344,10 @@ bool ResidentHsaSession::prepare(const ResidentHsaDispatch& request,
   if (!state.pte_backend->flush_deferred(&detail)) {
     return fail_after_resident("gc_tlb_flush", detail);
   }
-  if (state.image_buffers[0].gpu_va != kSmokePtbBoundaryGpuVa ||
+  if (state.image_buffers[0].gpu_va != state.layout.resident_gpu_va_base ||
       state.page_table->dynamic_ptb_count() == 0) {
-    return fail_after_resident("pte_map", "resident HSA image table did not force a dynamic PTB");
+    return fail_after_resident(
+        "pte_map", "resident HSA image table lacks dynamic page-table ownership");
   }
   result->hsa_image_gpu_va = state.image_buffers[0].gpu_va;
   result->hsa_image_physical_offset = state.image_buffers[0].allocation.physical_offset;
@@ -2783,22 +2777,30 @@ bool ResidentHsaSession::close(std::string* error_text) {
     state.reset_after_close();
     return true;
   }
-  std::printf("phase_timer model_load_usec: %ld\n", state.phase_timers.model_load_usec);
-  std::printf("phase_timer staging_copy_usec: %ld\n", state.phase_timers.staging_copy_usec);
-  std::printf("phase_timer sdma_setup_usec: %ld\n", state.phase_timers.sdma_setup_usec);
-  std::printf("phase_timer sdma_submit_inclusive_usec: %ld\n",
-              state.phase_timers.sdma_submit_inclusive_usec);
-  std::printf("phase_timer sdma_fence_wait_usec: %ld\n", state.phase_timers.sdma_fence_wait_usec);
-  std::printf("phase_timer pm4_build_usec: %ld\n", state.phase_timers.pm4_build_usec);
-  std::printf("phase_timer hdp_flush_usec: %ld\n", state.phase_timers.hdp_flush_usec);
-  std::printf("phase_timer doorbell_usec: %ld\n", state.phase_timers.doorbell_usec);
-  std::printf("phase_timer timeline_wait_usec: %ld\n", state.phase_timers.timeline_wait_usec);
-  std::printf("phase_counter sdma_setup_count: %llu\n",
-              static_cast<unsigned long long>(state.phase_timers.sdma_setup_count));
-  std::printf("phase_counter compute_submit_count: %llu\n",
-              static_cast<unsigned long long>(state.phase_timers.compute_submit_count));
-  std::printf("phase_counter socket_rpc_count: %llu\n",
-              static_cast<unsigned long long>(state.phase_timers.socket_rpc_count));
+  std::fprintf(stderr, "resident cleanup phase_timer model_load_usec: %ld\n",
+               state.phase_timers.model_load_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer staging_copy_usec: %ld\n",
+               state.phase_timers.staging_copy_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer sdma_setup_usec: %ld\n",
+               state.phase_timers.sdma_setup_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer sdma_submit_inclusive_usec: %ld\n",
+               state.phase_timers.sdma_submit_inclusive_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer sdma_fence_wait_usec: %ld\n",
+               state.phase_timers.sdma_fence_wait_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer pm4_build_usec: %ld\n",
+               state.phase_timers.pm4_build_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer hdp_flush_usec: %ld\n",
+               state.phase_timers.hdp_flush_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer doorbell_usec: %ld\n",
+               state.phase_timers.doorbell_usec);
+  std::fprintf(stderr, "resident cleanup phase_timer timeline_wait_usec: %ld\n",
+               state.phase_timers.timeline_wait_usec);
+  std::fprintf(stderr, "resident cleanup phase_counter sdma_setup_count: %llu\n",
+               static_cast<unsigned long long>(state.phase_timers.sdma_setup_count));
+  std::fprintf(stderr, "resident cleanup phase_counter compute_submit_count: %llu\n",
+               static_cast<unsigned long long>(state.phase_timers.compute_submit_count));
+  std::fprintf(stderr, "resident cleanup phase_counter socket_rpc_count: %llu\n",
+               static_cast<unsigned long long>(state.phase_timers.socket_rpc_count));
 
   std::string detail;
   if (state.compute_queue_retirement != nullptr &&
@@ -2859,10 +2861,9 @@ bool plan_resident_hsa_dispatch(const VramLayout& layout, const ResidentHsaDispa
     return false;
   }
   if (!validate_resident_hsa_dispatch(request, error_text)) return false;
-  if (layout.resident_gpu_va_base >= kSmokePtbBoundaryGpuVa ||
-      layout.resident_gpu_va_limit < kSmokePtbBoundaryGpuVa + kPageSize) {
+  if (layout.resident_gpu_va_base >= layout.resident_gpu_va_limit) {
     if (error_text != nullptr) {
-      *error_text = "resident window cannot host the dynamic HSA image table";
+      *error_text = "resident GPU VA window is empty";
     }
     return false;
   }
@@ -2873,15 +2874,9 @@ bool plan_resident_hsa_dispatch(const VramLayout& layout, const ResidentHsaDispa
   ResidentMemory resident(
       layout, allocator,
       [](ResidentPageOperation, uint64_t, uint64_t, std::string*) { return true; });
-  const uint64_t boundary_bytes = kSmokePtbBoundaryGpuVa - layout.resident_gpu_va_base;
-  ResidentBuffer boundary_guard{};
   std::vector<ResidentBuffer> image_buffers(images.size());
   std::vector<ResidentBuffer> buffers(request.buffers.size());
   std::string detail;
-  if (!resident.allocate("resident-hsa-ptb-boundary", boundary_bytes, &boundary_guard, &detail)) {
-    if (error_text != nullptr) *error_text = detail;
-    return false;
-  }
   for (size_t index = 0; index < images.size(); ++index) {
     if (!resident.allocate("resident-hsa-image-" + std::to_string(index),
                           images[index]->image.size(), &image_buffers[index], &detail)) {

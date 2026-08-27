@@ -36,7 +36,10 @@ FORMAT_PROBE_SOURCES = [
         "llama_layer_executor.cpp",
         "kernel_assets.cpp",
         "runtime.cpp",
+        "native_resource_worker.cpp",
+        "runner.cpp",
     )
+    if name != RUNNER_SOURCE.name
 ]
 STAGE_NAMES = (
     "rmsnorm",
@@ -86,7 +89,6 @@ int main() {
   if (!enabled.capture_gpu_timestamps) return 6;
   const native_r9700::ResidentHsaDispatchResult dispatch_result;
   if (!dispatch_result.gpu_stage_tick_samples.empty()) return 7;
-
   const native_r9700::NativePrefillRequest request;
   if (request.gpu_stage_profile) return 8;
   const native_r9700::NativePrefillResult result;

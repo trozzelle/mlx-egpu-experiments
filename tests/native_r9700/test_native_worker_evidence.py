@@ -3,9 +3,14 @@
 These tests exercise runner evidence parsing and NPZ acceptance without an AMD GPU.
 """
 
+import importlib
+import hashlib
+import io
 import json
 from pathlib import Path
 import subprocess
+import sys
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -1453,3 +1458,970 @@ def test_native_worker_accepts_identical_duplicate_integer_evidence(
     )
     assert result["native_prefill_acceptance"] == "pass", result["failure_text"]
     assert out_path.is_file()
+
+
+def _persistent_worker_module():
+    """Load the task-set-4 public worker entry points without setup failures."""
+    import importlib
+
+    try:
+        module = importlib.import_module("native_r9700.native_worker")
+    except (ImportError, ModuleNotFoundError) as exc:
+        pytest.fail(
+            f"RED: native_r9700.native_worker task-set-4 service entry point is required: {exc}",
+            pytrace=False,
+        )
+    missing = [
+        name
+        for name in ("serve_forever", "dispatch_request", "main")
+        if not callable(getattr(module, name, None))
+    ]
+    if missing:
+        pytest.fail(
+            "RED: native_r9700.native_worker is missing public service API: "
+            + ", ".join(missing),
+            pytrace=False,
+        )
+    return module
+
+
+def _public_request(request_id: str, operation: str, body: dict[str, object]) -> dict[str, object]:
+    return {
+        "protocol_version": "r9700_prefill_service_v1",
+        "request_id": request_id,
+        "operation": operation,
+        "body": body,
+    }
+
+
+class _FakePersistentChild:
+    """A process-shaped marker used only to prove public/private pipe ownership."""
+
+    def __init__(self) -> None:
+        self.pid = 73_001
+        self.stdin = SimpleNamespace(private_pipe=True)
+        self.stdout = SimpleNamespace(private_pipe=True)
+
+
+class _FakePersistentClient:
+    """Live-client double; task-set-2 owns the real private protocol semantics."""
+
+    instances: list["_FakePersistentClient"] = []
+
+    def __init__(self, *, runner_path: str) -> None:
+        self.runner_path = runner_path
+        self._process = _FakePersistentChild()
+        self.calls: list[str] = []
+        self.instances.append(self)
+
+    def shutdown(self) -> dict[str, str]:
+        self.calls.append("Shutdown")
+        return {"state": "shutdown"}
+
+
+class _FakePublicRegistry:
+    """Registry seam that keeps this test independent of a native device/model."""
+
+    def __init__(self, *args, resource_client, **kwargs) -> None:
+        self.resource_client = resource_client
+        self.dispatch_calls: list[dict[str, object]] = []
+        self.closed = False
+
+    def dispatch(self, request: dict[str, object]) -> dict[str, object]:
+        self.dispatch_calls.append(request)
+        return {
+            "protocol_version": "r9700_prefill_service_v1",
+            "request_id": request["request_id"],
+            "operation": request["operation"],
+            "status": "pass",
+            "result": {
+                "service_available": True,
+                "service_unavailable_reason": None,
+                "device_state": "ready",
+                "model_state": "unloaded",
+                "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                "loaded_model_count": 0,
+                "active_request_count": 0,
+                "last_failure_stage": None,
+            },
+            "error": None,
+            "evidence": None,
+        }
+
+    def close(self) -> None:
+        self.closed = True
+        self.resource_client.shutdown()
+
+
+def test_public_worker_uses_one_live_child_and_propagates_explicit_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The public loop owns one registry/client lifetime, never a per-request child."""
+    worker = _persistent_worker_module()
+    _FakePersistentClient.instances.clear()
+    registries: list[_FakePublicRegistry] = []
+
+    def registry_factory(*args, **kwargs):
+        registry = _FakePublicRegistry(*args, **kwargs)
+        registries.append(registry)
+        return registry
+
+    monkeypatch.setattr(worker, "NativeResourceClient", _FakePersistentClient, raising=False)
+    monkeypatch.setattr(worker, "ModelRegistry", registry_factory, raising=False)
+    public_in = io.StringIO(
+        json.dumps(
+            _public_request("health-1", "Health", {}),
+            separators=(",", ":"),
+        )
+        + "\n"
+    )
+    public_out = io.StringIO()
+    monkeypatch.setattr(sys, "stdin", public_in)
+    monkeypatch.setattr(sys, "stdout", public_out)
+    runner = str(tmp_path / "build" / "native_r9700_runner")
+
+    result = worker.main(
+        [
+            "--native-runner",
+            runner,
+            "--artifacts-dir",
+            str(tmp_path / "artifacts"),
+        ]
+    )
+
+    assert result in (None, 0)
+    assert len(_FakePersistentClient.instances) == 1
+    assert _FakePersistentClient.instances[0].runner_path == runner
+    assert _FakePersistentClient.instances[0].calls == ["Shutdown"]
+    assert len(registries) == 1
+    assert registries[0].closed is True
+    child = _FakePersistentClient.instances[0]._process
+    assert child.pid == 73_001
+    assert child.stdin is not public_in
+    assert child.stdout is not public_out
+    response = json.loads(public_out.getvalue())
+    assert set(response) == {
+        "protocol_version",
+        "request_id",
+        "operation",
+        "status",
+        "result",
+        "error",
+        "evidence",
+    }
+    assert "resource_generation" not in response["result"]
+    assert response["evidence"] is None
+
+
+def test_public_dispatch_request_projects_registry_response_at_public_boundary() -> None:
+    """Public dispatch delegates to one registry and does not expose child-only state."""
+    worker = _persistent_worker_module()
+    request = _public_request("health-2", "Health", {})
+    client = _FakePersistentClient(runner_path="runner")
+    registry = _FakePublicRegistry(resource_client=client)
+
+    response = worker.dispatch_request(request, registry=registry)
+
+    assert registry.dispatch_calls == [request]
+    assert set(response) == {
+        "protocol_version",
+        "request_id",
+        "operation",
+        "status",
+        "result",
+        "error",
+        "evidence",
+    }
+    assert response["request_id"] == "health-2"
+    assert response["operation"] == "Health"
+    assert response["status"] == "pass"
+    assert response["evidence"] is None
+    registry.close()
+
+
+def test_serve_forever_with_no_registry_delegates_to_build_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The direct public service path must use the concrete registry builder."""
+    worker = _persistent_worker_module()
+    runner = str(tmp_path / "build" / "native_r9700_runner")
+    artifacts_dir = tmp_path / "artifacts"
+    builder_calls: list[tuple[str, Path, dict[str, object]]] = []
+    close_calls: list[bool] = []
+    registry = SimpleNamespace(close=lambda: close_calls.append(True))
+
+    def fake_build_registry(*, runner_path: str, artifact_dir: str | Path, **kwargs):
+        builder_calls.append((runner_path, Path(artifact_dir), kwargs))
+        return registry
+
+    def forbidden_constructor(*args, **kwargs):
+        pytest.fail(
+            "RED: serve_forever must delegate registry construction to build_registry",
+            pytrace=False,
+        )
+
+    monkeypatch.setattr(worker, "build_registry", fake_build_registry, raising=False)
+    monkeypatch.setattr(worker, "NativeResourceClient", forbidden_constructor, raising=False)
+    monkeypatch.setattr(worker, "ModelRegistry", forbidden_constructor, raising=False)
+
+    assert (
+        worker.serve_forever(
+            io.StringIO(""),
+            io.StringIO(),
+            registry=None,
+            native_runner=runner,
+            artifacts_dir=artifacts_dir,
+        )
+        == 0
+    )
+    assert builder_calls == [(runner, artifacts_dir, {})]
+    assert close_calls == [True]
+
+
+_F1_DIRECT_AMDEV_PACK_NAME = "direct-amdev-llama-fp16"
+_F1_DIRECT_AMDEV_PACK_VERSION = "c1r-v1"
+_F1_CLI_MODEL_DIGEST = "sha256:" + "a" * 64
+_F1_CLI_PRODUCER_FINGERPRINT = "sha256:" + "b" * 64
+_F1_CLI_PACK_DIGEST = "sha256:" + "c" * 64
+_F1_CLI_RUNTIME_SUBSTRATE = "TinyGPU.app/APLRemotePCIDevice/PCIIface"
+
+
+def _write_tiny_valid_worker_model(tmp_path: Path) -> tuple[Path, str]:
+    """Create a valid path/inventory fixture without loading numerical weights."""
+    model_dir = tmp_path / "meta-Llama-3.2-1B-Instruct"
+    model_dir.mkdir()
+    config = {
+        "architectures": ["LlamaForCausalLM"],
+        "model_type": "llama",
+        "num_hidden_layers": 16,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 8,
+        "head_dim": 64,
+        "hidden_size": 2048,
+        "intermediate_size": 8192,
+        "vocab_size": 128256,
+        "max_position_embeddings": 131072,
+        "rms_norm_eps": 0.00001,
+        "rope_theta": 500000.0,
+        "rope_scaling": {
+            "rope_type": "llama3",
+            "factor": 32.0,
+            "high_freq_factor": 4.0,
+            "low_freq_factor": 1.0,
+            "original_max_position_embeddings": 8192,
+        },
+    }
+    config_bytes = json.dumps(config, separators=(",", ":")).encode("utf-8")
+    (model_dir / "config.json").write_bytes(config_bytes)
+    header = b"{}"
+    weights = len(header).to_bytes(8, "little") + header
+    (model_dir / "model.safetensors").write_bytes(weights)
+    identity = {
+        "config": {
+            "architectures": ["LlamaForCausalLM"],
+            "geometry": {
+                "num_layers": 16,
+                "num_heads": 32,
+                "n_kv_heads": 8,
+                "head_dim": 64,
+                "hidden_size": 2048,
+                "intermediate_size": 8192,
+                "vocab_size": 128256,
+                "max_position_embeddings": 131072,
+            },
+            "model_family": "llama",
+            "model_type": "llama",
+            "rms_norm_eps": 0.00001,
+            "rope_scaling": config["rope_scaling"],
+            "rope_theta": 500000.0,
+        },
+        "files": [
+            {
+                "path": "config.json",
+                "size": len(config_bytes),
+                "sha256": hashlib.sha256(config_bytes).hexdigest(),
+            },
+            {
+                "path": "model.safetensors",
+                "size": len(weights),
+                "sha256": hashlib.sha256(weights).hexdigest(),
+            },
+        ],
+        "format": "safetensors",
+        "model_family": "llama",
+        "quantization": "fp16",
+        "shard_index": {"index_path": None, "members": []},
+    }
+    from native_r9700 import service_protocol
+
+    return model_dir, service_protocol.compute_model_digest(identity)
+
+
+class _WorkerBuildFakeResourceClient:
+    """Python-only private-client double for the real ModelRegistry seam."""
+
+    def __init__(self, *, runner_path: str) -> None:
+        self.runner_path = runner_path
+        self.calls: list[tuple[str, object]] = []
+        self.resource_generation = 71
+
+    def prepare(self, resource_spec: object) -> dict[str, object]:
+        self.calls.append(("Prepare", resource_spec))
+        return {
+            "resource_generation": self.resource_generation,
+            "state": "prepared",
+            "producer_fingerprint": _F1_CLI_PRODUCER_FINGERPRINT,
+        }
+
+    def commit(self, resource_generation: int) -> dict[str, object]:
+        self.calls.append(("Commit", resource_generation))
+        return {
+            "resource_generation": resource_generation,
+            "state": "resident-ready",
+            "producer_fingerprint": _F1_CLI_PRODUCER_FINGERPRINT,
+        }
+
+    def rollback(self, resource_generation: int) -> dict[str, object]:
+        self.calls.append(("Rollback", resource_generation))
+        return {
+            "resource_generation": resource_generation,
+            "state": "released",
+            "already_released": False,
+        }
+
+    def release(self, resource_generation: int) -> dict[str, object]:
+        self.calls.append(("Release", resource_generation))
+        return {
+            "resource_generation": resource_generation,
+            "state": "released",
+            "already_released": False,
+        }
+
+    def shutdown(self) -> dict[str, str]:
+        self.calls.append(("Shutdown", None))
+        return {"state": "shutdown"}
+
+
+def _worker_digest_is_valid(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == len("sha256:") + 64
+        and value.startswith("sha256:")
+        and all(character in "0123456789abcdef" for character in value[7:])
+    )
+
+
+def test_build_registry_reaches_prepare_with_concrete_pack_and_budget(
+    tmp_path: Path,
+) -> None:
+    worker = _persistent_worker_module()
+    build_registry = getattr(worker, "build_registry", None)
+    if not callable(build_registry):
+        pytest.fail(
+            "RED: native_r9700.native_worker.build_registry is required",
+            pytrace=False,
+        )
+    model_dir, model_digest = _write_tiny_valid_worker_model(tmp_path)
+    clients: list[_WorkerBuildFakeResourceClient] = []
+
+    def resource_client_factory(*, runner_path: str) -> _WorkerBuildFakeResourceClient:
+        client = _WorkerBuildFakeResourceClient(runner_path=runner_path)
+        clients.append(client)
+        return client
+
+    registry = build_registry(
+        runner_path=str(tmp_path / "native_r9700_runner"),
+        artifact_dir=tmp_path / "artifacts",
+        resource_client_factory=resource_client_factory,
+    )
+    try:
+        loaded = registry.dispatch(
+            _public_request(
+                "worker-build-load",
+                "LoadModel",
+                {
+                    "model_uri": str(model_dir),
+                    "model_digest": model_digest,
+                    "format": "safetensors",
+                    "quantization": "fp16",
+                },
+            )
+        )
+        assert loaded["status"] == "pass", loaded
+        assert clients and clients[0].runner_path.endswith("native_r9700_runner")
+        prepare_calls = [
+            value for operation, value in clients[0].calls if operation == "Prepare"
+        ]
+        assert len(prepare_calls) == 1, clients[0].calls
+        spec = prepare_calls[0]
+        assert spec.model_uri == str(model_dir.resolve())
+        assert spec.kernel_pack["name"] == _F1_DIRECT_AMDEV_PACK_NAME
+        assert spec.kernel_pack["version"] == _F1_DIRECT_AMDEV_PACK_VERSION
+        digests = list(spec.kernel_pack["digests"])
+        assert digests
+        assert digests == list(dict.fromkeys(digests))
+        assert all(_worker_digest_is_valid(digest) for digest in digests)
+        budget = spec.resource_budget
+        assert budget["resident_bytes_max"] > 0
+        assert budget["scratch_bytes_max"] > 0
+        assert budget["total_bytes_max"] == (
+            budget["resident_bytes_max"] + budget["scratch_bytes_max"]
+        )
+        assert loaded["result"]["kernel_pack_digests"] == digests
+
+        handle = loaded["result"]["model_handle"]
+        unloaded = registry.dispatch(
+            _public_request(
+                "worker-build-unload",
+                "UnloadModel",
+                {"model_handle": handle},
+            )
+        )
+        assert unloaded["status"] == "pass", unloaded
+    finally:
+        registry.close()
+    assert [operation for operation, _ in clients[0].calls] == [
+        "Prepare",
+        "Commit",
+        "Release",
+        "Shutdown",
+    ]
+
+
+_F1_CLI_MODEL_FINGERPRINT = {
+    "model_digest": _F1_CLI_MODEL_DIGEST,
+    "format": "safetensors",
+    "quantization": "fp16",
+    "model_family": "llama",
+    "model_type": "llama",
+    "architectures": ["LlamaForCausalLM"],
+    "geometry": {
+        "num_layers": 16,
+        "num_heads": 32,
+        "n_kv_heads": 8,
+        "head_dim": 64,
+        "hidden_size": 2048,
+        "intermediate_size": 8192,
+        "vocab_size": 128256,
+        "max_position_embeddings": 131072,
+    },
+    "rms_norm_eps": 0.00001,
+    "rope_theta": 500000.0,
+    "rope_scaling": {
+        "rope_type": "llama3",
+        "factor": 32.0,
+        "high_freq_factor": 4.0,
+        "low_freq_factor": 1.0,
+        "original_max_position_embeddings": 8192,
+    },
+}
+
+
+class _WorkerModeRegistry:
+    """In-memory registry double that preserves public lifecycle observations."""
+
+    def __init__(self, artifact_dir: Path) -> None:
+        self.artifact_dir = artifact_dir
+        self.requests: list[dict[str, object]] = []
+        self.load_generations: list[int] = []
+        self.prefill_generations: list[int] = []
+        self.close_calls = 0
+        self.shutdown_calls = 0
+        self._generation = 0
+        self._handle: str | None = None
+        self.load_handles: list[str] = []
+        self.model_uri: str | None = None
+
+    def _response(
+        self,
+        request: dict[str, object],
+        *,
+        result: dict[str, object] | None = None,
+        evidence: dict[str, object] | None = None,
+        status: str = "pass",
+        error: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return {
+            "protocol_version": "r9700_prefill_service_v1",
+            "request_id": request["request_id"],
+            "operation": request["operation"],
+            "status": status,
+            "result": {} if result is None else result,
+            "error": error,
+            "evidence": evidence,
+        }
+
+    def dispatch(self, request: dict[str, object]) -> dict[str, object]:
+        self.requests.append(request)
+        operation = request["operation"]
+        body = request["body"]
+        if operation == "LoadModel":
+            self.model_uri = str(body["model_uri"])
+            if self._handle is not None:
+                return self._response(
+                    request,
+                    status="blocked",
+                    error={
+                        "domain": "resource_exhaustion",
+                        "message": "model slot is occupied",
+                        "failure_stage": "model_capacity",
+                    },
+                )
+            self._generation += 1
+            self.load_generations.append(self._generation)
+            self._handle = "mh_" + f"{self._generation:032x}"
+            self.load_handles.append(self._handle)
+            return self._response(
+                request,
+                result={
+                    "model_handle": self._handle,
+                    "model_state": "resident-ready",
+                    "model_fingerprint": _F1_CLI_MODEL_FINGERPRINT,
+                    "kernel_pack_digests": [_F1_CLI_PACK_DIGEST],
+                },
+            )
+        if operation == "UnloadModel":
+            handle = body["model_handle"]
+            if handle != self._handle:
+                return self._response(
+                    request,
+                    status="blocked",
+                    error={
+                        "domain": "invalid_request",
+                        "message": "model handle was not found",
+                        "failure_stage": "handle_lookup",
+                    },
+                )
+            self._handle = None
+            return self._response(
+                request,
+                result={"model_handle": handle, "model_state": "unloaded"},
+            )
+        if operation == "Prefill":
+            handle = body["model_handle"]
+            if handle != self._handle:
+                return self._response(
+                    request,
+                    status="blocked",
+                    error={
+                        "domain": "invalid_request",
+                        "message": "model handle was not found",
+                        "failure_stage": "handle_lookup",
+                    },
+                )
+            self.prefill_generations.append(self._generation)
+            request_id = str(request["request_id"])
+            token_ids = list(body["token_ids"])
+            self.artifact_dir.mkdir(parents=True, exist_ok=True)
+            npz_path = self.artifact_dir / f"{request_id}.prefill.npz"
+            log_path = self.artifact_dir / f"{request_id}.prefill.log"
+            cache_path = self.artifact_dir / f"{request_id}.prompt-cache.safetensors"
+            cache_log_path = self.artifact_dir / f"{request_id}.kv-cache.log"
+            n_prefix = len(token_ids) - 1
+            arrays: dict[str, object] = {
+                "model": np.array(self.model_uri),
+                "n_prefix": np.array(n_prefix, dtype=np.int64),
+                "num_layers": np.array(16, dtype=np.int64),
+                "producer_kind": np.array("r9700_native"),
+            }
+            shape = (1, 8, n_prefix, 64)
+            for layer_index in range(16):
+                arrays[f"layer{layer_index}_K"] = np.zeros(shape, dtype=np.float16)
+                arrays[f"layer{layer_index}_V"] = np.zeros(shape, dtype=np.float16)
+            np.savez(npz_path, **arrays)
+            log_path.write_text("fake native evidence\n", encoding="utf-8")
+            cache_path.write_bytes(b"fake-prompt-cache")
+            cache_log_path.write_text("fake cache evidence\n", encoding="utf-8")
+            metadata = {
+                "request_id": request_id,
+                "schema_version": "mlx_lm_prompt_cache_v1",
+                "producer_kind": "r9700_native",
+                "producer_fingerprint": _F1_CLI_PRODUCER_FINGERPRINT,
+                "model_digest": _F1_CLI_MODEL_DIGEST,
+                "num_layers": 16,
+                "batch": 1,
+                "n_kv_heads": 8,
+                "head_dim": 64,
+                "sequence_length": len(token_ids) - 1,
+                "offset": len(token_ids) - 1,
+                "absolute_start_position": 0,
+                "absolute_end_position": len(token_ids) - 1,
+                "rope_theta": 500000.0,
+                "rope_scaling": {
+                    "rope_type": "llama3",
+                    "factor": 32.0,
+                    "high_freq_factor": 4.0,
+                    "low_freq_factor": 1.0,
+                    "original_max_position_embeddings": 8192,
+                },
+                "dtype": "float16",
+                "physical_layout": "B,H,S,D",
+                "cache_class": "KVCache",
+                "cache_variant": "llama3.2_1b_fp16",
+                "meta_state": ["" for _ in range(16)],
+            }
+            return self._response(
+                request,
+                result={
+                    "model_handle": handle,
+                    "request_state": "produced",
+                    "prompt_token_count": len(token_ids),
+                    "prefix_token_count": len(token_ids) - 1,
+                    "cache": {
+                        "prompt_cache_path": str(cache_path),
+                        "metadata": metadata,
+                        "prefill_npz_path": str(npz_path),
+                        "prefill_log_path": str(log_path),
+                        "kv_cache_log_path": str(cache_log_path),
+                        "payload_digest": _F1_CLI_PACK_DIGEST,
+                        "payload_length_bytes": npz_path.stat().st_size,
+                    },
+                    "metrics": {
+                        "prefill_elapsed_sec": 0.0125,
+                        "kernel_elapsed_usec": 8000,
+                        "transfer_elapsed_sec": 0.0025,
+                        "cache_emit_elapsed_sec": 0.001,
+                        "total_elapsed_sec": 0.014,
+                        "tokens_per_sec_prefill": (len(token_ids) - 1) / 0.0125,
+                        "transfer_h2d_bytes": 6144,
+                        "transfer_d2h_bytes": 2048,
+                    },
+                },
+                evidence={
+                    "producer_kind": "r9700_native",
+                    "producer_fingerprint": _F1_CLI_PRODUCER_FINGERPRINT,
+                    "native_prefill_acceptance": "pass",
+                    "native_prefill_full_layer_loop_status": "pass",
+                    "runtime_substrate": _F1_CLI_RUNTIME_SUBSTRATE,
+                    "hardware_log_path": str(log_path),
+                    "compute_completion_policy": "terminal",
+                    "compute_barrier_policy": "full",
+                    "prefill_npz_path": str(npz_path),
+                    "kernel_count": 1,
+                    "transfer_bytes": 8192,
+                    "block_tokens": 32,
+                    "block_count": (n_prefix + 31) // 32,
+                    "failure_stage": "none",
+                    "failure_text": "none",
+                    "exit_status": 0,
+                },
+            )
+        if operation == "GetMetrics":
+            return self._response(
+                request,
+                result={
+                    "model_handle": self._handle,
+                    "model_state": "unloaded" if self._handle is None else "resident-ready",
+                    "metrics": {
+                        "load_preparation_count": len(self.load_generations),
+                        "warm_prefill_weight_reload_count": 0,
+                        "prefill_count": len(self.prefill_generations),
+                    },
+                },
+            )
+        if operation == "CaptureTrace":
+            return self._response(
+                request,
+                result={
+                    "trace_format": "json",
+                    "trace_path": str(self.artifact_dir / "registry-trace.json"),
+                    "snapshot": {"operations": [item["operation"] for item in self.requests]},
+                },
+            )
+        raise AssertionError(f"unexpected worker operation: {operation}")
+
+    def close(self) -> None:
+        self.close_calls += 1
+        self._handle = None
+        self.shutdown_calls += 1
+
+
+def _install_worker_mode_doubles(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[object, list[_WorkerModeRegistry], list[tuple[str, object]]]:
+    worker = _persistent_worker_module()
+    registries: list[_WorkerModeRegistry] = []
+    verified_calls: list[tuple[str, object]] = []
+
+    def fake_build_registry(*, runner_path: str, artifact_dir: str | Path, **kwargs):
+        assert not kwargs
+        registry = _WorkerModeRegistry(Path(artifact_dir))
+        registries.append(registry)
+        assert runner_path == str(tmp_path / "build" / "native_r9700_runner")
+        return registry
+
+    def fake_verify_model_identity(model_uri: str, supplied_digest: object = None):
+        verified_calls.append((model_uri, supplied_digest))
+        return SimpleNamespace(
+            canonical_uri=model_uri,
+            digest=_F1_CLI_MODEL_DIGEST,
+            fingerprint=_F1_CLI_MODEL_FINGERPRINT,
+            resident_bytes=123,
+        )
+
+    monkeypatch.setattr(worker, "build_registry", fake_build_registry, raising=False)
+    monkeypatch.setattr(
+        worker,
+        "verify_model_identity",
+        fake_verify_model_identity,
+        raising=False,
+    )
+    serving = importlib.import_module("native_r9700.serving")
+    monkeypatch.setattr(
+        serving,
+        "load_model",
+        lambda model_uri: ("resident-model", None),
+    )
+
+    def fake_generate_with_native_prefill(
+        model,
+        tokenizer,
+        prompt,
+        *,
+        native,
+        service_session,
+        prompt_name=None,
+        **kwargs,
+    ):
+        del model, tokenizer, kwargs
+        state = service_session.prefill(
+            list(prompt),
+            native=native,
+            prompt_name=prompt_name,
+        )
+        metadata = dict(state["metadata"])
+        baseline_tokens = [13, 578, 30791, 17604]
+        return {
+            **state["evidence"],
+            "request_id": str(native.request_id),
+            "prompt_name": prompt_name,
+            "prompt_token_count": len(prompt),
+            "n_prefix": len(prompt) - 1,
+            "requested_producer_kind": "r9700_native",
+            "S": len(prompt),
+            "N": len(prompt) - 1,
+            "status": "pass",
+            "route": "native_producer",
+            "producer_kind": "r9700_native",
+            "accepted_cache": True,
+            "fallback_reason": "",
+            "comparison": {"exact_match": True},
+            "prefill_npz_path": state["npz_path"],
+            "prompt_cache_path": state["cache_path"],
+            "requested_prompt_cache_path": state["cache_path"],
+            "decoded_tokens": list(baseline_tokens),
+            "r_tokens": list(baseline_tokens),
+            "prefill_log_path": state["prefill_log_path"],
+            "comparison": {
+                "exact_match": True,
+                "mismatch_indices": [],
+                "decoded_length": len(baseline_tokens),
+                "baseline_length": len(baseline_tokens),
+            },
+            "kv_cache_log_path": state["cache_log_path"],
+            "producer_fingerprint": state["producer_fingerprint"],
+            "model_fingerprint": state["model_fingerprint"],
+            "model_digest": state["model_fingerprint"]["model_digest"],
+            "metadata": metadata,
+            "exit_status": 0,
+        }
+
+    monkeypatch.setattr(
+        serving,
+        "generate_with_native_prefill",
+        fake_generate_with_native_prefill,
+    )
+
+    def no_subprocess(*args, **kwargs):
+        pytest.fail("RED: worker modes must not launch subprocesses")
+
+    monkeypatch.setattr(worker.subprocess, "run", no_subprocess, raising=False)
+    monkeypatch.setattr(worker.subprocess, "Popen", no_subprocess, raising=False)
+    return worker, registries, verified_calls
+
+
+def _frozen_worker_mode_args(
+    mode: str, tmp_path: Path, *, result_name: str, log_name: str
+) -> tuple[list[str], Path, Path, Path]:
+    artifacts_dir = tmp_path / "artifacts"
+    result_path = tmp_path / result_name
+    log_path = tmp_path / log_name
+    trace_path = tmp_path / "trace.json"
+    argv = [
+        mode,
+        "--model",
+        str(tmp_path / "model"),
+        "--fixtures-dir",
+        str(Path(__file__).resolve().parent / "fixtures"),
+        "--prompt-name",
+        "prompt-128",
+        "--samples",
+        "10",
+        "--producer-kind",
+        "r9700_native",
+        "--native-runner",
+        str(tmp_path / "build" / "native_r9700_runner"),
+        "--artifacts-dir",
+        str(artifacts_dir),
+        "--json",
+        str(result_path),
+        "--log",
+        str(log_path),
+        "--trace",
+        str(trace_path),
+    ]
+    return argv, result_path, log_path, trace_path
+
+
+def test_worker_smoke_mode_accepts_frozen_options_and_closes_one_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worker, registries, verified_calls = _install_worker_mode_doubles(
+        monkeypatch, tmp_path
+    )
+    argv, result_path, log_path, trace_path = _frozen_worker_mode_args(
+        "--smoke-load-unload-reload",
+        tmp_path,
+        result_name="result.json",
+        log_name="run.log",
+    )
+
+    exit_status = worker.main(argv)
+
+    assert exit_status == 0
+    assert len(registries) == 1
+    registry = registries[0]
+    assert [request["operation"] for request in registry.requests] == [
+        "LoadModel",
+        *["Prefill"] * 10,
+        "UnloadModel",
+        "LoadModel",
+        "UnloadModel",
+    ]
+    assert registry.load_generations == [1, 2]
+    assert len(registry.load_handles) == 2
+    first_handle, second_handle = registry.load_handles
+    assert first_handle != second_handle
+    prefill_requests = [
+        request for request in registry.requests if request["operation"] == "Prefill"
+    ]
+    assert len(prefill_requests) == 10
+    assert {request["body"]["model_handle"] for request in prefill_requests} == {
+        first_handle
+    }
+    assert registry.prefill_generations == [registry.load_generations[0]] * 10
+    assert all(len(request["body"]["token_ids"]) == 129 for request in prefill_requests)
+    assert registry.close_calls == 1
+    assert registry.shutdown_calls == 1
+    assert verified_calls and all(call[0] == str(tmp_path / "model") for call in verified_calls)
+    load_bodies = [
+        request["body"]
+        for request in registry.requests
+        if request["operation"] == "LoadModel"
+    ]
+    assert all(body["model_digest"] == _F1_CLI_MODEL_DIGEST for body in load_bodies)
+    assert result_path.is_file()
+    assert log_path.is_file()
+    assert trace_path.is_file()
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    assert result["status"] == "pass"
+    assert result["exit_status"] == 0
+    assert result["sample_count"] == 10
+    assert result["metrics"]["load_preparation_count"] == 2
+    assert result["metrics"]["warm_prefill_weight_reload_count"] == 0
+    assert result["metrics"]["prefill_count"] == 10
+    assert "exit_status: 0" in log_path.read_text(encoding="utf-8")
+    assert json.loads(trace_path.read_text(encoding="utf-8"))
+
+
+def test_worker_warm_mode_reuses_one_handle_and_generation_for_ten_prefills(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worker, registries, verified_calls = _install_worker_mode_doubles(
+        monkeypatch, tmp_path
+    )
+    argv, result_path, log_path, trace_path = _frozen_worker_mode_args(
+        "--warm-prefill-samples",
+        tmp_path,
+        result_name="serving.json",
+        log_name="worker.log",
+    )
+
+    exit_status = worker.main(argv)
+
+    assert exit_status == 0
+    assert len(registries) == 1
+    registry = registries[0]
+    operations = [request["operation"] for request in registry.requests]
+    assert operations == ["LoadModel", *["Prefill"] * 10, "UnloadModel"]
+    assert registry.load_generations == [1]
+    assert len(registry.load_handles) == 1
+    assert registry.prefill_generations == [registry.load_generations[0]] * 10
+    prefill_requests = [
+        request for request in registry.requests if request["operation"] == "Prefill"
+    ]
+    assert len(prefill_requests) == 10
+    assert {request["body"]["model_handle"] for request in prefill_requests} == {
+        registry.load_handles[0]
+    }
+    assert [request["request_id"] for request in prefill_requests] == [
+        f"worker-warm-prefill-{index}" for index in range(1, 11)
+    ]
+    assert all(len(request["body"]["token_ids"]) == 129 for request in prefill_requests)
+    assert registry.close_calls == 1
+    assert registry.shutdown_calls == 1
+    assert verified_calls and verified_calls[0][0] == str(tmp_path / "model")
+    assert result_path.is_file()
+    assert log_path.is_file()
+    assert trace_path.is_file()
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    assert result["status"] == "pass"
+    assert result["exit_status"] == 0
+    assert result["sample_count"] == 10
+    assert result["metrics"]["load_preparation_count"] == 1
+    assert result["metrics"]["warm_prefill_weight_reload_count"] == 0
+    assert result["metrics"]["prefill_count"] == 10
+    assert result["metrics"]["cold_process_sample_count"] == 1
+    assert result["metrics"]["cold_process_elapsed_sec"] > 0.0
+
+    samples = result.get("samples")
+    assert isinstance(samples, list)
+    assert len(samples) == 10
+    for sample, request in zip(samples, prefill_requests, strict=True):
+        assert isinstance(sample, dict)
+        request_id = request["request_id"]
+        assert sample["request_id"] == request_id
+        assert sample["S"] == 129
+        assert sample["N"] == 128
+        assert sample["status"] == "pass"
+        assert sample["route"] == "native_producer"
+        assert sample["producer_kind"] == "r9700_native"
+        assert sample["accepted_cache"] is True
+        assert sample["fallback_reason"] == ""
+        assert sample["comparison"]["exact_match"] is True
+
+        artifact_root = tmp_path / "artifacts"
+        expected_paths = {
+            "prefill_npz_path": artifact_root / f"{request_id}.prefill.npz",
+            "prompt_cache_path": artifact_root / f"{request_id}.prompt-cache.safetensors",
+            "prefill_log_path": artifact_root / f"{request_id}.prefill.log",
+            "hardware_log_path": artifact_root / f"{request_id}.prefill.log",
+            "kv_cache_log_path": artifact_root / f"{request_id}.kv-cache.log",
+        }
+        for field_name, expected_path in expected_paths.items():
+            assert Path(sample[field_name]) == expected_path
+            assert expected_path.is_file()
+
+        metadata = sample["metadata"]
+        assert metadata["request_id"] == request_id
+        assert sample["producer_fingerprint"] == _F1_CLI_PRODUCER_FINGERPRINT
+        assert metadata["producer_fingerprint"] == sample["producer_fingerprint"]
+        assert sample["model_fingerprint"] == _F1_CLI_MODEL_FINGERPRINT
+        assert sample["model_digest"] == sample["model_fingerprint"]["model_digest"]
+        assert metadata["model_digest"] == sample["model_digest"]
+
+    assert "LoadModel" not in result["operations"][1:]
+    assert "exit_status: 0" in log_path.read_text(encoding="utf-8")
+    assert json.loads(trace_path.read_text(encoding="utf-8"))
+
+

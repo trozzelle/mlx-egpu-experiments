@@ -1,0 +1,49 @@
+#ifndef TinyGPUInferenceUserClient_h
+#define TinyGPUInferenceUserClient_h
+
+#include <DriverKit/IOUserClient.iig>
+#include "TGPUABI.h"
+
+#ifndef TGPU_IIG_RPC_H
+#define TGPU_IIG_RPC_H
+// Unversioned legacy scalar/descriptor meanings are intentionally not aliases
+// and are not part of this interface.
+enum TinyGPURPC
+{
+	QueryCapabilities = TGPU_QUERY_CAPABILITIES,
+	BufferAllocate = TGPU_BUFFER_ALLOCATE,
+	BufferImport = TGPU_BUFFER_IMPORT,
+	BufferMap = TGPU_BUFFER_MAP,
+	BufferUnmap = TGPU_BUFFER_UNMAP,
+	BufferRelease = TGPU_BUFFER_RELEASE,
+	QueueCreate = TGPU_QUEUE_CREATE,
+	QueueDestroy = TGPU_QUEUE_DESTROY,
+	ExecutableAdmit = TGPU_EXECUTABLE_ADMIT,
+	ExecutableRelease = TGPU_EXECUTABLE_RELEASE,
+	Submit = TGPU_SUBMIT,
+	FenceWait = TGPU_FENCE_WAIT,
+	TimestampQuery = TGPU_TIMESTAMP_QUERY,
+	HealthFaultQuery = TGPU_HEALTH_FAULT_QUERY,
+	QueueReset = TGPU_QUEUE_RESET,
+	DeviceReset = TGPU_DEVICE_RESET,
+	DiagnosticMMIORead = TGPU_DIAGNOSTIC_MMIO_READ,
+	DiagnosticMMIOWrite = TGPU_DIAGNOSTIC_MMIO_WRITE,
+};
+#endif /* TGPU_IIG_RPC_H */
+
+class TinyGPUInferenceUserClient : public IOUserClient
+{
+public:
+	virtual bool init() final;
+	virtual void free() final;
+
+	virtual kern_return_t Start(IOService* in_provider) final;
+	virtual kern_return_t Stop(IOService* in_provider) final;
+
+	virtual kern_return_t ExternalMethod(uint64_t in_selector, IOUserClientMethodArguments* in_arguments, const IOUserClientMethodDispatch* in_dispatch, OSObject* in_target, void* in_reference) final;
+
+	virtual kern_return_t CopyClientMemoryForType(
+		uint64_t type, uint64_t *options, IOMemoryDescriptor **memory) final;
+};
+
+#endif /* TinyGPUInferenceUserClient_h */

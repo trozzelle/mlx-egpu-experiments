@@ -33,6 +33,7 @@ _SCHEMA_PATH = (
     / "fixtures"
     / "fixtures_schema.json"
 )
+_QWEN_SCHEMA_PATH = _SCHEMA_PATH.with_name("qwen_fixtures_schema.json")
 _EXACT_BYTES = "exact_bytes"
 
 
@@ -63,24 +64,37 @@ def _entry_groups(entry: dict[str, Any]) -> tuple[tuple[tuple[int, ...], str, tu
 
 
 def _load_specs() -> tuple[FixtureSpec, ...]:
-    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
     specs: list[FixtureSpec] = []
-    for archive_name, entry in schema["files"].items():
-        if entry.get("kind") != "npz":
-            continue
-        for group_index, (shape, dtype, arrays) in enumerate(_entry_groups(entry)):
-            archive_stem = archive_name.removesuffix(".npz")
-            specs.append(
-                FixtureSpec(
-                    name=f"{archive_stem}:{dtype}:{_shape_name(shape)}:{group_index}",
-                    archive_name=archive_name,
-                    arrays=arrays,
-                    shape=shape,
-                    dtype=dtype,
-                    tolerance=_EXACT_BYTES,
-                    sha256=str(entry["sha256"]),
+    schema_paths = [_SCHEMA_PATH]
+    # Qwen's schema is deliberately a separate file so the legacy Llama
+    # fixture contract remains untouched.  It is optional until the
+    # supervisor publishes the five-file Qwen package; once present it is
+    # loaded by the same immutable catalog.
+    if _QWEN_SCHEMA_PATH.is_file():
+        schema_paths.append(_QWEN_SCHEMA_PATH)
+    for schema_path in schema_paths:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        files = schema.get("files")
+        if not isinstance(files, dict):
+            raise ValueError(f"fixture schema {schema_path} has no files object")
+        for archive_name, entry in files.items():
+            if not isinstance(archive_name, str) or not isinstance(entry, dict):
+                raise ValueError(f"fixture schema {schema_path} has malformed file metadata")
+            if entry.get("kind") != "npz":
+                continue
+            for group_index, (shape, dtype, arrays) in enumerate(_entry_groups(entry)):
+                archive_stem = archive_name.removesuffix(".npz")
+                specs.append(
+                    FixtureSpec(
+                        name=f"{archive_stem}:{dtype}:{_shape_name(shape)}:{group_index}",
+                        archive_name=archive_name,
+                        arrays=arrays,
+                        shape=shape,
+                        dtype=dtype,
+                        tolerance=_EXACT_BYTES,
+                        sha256=str(entry["sha256"]),
+                    )
                 )
-            )
     return tuple(specs)
 
 

@@ -58,6 +58,13 @@ bool build_llama_layer_weight_table(const std::string& model_dir,
                                     LlamaLayerWeightTable* table,
                                     std::string* error_text);
 
+// Binds the complete Llama layer table using an already-open binder.  The
+// caller retains the binder for the lifetime of the resident execution owner,
+// so repeated prefill requests reuse the exact validated file-backed spans.
+bool bind_llama_layer_weight_table(ModelWeightBinder& binder,
+                                   LlamaLayerWeightTable* table,
+                                   std::string* error_text);
+
 struct LlamaLayerResidentBufferIndices {
   uint32_t input_layernorm;
   uint32_t post_attention_layernorm;

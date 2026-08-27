@@ -1,0 +1,1105 @@
+#!/usr/bin/env python3
+"""Offline admission and physical-layout proof for the frozen F2 WMMA pack."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import sys
+import tempfile
+from typing import Any, Iterable
+import zipfile
+
+import numpy as np
+
+
+SOURCE_LAYOUT_VERSION = "f16-row-major-nk-source-v1"
+PHYSICAL_LAYOUT_VERSION = "f2-wmma-physical-tile-v1"
+SPEC_ID = "f2-wmma-physical-layout-spec-v1"
+TARGET = "gfx1201"
+WAVE_SIZE = 32
+WMMA_INSTRUCTION = "v_wmma_f32_16x16x16_f16"
+RECORD_KIND = "offline_review"
+EVIDENCE_SLOT = "layout_proof"
+RECORD_ID = "f2-wmma-physical-layout-proof-v1"
+RECORD_PATH = "logs/f2/wmma-physical-layout-proof.json"
+
+ROCWMMA_REVISION = "f7f2aee8e764e612f49f2dc030b7e1639fb30d34"
+AITER_REVISION = "35c652ed3bd34e5d5828954e1545babc9255a69a"
+CALCULATOR_REVISION = "2ef91896bcdc4d26624f952e5c905c787cd9bc9e"
+ISA_DECODER_REVISION = "452645535ac05f466b06a13e5eafeb5a86d3ad11"
+RGA_REVISION = "39688b004af6993f7146dd8e26b52994ec020fe6"
+LOCAL_SOURCE_REVISION = "local-f2-wmma-source-v1"
+
+ROCWMMA_SYMBOLS = (
+    "matrix_b",
+    "col_major",
+    "fragment",
+    "load_matrix_sync",
+    "IOConfig",
+    "GetMappingUtil",
+)
+
+
+EVIDENCE_FIELDS = frozenset(
+    {
+        "record_path",
+        "record_kind",
+        "evidence_slot",
+        "record_id",
+        "record_sha256",
+        "subject_target",
+        "image_sha256",
+        "pack_sha256",
+        "producer_kind",
+        "tool_digest",
+        "input_digest",
+        "output_digest",
+    }
+)
+
+SPEC_FIELDS = frozenset(
+    {
+        "schema_version",
+        "spec_id",
+        "source_tensor_layout_version",
+        "physical_layout_version",
+        "target",
+        "wave_size",
+        "instruction",
+        "shape",
+        "layout_origin",
+        "layout_mapping",
+        "layout_strides",
+        "alignment_bytes",
+        "padding_bytes",
+        "swizzle",
+        "admission_record",
+        "pack_record",
+        "source_digests",
+        "tool_inputs",
+    }
+)
+ADMISSION_FIELDS = frozenset(
+    {
+        "subject_target",
+        "image",
+        "wave_size",
+        "descriptor",
+        "kernarg",
+        "resources",
+        "resource_analysis",
+        "isa",
+    }
+)
+IMAGE_FIELDS = frozenset({"path", "sha256"})
+DESCRIPTOR_FIELDS = frozenset(
+    {
+        "size",
+        "descriptor_offset",
+        "entry_offset",
+        "entry_alignment",
+        "kernel_code_properties",
+        "kernarg_segment_size",
+        "kernarg_preload_bytes",
+    }
+)
+KERNARG_FIELDS = frozenset({"name", "bytes", "tail_padding_bytes", "fields"})
+KERNARG_ENTRY_FIELDS = frozenset({"name", "offset", "size", "alignment", "type"})
+RESOURCE_FIELDS = frozenset(
+    {
+        "rsrc1",
+        "rsrc2",
+        "rsrc3",
+        "sgpr_count",
+        "vgpr_count",
+        "lds_bytes",
+        "private_segment_bytes",
+        "dynamic_lds_bytes",
+        "metadata_provenance",
+    }
+)
+RESOURCE_ANALYSIS_FIELDS = frozenset(
+    {
+        "rsrc1",
+        "rsrc2",
+        "rsrc3",
+        "sgpr_count",
+        "vgpr_count",
+        "lds_bytes",
+        "private_segment_bytes",
+        "dynamic_lds_bytes",
+        "metadata_provenance",
+        "tool_revision",
+        "input_digest",
+        "output_digest",
+    }
+)
+ISA_FIELDS = frozenset(
+    {
+        "target",
+        "wave_size",
+        "wmma_instructions",
+        "unsupported_instructions",
+        "isa_decoder_revision",
+        "rga_revision",
+        "isa_digest",
+        "resource_digest",
+    }
+)
+
+PACK_FIELDS = frozenset(
+    {
+        "schema_version",
+        "name",
+        "version",
+        "target",
+        "required_features",
+        "provenance",
+        "image",
+        "entries",
+        "compatibility",
+        "numerics",
+        "evidence",
+        "pack_sha256",
+    }
+)
+PACK_PROVENANCE_FIELDS = frozenset(
+    {"upstream_repository", "upstream_revision", "upstream_paths", "local_sources", "license_reviews", "modifications"}
+)
+PACK_IMAGE_FIELDS = frozenset(
+    {"image_path", "image_sha256", "image_size", "code_object_version", "build"}
+)
+PACK_BUILD_FIELDS = frozenset(
+    {"toolchain_id", "toolchain_revision", "generator_id", "generator_revision", "command_sha256"}
+)
+PACK_ENTRY_FIELDS = frozenset(
+    {"symbol", "descriptor_offset", "entry_offset", "kernargs", "resources", "geometry", "pack_sha256"}
+)
+PACK_ENTRY_RESOURCE_FIELDS = frozenset(
+    {
+        "rsrc1",
+        "rsrc2",
+        "rsrc3",
+        "wave_size",
+        "sgpr_count",
+        "vgpr_count",
+        "lds_bytes",
+        "private_segment_bytes",
+        "metadata_provenance",
+    }
+)
+PACK_GEOMETRY_FIELDS = frozenset({"shape_family", "geometry_rule", "workgroup", "grid_tile"})
+PACK_COMPAT_FIELDS = frozenset({"input_dtype", "weight_dtype", "output_dtype", "source_tensor_layout_version", "weight_packing_version", "shape_family"})
+PACK_SHAPE_FIELDS = frozenset({"name", "fixed_dimensions", "runtime_dimension", "tail_policy", "geometry_rule"})
+PACK_RUNTIME_DIM_FIELDS = frozenset({"name", "min_value", "max_value", "full_value"})
+PACK_NUMERICS_FIELDS = frozenset({"policy", "accumulator", "output_cast"})
+
+FIXTURE_FIELDS = frozenset(
+    {
+        "source_n",
+        "source_k",
+        "source_f16",
+        "physical_f16",
+        "physical_byte_offset",
+        "b_tile_offset",
+        "lds_byte_offset",
+    }
+)
+SOURCE_PIN_FIELDS = frozenset({"schema_version", "status", "kind", "sources", "record_sha256"})
+SOURCE_PIN_ENTRY_FIELDS = frozenset({"role", "revision", "path", "sha256"})
+RESOURCE_REPORT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "status",
+        "kind",
+        "record_sha256",
+        "tool",
+        "tool_version",
+        "tool_sha256",
+        "input_image_sha256",
+        "output_sha256",
+        "descriptor_offset",
+        "entry_offset",
+        "rsrc1",
+        "rsrc2",
+        "rsrc3",
+        "sgpr_count",
+        "vgpr_count",
+        "group_segment_bytes",
+        "private_segment_bytes",
+        "kernarg_bytes",
+        "kernarg_preload_bytes",
+        "kernel_code_properties",
+    }
+)
+ISA_REPORT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "status",
+        "kind",
+        "record_sha256",
+        "tool",
+        "tool_version",
+        "tool_sha256",
+        "input_image_sha256",
+        "output_sha256",
+        "target",
+        "wave_size",
+        "instructions",
+        "disallowed_instructions",
+    }
+)
+FIXTURE_MEMBER_LIMIT_BYTES = 64 * 1024
+FROZEN_SOURCE_N = (0, 0, 0, 15, 16, 16, 8191)
+FROZEN_SOURCE_K = (0, 1, 16, 15, 0, 2047, 2047)
+FROZEN_SOURCE_F16 = (0x3C00, 0x4000, 0x4200, 0x4400, 0x4500, 0x4600, 0x4700)
+
+
+class ProofError(ValueError):
+    """A rejected proof input or admission record."""
+
+
+def _fail(message: str) -> None:
+    raise ProofError(message)
+
+
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        _fail(message)
+
+
+def _is_digest(value: object) -> bool:
+    return isinstance(value, str) and len(value) == 64 and value == value.lower() and all(
+        character in "0123456789abcdef" for character in value
+    )
+
+
+def _require_digest(value: object, label: str) -> str:
+    _require(_is_digest(value), f"{label} must be a lowercase SHA-256 digest")
+    return str(value)
+
+
+def _canonical_json(value: object) -> bytes:
+    """Serialize the typed JSON subset used by the frozen records as JCS."""
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError, UnicodeError) as exc:
+        _fail(f"canonical input is not finite JSON: {exc}")
+    raise AssertionError("unreachable")
+
+
+def _canonical_record_sha256(record: dict[str, Any]) -> str:
+    preimage = {key: value for key, value in record.items() if key != "record_sha256"}
+    return hashlib.sha256(_canonical_json(preimage)).hexdigest()
+
+
+def _strip_pack_digests(value: object) -> object:
+    if isinstance(value, dict):
+        return {
+            key: _strip_pack_digests(item)
+            for key, item in value.items()
+            if key != "pack_sha256"
+        }
+    if isinstance(value, list):
+        return [_strip_pack_digests(item) for item in value]
+    return value
+
+
+def _pack_sha256(pack: dict[str, Any]) -> str:
+    normalized = {
+        key: value for key, value in pack.items() if key != "evidence"
+    }
+    preimage = {
+        "domain": "r9700-kernel-pack-identity-v1",
+        "pack": _strip_pack_digests(normalized),
+    }
+    return hashlib.sha256(_canonical_json(preimage)).hexdigest()
+
+
+def _file_sha256(path: Path, label: str) -> str:
+    try:
+        with path.open("rb") as stream:
+            digest = hashlib.sha256()
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+    except (OSError, UnicodeError) as exc:
+        _fail(f"{label} cannot be read: {exc}")
+    return digest.hexdigest()
+
+
+def _strict_object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            _fail(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> Any:
+    _fail(f"non-finite JSON constant: {value}")
+
+
+def _read_json(path: Path, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_strict_object_pairs,
+            parse_constant=_reject_json_constant,
+        )
+    except ProofError:
+        raise
+    except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        _fail(f"{label} cannot be read: {exc}")
+    _require(isinstance(value, dict), f"{label} must be a JSON object")
+    return value
+
+
+def _exact_keys(value: object, expected: frozenset[str], label: str) -> dict[str, Any]:
+    _require(isinstance(value, dict), f"{label} must be an object")
+    keys = frozenset(value)
+    _require(keys == expected, f"{label} has unknown or missing fields")
+    return value
+
+
+def _nonempty_string(value: object, label: str) -> str:
+    _require(isinstance(value, str) and bool(value), f"{label} must be nonempty")
+    return str(value)
+
+
+def _integer(value: object, label: str, *, minimum: int | None = None) -> int:
+    _require(isinstance(value, int) and not isinstance(value, bool), f"{label} must be an integer")
+    result = int(value)
+    if minimum is not None:
+        _require(result >= minimum, f"{label} must be >= {minimum}")
+    return result
+
+
+def _relative_path(path: Path, cwd: Path) -> str:
+    try:
+        return os.path.relpath(path, cwd)
+    except ValueError as exc:
+        _fail(f"path cannot be normalized: {exc}")
+    raise AssertionError("unreachable")
+
+
+def _trusted_record(path: Path, expected: frozenset[str], label: str) -> dict[str, Any]:
+    record = _exact_keys(_read_json(path, label), expected, label)
+    _require(_integer(record["schema_version"], f"{label} schema version") == 1, f"{label} schema version mismatch")
+    _require(record["status"] == "pass", f"{label} status is not pass")
+    _require_digest(record["record_sha256"], f"{label} record digest")
+    _require(_canonical_record_sha256(record) == record["record_sha256"], f"{label} record digest mismatch")
+    return record
+
+def _validate_source_pin_record(
+    path: Path,
+    paths: list[Path],
+    path_strings: list[str],
+    source_digests: dict[str, Any],
+) -> dict[str, str]:
+    record = _trusted_record(path, SOURCE_PIN_FIELDS, "source pin record")
+    _require(record["kind"] == "f2_wmma_source_pin", "source pin record kind mismatch")
+    entries = record["sources"]
+    _require(isinstance(entries, list) and len(entries) == len(paths), "source pin record does not cover the CLI source set")
+
+    expected_roles = [*(f"rocwmma_source_{index}" for index in range(7)), "aiter_source", "calculator_source", "local_source"]
+    expected_revisions = [
+        *(ROCWMMA_REVISION for _ in range(7)),
+        AITER_REVISION,
+        CALCULATOR_REVISION,
+        LOCAL_SOURCE_REVISION,
+    ]
+    actual: dict[str, str] = {}
+    seen_paths: set[str] = set()
+    seen_roles: set[str] = set()
+    for index, (entry, source_path, path_string) in enumerate(zip(entries, paths, path_strings, strict=True)):
+        source = _exact_keys(entry, SOURCE_PIN_ENTRY_FIELDS, f"source pin entry {index}")
+        role = _nonempty_string(source["role"], f"source pin entry {index} role")
+        revision = _nonempty_string(source["revision"], f"source pin entry {index} revision")
+        declared_path = _nonempty_string(source["path"], f"source pin entry {index} path")
+        _require(role == expected_roles[index], f"source pin entry {index} role mismatch")
+        _require(revision == expected_revisions[index], f"source pin entry {index} revision mismatch")
+        _require(declared_path == path_string, f"source pin entry {index} path mismatch")
+        _require(path_string not in seen_paths and role not in seen_roles, "source pin record has duplicate identity")
+        seen_paths.add(path_string)
+        seen_roles.add(role)
+        _require(source_path.is_file() and not source_path.is_dir(), f"source input is missing: {path_string}")
+        digest = _require_digest(source["sha256"], f"source pin digest for {path_string}")
+        _require(source_digests.get(path_string) == digest, f"source digest record disagrees with the pinned report: {path_string}")
+        actual_digest = _file_sha256(source_path, f"source input {path_string}")
+        _require(actual_digest == digest, f"source pin digest mismatch: {path_string}")
+        actual[path_string] = actual_digest
+    _require(frozenset(actual) == frozenset(path_strings), "source pin record does not bind every CLI source")
+    return actual
+
+
+def _load_sources(args: argparse.Namespace, spec: dict[str, Any]) -> tuple[dict[str, str], list[Path]]:
+    rocwmma = [Path(item) for item in args.rocwmma_source]
+    _require(len(rocwmma) == 7, "source input requires exactly seven rocWMMA sources")
+    normalized = [str(path) for path in rocwmma]
+    _require(len(set(normalized)) == len(normalized), "duplicate rocWMMA source input")
+
+    symbols = [item for item in args.rocwmma_symbols.split(",") if item]
+    _require(len(symbols) == len(set(symbols)), "duplicate rocWMMA symbol input")
+    _require(set(symbols) == set(ROCWMMA_SYMBOLS), "rocWMMA symbols do not match the frozen input set")
+
+    paths = rocwmma + [Path(args.aiter_source), Path(args.calculator_source), Path(args.local_source)]
+    path_strings = [str(path) for path in paths]
+    _require(len(set(path_strings)) == len(path_strings), "duplicate source input")
+
+    source_digests = spec.get("source_digests")
+    _require(isinstance(source_digests, dict), "source digest record is missing")
+    _require(frozenset(source_digests) == frozenset(path_strings), "source digest record does not bind every input")
+    actual = _validate_source_pin_record(
+        Path(args.source_pin_record),
+        paths,
+        path_strings,
+        source_digests,
+    )
+
+    contents = "\n".join(path.read_text(encoding="utf-8") for path in paths)
+    for symbol in ROCWMMA_SYMBOLS:
+        _require(symbol in contents, f"rocWMMA source symbol is absent: {symbol}")
+    return actual, paths
+
+
+def _validate_tool_inputs(spec: dict[str, Any]) -> None:
+    values = spec.get("tool_inputs")
+    _require(isinstance(values, dict), "tool input revision record is missing")
+    expected = {
+        "rocwmma_revision": ROCWMMA_REVISION,
+        "aiter_revision": AITER_REVISION,
+        "calculator_revision": CALCULATOR_REVISION,
+        "isa_decoder_revision": ISA_DECODER_REVISION,
+        "rga_revision": RGA_REVISION,
+    }
+    _require(frozenset(values) == frozenset(expected), "tool input revision record has unknown or missing fields")
+    for key, revision in expected.items():
+        _require(values[key] == revision, f"{key} revision mismatch")
+
+
+def _validate_kernarg(value: object, descriptor: dict[str, Any]) -> dict[str, Any]:
+    kernarg = _exact_keys(value, KERNARG_FIELDS, "kernarg")
+    _require(kernarg["name"] == "f2-linear-wmma-f16-v1", "kernarg ABI name mismatch")
+    _require(_integer(kernarg["bytes"], "kernarg bytes") == 32, "kernarg segment must be exactly 32 bytes")
+    _require(_integer(kernarg["tail_padding_bytes"], "kernarg tail padding") == 4, "kernarg tail padding must be four bytes")
+    fields = kernarg["fields"]
+    _require(isinstance(fields, list) and len(fields) == 4, "kernarg must contain exactly four fields")
+    expected = (
+        ("activation", 0, 8, 8, "uint64"),
+        ("weight_nk", 8, 8, 8, "uint64"),
+        ("output", 16, 8, 8, "uint64"),
+        ("m", 24, 4, 4, "uint32"),
+    )
+    ranges: list[tuple[int, int]] = []
+    names: set[str] = set()
+    for index, (field, expected_values) in enumerate(zip(fields, expected, strict=True)):
+        item = _exact_keys(field, KERNARG_ENTRY_FIELDS, f"kernarg field {index}")
+        name, offset, size, alignment, type_name = expected_values
+        _require(item["name"] == name, f"kernarg field {index} name mismatch")
+        got_offset = _integer(item["offset"], f"kernarg field {index} offset", minimum=0)
+        got_size = _integer(item["size"], f"kernarg field {index} size", minimum=1)
+        got_alignment = _integer(item["alignment"], f"kernarg field {index} alignment", minimum=1)
+        _require((got_offset, got_size, got_alignment, item["type"]) == (offset, size, alignment, type_name), f"kernarg field {index} schema mismatch")
+        _require(got_offset % got_alignment == 0, f"kernarg field {index} is misaligned")
+        _require(name not in names, "kernarg fields contain duplicate names")
+        names.add(name)
+        ranges.append((got_offset, got_offset + got_size))
+    for index, (start, end) in enumerate(ranges):
+        _require(end <= 32, f"kernarg field {index} exceeds the segment")
+        for other_start, other_end in ranges[index + 1 :]:
+            _require(end <= other_start or other_end <= start, "kernarg fields overlap")
+    _require(descriptor["kernarg_segment_size"] == 32, "descriptor kernarg segment mismatch")
+    _require(descriptor["kernarg_preload_bytes"] == 0, "kernarg preload is not admitted")
+    return kernarg
+
+
+def _validate_resource_report(
+    path: Path,
+    image_sha256: str,
+    descriptor: dict[str, Any],
+    resources: dict[str, Any],
+    analysis: dict[str, Any],
+) -> dict[str, Any]:
+    report = _trusted_record(path, RESOURCE_REPORT_FIELDS, "resource report")
+    _require(report["kind"] == "f2_wmma_resource_review", "resource report kind mismatch")
+    _require(report["tool"] == "rga", "resource report tool mismatch")
+    _require(report["tool_version"] == RGA_REVISION, "resource report tool revision mismatch")
+    _require_digest(report["tool_sha256"], "resource report tool digest")
+    _require(report["input_image_sha256"] == image_sha256, "resource report image digest mismatch")
+    _require_digest(report["output_sha256"], "resource report output digest")
+
+    expected = {
+        "descriptor_offset": descriptor["descriptor_offset"],
+        "entry_offset": descriptor["entry_offset"],
+        "rsrc1": resources["rsrc1"],
+        "rsrc2": resources["rsrc2"],
+        "rsrc3": resources["rsrc3"],
+        "sgpr_count": resources["sgpr_count"],
+        "vgpr_count": resources["vgpr_count"],
+        "group_segment_bytes": resources["lds_bytes"],
+        "private_segment_bytes": resources["private_segment_bytes"],
+        "kernarg_bytes": descriptor["kernarg_segment_size"],
+        "kernarg_preload_bytes": descriptor["kernarg_preload_bytes"],
+        "kernel_code_properties": descriptor["kernel_code_properties"],
+    }
+    for key, expected_value in expected.items():
+        _require(
+            _integer(report[key], f"resource report {key}", minimum=0) == _integer(expected_value, f"admission {key}", minimum=0),
+            f"resource report {key} disagrees with admission",
+        )
+    _require(report["output_sha256"] == analysis["output_digest"], "resource report output is not the admitted analysis")
+    return report
+
+
+def _validate_isa_report(
+    path: Path,
+    image_sha256: str,
+    isa: dict[str, Any],
+) -> dict[str, Any]:
+    report = _trusted_record(path, ISA_REPORT_FIELDS, "ISA report")
+    _require(report["kind"] == "f2_wmma_isa_review", "ISA report kind mismatch")
+    _require(report["tool"] == "isa-decoder", "ISA report tool mismatch")
+    _require(report["tool_version"] == ISA_DECODER_REVISION, "ISA report tool revision mismatch")
+    _require_digest(report["tool_sha256"], "ISA report tool digest")
+    _require(report["input_image_sha256"] == image_sha256, "ISA report image digest mismatch")
+    _require_digest(report["output_sha256"], "ISA report output digest")
+    _require(report["target"] == TARGET, "ISA report target mismatch")
+    _require(_integer(report["wave_size"], "ISA report wave size") == WAVE_SIZE, "ISA report wave size mismatch")
+    instructions = report["instructions"]
+    disallowed = report["disallowed_instructions"]
+    _require(isinstance(instructions, list) and all(isinstance(item, str) and item for item in instructions), "ISA report instruction list is malformed")
+    _require(isinstance(disallowed, list) and all(isinstance(item, str) for item in disallowed), "ISA report disallowed list is malformed")
+    _require(len(instructions) == len(set(instructions)), "ISA report instruction list contains duplicates")
+    _require(len(disallowed) == len(set(disallowed)), "ISA report disallowed list contains duplicates")
+    _require(instructions == isa["wmma_instructions"], "ISA report instructions disagree with admission")
+    _require(disallowed == isa["unsupported_instructions"], "ISA report disallowed instructions disagree with admission")
+    _require(WMMA_INSTRUCTION in instructions and not disallowed, "ISA report does not admit the frozen WMMA instruction")
+    _require(report["output_sha256"] == isa["isa_digest"], "ISA report output is not the admitted decoder result")
+    return report
+
+
+def _validate_admission(spec: dict[str, Any], args: argparse.Namespace, cwd: Path) -> tuple[str, dict[str, Any]]:
+    admission = _exact_keys(spec.get("admission_record"), ADMISSION_FIELDS, "admission record")
+    _require(admission["subject_target"] == TARGET, "target admission mismatch")
+    image = _exact_keys(admission["image"], IMAGE_FIELDS, "admission image")
+    image_path = Path(_nonempty_string(image["path"], "admission image path"))
+    _require(image_path.is_file() and not image_path.is_dir(), "admission image is missing")
+    declared_image_digest = _require_digest(image["sha256"], "admission image digest")
+    actual_image_digest = _file_sha256(image_path, "admission image")
+    _require(actual_image_digest == declared_image_digest, "image digest mismatch")
+
+    _require(_integer(admission["wave_size"], "admission wave size") == WAVE_SIZE, "wave size admission mismatch")
+    descriptor = _exact_keys(admission["descriptor"], DESCRIPTOR_FIELDS, "descriptor")
+    _require(_integer(descriptor["size"], "descriptor size") == 64, "descriptor size must be 64 bytes")
+    descriptor_offset = _integer(descriptor["descriptor_offset"], "descriptor offset", minimum=0)
+    _require(descriptor_offset % 64 == 0, "descriptor offset is misaligned")
+    entry_offset = _integer(descriptor["entry_offset"], "descriptor entry offset", minimum=1)
+    entry_alignment = _integer(descriptor["entry_alignment"], "descriptor entry alignment", minimum=1)
+    _require(entry_alignment == 256, "descriptor entry alignment must be 256 bytes")
+    _require(entry_offset % entry_alignment == 0, "descriptor entry offset is not 256-byte aligned")
+    properties = _integer(descriptor["kernel_code_properties"], "kernel code properties", minimum=0)
+    _require(properties & 0x400, "descriptor does not declare wave32")
+    _require(_integer(descriptor["kernarg_segment_size"], "descriptor kernarg segment size") == 32, "descriptor kernarg segment must be 32 bytes")
+    _require(_integer(descriptor["kernarg_preload_bytes"], "descriptor kernarg preload") == 0, "descriptor declares kernarg preload")
+    _validate_kernarg(admission["kernarg"], descriptor)
+
+    resources = _exact_keys(admission["resources"], RESOURCE_FIELDS, "resource record")
+    analysis = _exact_keys(admission["resource_analysis"], RESOURCE_ANALYSIS_FIELDS, "resource analysis")
+    for key in ("rsrc1", "rsrc2", "rsrc3", "sgpr_count", "vgpr_count", "lds_bytes"):
+        _require(_integer(resources[key], f"resource {key}", minimum=1) == _integer(analysis[key], f"resource analysis {key}", minimum=1), f"resource {key} disagrees with resource analysis")
+    for key in ("private_segment_bytes", "dynamic_lds_bytes"):
+        resource_value = _integer(resources[key], f"resource {key}", minimum=0)
+        analysis_value = _integer(analysis[key], f"resource analysis {key}", minimum=0)
+        _require(resource_value == analysis_value, f"resource {key} disagrees with resource analysis")
+    _require(resources["private_segment_bytes"] == 0, "private segment is not zero")
+    _require(resources["dynamic_lds_bytes"] == 0, "dynamic LDS is not zero")
+    _require(resources["metadata_provenance"] == "source_amdgpu_metadata", "resource metadata provenance mismatch")
+    _require(analysis["metadata_provenance"] == "source_amdgpu_metadata", "resource analysis metadata provenance mismatch")
+    _require(analysis["tool_revision"] == RGA_REVISION, "resource analysis tool revision mismatch")
+    _require_digest(analysis["input_digest"], "resource analysis input digest")
+    _require_digest(analysis["output_digest"], "resource analysis output digest")
+
+    isa = _exact_keys(admission["isa"], ISA_FIELDS, "ISA record")
+    _require(_integer(isa["wave_size"], "ISA wave size") == WAVE_SIZE, "ISA wave size mismatch")
+    instructions = isa["wmma_instructions"]
+    unsupported = isa["unsupported_instructions"]
+    _require(isinstance(instructions, list) and all(isinstance(item, str) and item for item in instructions), "WMMA instruction record is malformed")
+    _require(len(instructions) == len(set(instructions)), "WMMA instruction record contains duplicates")
+    _require(WMMA_INSTRUCTION in instructions, "required WMMA instruction is absent")
+    _require(isinstance(unsupported, list) and all(isinstance(item, str) for item in unsupported), "unsupported ISA record is malformed")
+    _require(len(unsupported) == len(set(unsupported)), "unsupported ISA record contains duplicates")
+    _require(not unsupported, "unsupported ISA instruction is admitted")
+    _require(isa["isa_decoder_revision"] == ISA_DECODER_REVISION, "ISA decoder revision mismatch")
+    _require(isa["rga_revision"] == RGA_REVISION, "ISA RGA revision mismatch")
+    _require_digest(isa["isa_digest"], "ISA digest")
+    _require_digest(isa["resource_digest"], "ISA resource digest")
+    _require(isa["resource_digest"] == analysis["input_digest"], "ISA/resource digest linkage mismatch")
+    resource_report = _validate_resource_report(
+        Path(args.resource_report),
+        declared_image_digest,
+        descriptor,
+        resources,
+        analysis,
+    )
+    isa_report = _validate_isa_report(Path(args.isa_report), declared_image_digest, isa)
+
+
+    relative_image = _relative_path(image_path, cwd)
+    return declared_image_digest, {
+        "image_path": image_path,
+        "relative_image": relative_image,
+        "descriptor": descriptor,
+        "kernarg": admission["kernarg"],
+        "resources": resources,
+        "analysis": analysis,
+        "isa": isa,
+        "resource_report": resource_report,
+        "isa_report": isa_report,
+    }
+
+
+def _validate_pack(pack: object, admission: dict[str, Any], image_sha256: str) -> str:
+    pack_record = _exact_keys(pack, PACK_FIELDS, "pack record")
+    _require(_integer(pack_record["schema_version"], "pack schema version") == 1, "pack schema version mismatch")
+    _require(_nonempty_string(pack_record["name"], "pack name") == "f2-linear-gate-up-f16-v1", "pack name mismatch")
+    _require(_nonempty_string(pack_record["version"], "pack version"), "pack version missing")
+    _require(pack_record["target"] == TARGET, "pack target mismatch")
+    _require(pack_record["required_features"] == ["wave32", "wmma"], "pack required features mismatch")
+
+    provenance = _exact_keys(pack_record["provenance"], PACK_PROVENANCE_FIELDS, "pack provenance")
+    _nonempty_string(provenance["upstream_repository"], "pack upstream repository")
+    _nonempty_string(provenance["upstream_revision"], "pack upstream revision")
+    _require(isinstance(provenance["upstream_paths"], list) and all(isinstance(item, str) and item for item in provenance["upstream_paths"]), "pack upstream paths are malformed")
+    local_sources = provenance["local_sources"]
+    _require(isinstance(local_sources, list) and local_sources, "pack local sources are missing")
+    for item in local_sources:
+        source = _exact_keys(item, frozenset({"path", "sha256"}), "pack local source")
+        _nonempty_string(source["path"], "pack local source path")
+        _require_digest(source["sha256"], "pack local source digest")
+    reviews = provenance["license_reviews"]
+    _require(isinstance(reviews, list) and reviews, "pack license review is missing")
+    for item in reviews:
+        review = _exact_keys(item, frozenset({"component", "spdx_expression", "review_id", "status"}), "pack license review")
+        for key in review:
+            _nonempty_string(review[key], f"pack license review {key}")
+    modifications = provenance["modifications"]
+    _require(isinstance(modifications, list), "pack modifications are malformed")
+    for index, item in enumerate(modifications):
+        modification = _exact_keys(item, frozenset({"component", "summary"}), f"pack modification {index}")
+        _nonempty_string(modification["component"], f"pack modification {index} component")
+        _nonempty_string(modification["summary"], f"pack modification {index} summary")
+
+    pack_image = _exact_keys(pack_record["image"], PACK_IMAGE_FIELDS, "pack image")
+    _require(pack_image["image_path"] == admission["relative_image"], "pack image path mismatch")
+    _require(pack_image["image_sha256"] == image_sha256, "pack image digest mismatch")
+    _require(_integer(pack_image["image_size"], "pack image size", minimum=1) == admission["image_path"].stat().st_size, "pack image size mismatch")
+    _nonempty_string(pack_image["code_object_version"], "pack code object version")
+    build = _exact_keys(pack_image["build"], PACK_BUILD_FIELDS, "pack build")
+    for key in ("toolchain_id", "toolchain_revision", "generator_id", "generator_revision"):
+        _nonempty_string(build[key], f"pack build {key}")
+    _require_digest(build["command_sha256"], "pack build command digest")
+
+    entries = pack_record["entries"]
+    _require(isinstance(entries, list) and len(entries) == 1, "pack must contain one entry")
+    entry = _exact_keys(entries[0], PACK_ENTRY_FIELDS, "pack entry")
+    _require(entry["symbol"] == "linear_wmma_f16", "pack entry symbol mismatch")
+    _require(_integer(entry["descriptor_offset"], "pack descriptor offset") == _integer(admission["descriptor"]["descriptor_offset"], "descriptor offset"), "pack descriptor offset mismatch")
+    _require(_integer(entry["entry_offset"], "pack entry offset") == _integer(admission["descriptor"]["entry_offset"], "descriptor entry offset"), "pack entry offset mismatch")
+    _require_digest(entry["pack_sha256"], "entry pack digest")
+    entry_kernargs = _exact_keys(entry["kernargs"], frozenset({"bytes", "tail_padding_bytes", "fields"}), "pack kernargs")
+    _require(entry_kernargs["bytes"] == admission["kernarg"]["bytes"], "pack kernarg bytes mismatch")
+    _require(entry_kernargs["tail_padding_bytes"] == admission["kernarg"]["tail_padding_bytes"], "pack kernarg tail padding mismatch")
+    _require(entry_kernargs["fields"] == admission["kernarg"]["fields"], "pack kernarg fields mismatch")
+    entry_resources = _exact_keys(entry["resources"], PACK_ENTRY_RESOURCE_FIELDS, "pack resources")
+    for key in entry_resources:
+        if key == "wave_size":
+            _require(entry_resources[key] == WAVE_SIZE, "pack wave resource mismatch")
+        else:
+            _require(entry_resources[key] == admission["resources"].get(key), f"pack resource {key} mismatch")
+    geometry = _exact_keys(entry["geometry"], PACK_GEOMETRY_FIELDS, "pack geometry")
+    _require(geometry["shape_family"] == "f2-linear-gate-up-f16-v1", "pack shape family mismatch")
+    _require(geometry["geometry_rule"] == "f2-wmma-64x64-m-tail-v1", "pack geometry rule mismatch")
+    _require(geometry["workgroup"] == [128, 4, 1], "pack workgroup mismatch")
+    _require(geometry["grid_tile"] == [64, 64], "pack grid tile mismatch")
+
+    compatibility = _exact_keys(pack_record["compatibility"], PACK_COMPAT_FIELDS, "pack compatibility")
+    _require(compatibility["input_dtype"] == "fp16" and compatibility["weight_dtype"] == "fp16" and compatibility["output_dtype"] == "fp16", "pack dtype compatibility mismatch")
+    _require(compatibility["source_tensor_layout_version"] == SOURCE_LAYOUT_VERSION, "pack source layout version mismatch")
+    _require(compatibility["weight_packing_version"] == PHYSICAL_LAYOUT_VERSION, "pack physical layout version mismatch")
+    shape = _exact_keys(compatibility["shape_family"], PACK_SHAPE_FIELDS, "pack shape family")
+    _require(shape["name"] == "f2-linear-gate-up-f16-v1", "pack shape name mismatch")
+    _require(shape["fixed_dimensions"] == {"K": 2048, "N": 8192}, "pack fixed dimensions mismatch")
+    runtime = _exact_keys(shape["runtime_dimension"], PACK_RUNTIME_DIM_FIELDS, "pack runtime dimension")
+    _require(runtime == {"name": "M", "min_value": 1, "max_value": 128, "full_value": 128}, "pack runtime dimension mismatch")
+    _require(shape["tail_policy"] == "masked/padded", "pack tail policy mismatch")
+    _require(shape["geometry_rule"] == "f2-wmma-64x64-m-tail-v1", "pack shape geometry mismatch")
+
+    numerics = _exact_keys(pack_record["numerics"], PACK_NUMERICS_FIELDS, "pack numerics")
+    _require(numerics == {"policy": "F2_WMMA_FP16_FP32_ACC_SINGLE_CAST_V1", "accumulator": "fp32", "output_cast": "fp16"}, "pack numerical policy mismatch")
+
+    evidence = _exact_keys(pack_record["evidence"], frozenset({"layout_proof"}), "pack evidence")
+    layout_ref = _exact_keys(evidence["layout_proof"], EVIDENCE_FIELDS, "pack layout evidence")
+    _require(
+        layout_ref["record_kind"] == RECORD_KIND and layout_ref["evidence_slot"] == EVIDENCE_SLOT,
+        "pack layout evidence kind mismatch",
+    )
+    record_path = _nonempty_string(layout_ref["record_path"], "pack layout evidence path")
+    _require(record_path == RECORD_PATH, "pack layout evidence path mismatch")
+
+    record_id = _nonempty_string(layout_ref["record_id"], "pack layout evidence id")
+    _require(record_id == RECORD_ID, "pack layout evidence id mismatch")
+    _require(layout_ref["subject_target"] == TARGET and layout_ref["image_sha256"] == image_sha256, "pack layout evidence target/image mismatch")
+    _require(layout_ref["producer_kind"] == "", "pack layout evidence producer mismatch")
+    for key in EVIDENCE_FIELDS - {"producer_kind"}:
+        if key in {"record_path", "record_kind", "evidence_slot", "record_id", "subject_target", "image_sha256"}:
+            continue
+        _require_digest(layout_ref[key], f"pack layout evidence {key}")
+
+    computed_pack_sha256 = _pack_sha256(pack_record)
+    _require(layout_ref["pack_sha256"] == computed_pack_sha256, "pack layout evidence digest is not bound to the pack")
+    _require_digest(pack_record["pack_sha256"], "pack digest field")
+    return computed_pack_sha256
+
+
+def _expected_mapping() -> dict[str, str]:
+    return {
+        "source_element": "source_weight[n*K+k]",
+        "physical_byte_offset": "((((n // 16) * 128 + (k // 16)) * 512) + (((k % 16) * 16 + (n % 16)) * 2))",
+        "b_tile": "tile_n=n//16,tile_k=k//16,row=k%16,col=n%16",
+        "lds_byte_offset": "((k % 16) * 16 + (n % 16)) * 2",
+    }
+
+
+def _expected_strides() -> dict[str, int]:
+    return {
+        "source_row_stride_elements": 2048,
+        "physical_tile_stride_bytes": 512,
+        "lds_tile_stride_bytes": 512,
+        "tile_n_count": 512,
+        "tile_k_count": 128,
+    }
+
+
+def _validate_fixture_archive(path: Path) -> None:
+    _require(path.is_file() and not path.is_dir(), "inverse fixture is missing")
+    expected_members = {f"{name}.npy" for name in FIXTURE_FIELDS}
+    expected_dtypes = {
+        "source_n.npy": np.dtype("uint32"),
+        "source_k.npy": np.dtype("uint32"),
+        "source_f16.npy": np.dtype("uint16"),
+        "physical_f16.npy": np.dtype("uint16"),
+        "physical_byte_offset.npy": np.dtype("uint64"),
+        "b_tile_offset.npy": np.dtype("uint32"),
+        "lds_byte_offset.npy": np.dtype("uint32"),
+    }
+    try:
+        with zipfile.ZipFile(path, "r") as archive:
+            infos = archive.infolist()
+            names = [info.filename for info in infos]
+            _require(
+                len(names) == len(expected_members) and set(names) == expected_members,
+                "inverse fixture ZIP members are unknown, missing, or duplicated",
+            )
+            total_size = 0
+            for info in infos:
+                _require(not info.is_dir(), "inverse fixture ZIP contains a directory member")
+                _require(info.file_size <= FIXTURE_MEMBER_LIMIT_BYTES, "inverse fixture ZIP member exceeds the 64 KiB bound")
+                _require(info.compress_size <= FIXTURE_MEMBER_LIMIT_BYTES, "inverse fixture ZIP member is too large")
+                total_size += info.file_size
+            _require(total_size <= len(expected_members) * FIXTURE_MEMBER_LIMIT_BYTES, "inverse fixture ZIP exceeds the total size bound")
+
+            for info in infos:
+                try:
+                    with archive.open(info, "r") as member:
+                        version = np.lib.format.read_magic(member)
+                        if version == (1, 0):
+                            shape, fortran_order, dtype = np.lib.format.read_array_header_1_0(member)
+                        elif version == (2, 0):
+                            shape, fortran_order, dtype = np.lib.format.read_array_header_2_0(member)
+                        else:
+                            _fail(f"inverse fixture member {info.filename} has an unsupported NPY version")
+                except (OSError, EOFError, ValueError, TypeError, UnicodeError) as exc:
+                    _fail(f"inverse fixture member {info.filename} header is invalid: {exc}")
+                _require(tuple(shape) == (7,), f"inverse fixture member {info.filename} has an invalid shape")
+                _require(not fortran_order, f"inverse fixture member {info.filename} is not C-contiguous")
+                _require(np.dtype(dtype) == expected_dtypes[info.filename], f"inverse fixture member {info.filename} has an invalid dtype")
+    except ProofError:
+        raise
+    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile) as exc:
+        _fail(f"inverse fixture ZIP cannot be inspected: {exc}")
+def _decode_physical_inverse(
+    physical_byte_offset: np.ndarray,
+    physical_f16: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    decoded_n: list[int] = []
+    decoded_k: list[int] = []
+    decoded_f16: list[int] = []
+    for offset, value in zip(physical_byte_offset, physical_f16, strict=True):
+        offset_int = int(offset)
+        _require(offset_int % 2 == 0, "inverse physical byte offset is not F16 aligned")
+        tile_index, tile_byte_offset = divmod(offset_int, 512)
+        _require(tile_index < 512 * 128, "inverse physical tile index is out of bounds")
+        inner_index, inner_remainder = divmod(tile_byte_offset, 2)
+        _require(inner_remainder == 0 and inner_index < 16 * 16, "inverse physical tile offset is out of bounds")
+        tile_n, tile_k = divmod(tile_index, 128)
+        row, col = divmod(inner_index, 16)
+        decoded_n.append(tile_n * 16 + col)
+        decoded_k.append(tile_k * 16 + row)
+        decoded_f16.append(int(value))
+    return (
+        np.asarray(decoded_n, dtype=np.uint32),
+        np.asarray(decoded_k, dtype=np.uint32),
+        np.asarray(decoded_f16, dtype=np.uint16),
+    )
+
+
+def _validate_layout(spec: dict[str, Any], args: argparse.Namespace, fixture_path: Path, cwd: Path) -> tuple[dict[str, Any], str, str]:
+    _require(spec["source_tensor_layout_version"] == args.source_layout_version == SOURCE_LAYOUT_VERSION, "layout source version mismatch")
+    _require(spec["physical_layout_version"] == args.physical_layout_version == PHYSICAL_LAYOUT_VERSION, "layout physical version mismatch")
+    _require(_integer(spec["schema_version"], "layout schema version") == 1, "layout schema version mismatch")
+    _require(spec["spec_id"] == SPEC_ID, "layout spec identifier mismatch")
+    _require(spec["target"] == TARGET, "layout target mismatch")
+    _require(_integer(spec["wave_size"], "layout wave size") == WAVE_SIZE, "layout wave size mismatch")
+    _require(spec["instruction"] == WMMA_INSTRUCTION, "layout WMMA instruction mismatch")
+    shape = _exact_keys(spec["shape"], frozenset({"N", "K", "tile_n", "tile_k", "element_bytes"}), "layout shape")
+    _require(shape == {"N": 8192, "K": 2048, "tile_n": 16, "tile_k": 16, "element_bytes": 2}, "layout shape mismatch")
+    _require(spec["layout_origin"] in {"pinned_header", "reviewed_local_v1"}, "layout origin is not reviewed")
+    mapping = _exact_keys(spec["layout_mapping"], frozenset(_expected_mapping()), "layout mapping")
+    _require(mapping == _expected_mapping(), "layout mapping mismatch")
+    strides = _exact_keys(spec["layout_strides"], frozenset(_expected_strides()), "layout strides")
+    _require(strides == _expected_strides(), "layout strides mismatch")
+    _require(_integer(spec["alignment_bytes"], "layout alignment") == 16, "layout alignment mismatch")
+    _require(_integer(spec["padding_bytes"], "layout padding", minimum=0) == 0, "layout padding mismatch")
+    _require(spec["swizzle"] == "none", "layout swizzle mismatch")
+
+    source_digests, _ = _load_sources(args, spec)
+    _validate_tool_inputs(spec)
+    image_sha256, admission = _validate_admission(spec, args, cwd)
+    pack_sha256 = _validate_pack(spec.get("pack_record"), admission, image_sha256)
+
+    _validate_fixture_archive(fixture_path)
+    fixture_sha256 = _file_sha256(fixture_path, "inverse fixture")
+    try:
+        with np.load(fixture_path, allow_pickle=False) as loaded:
+            _require(frozenset(loaded.files) == FIXTURE_FIELDS, "inverse fixture has unknown or missing arrays")
+            arrays = {name: np.array(loaded[name], copy=True) for name in loaded.files}
+    except (OSError, ValueError, TypeError) as exc:
+        _fail(f"inverse fixture cannot be loaded: {exc}")
+
+    dtypes = {
+        "source_n": np.dtype("uint32"),
+        "source_k": np.dtype("uint32"),
+        "source_f16": np.dtype("uint16"),
+        "physical_f16": np.dtype("uint16"),
+        "physical_byte_offset": np.dtype("uint64"),
+        "b_tile_offset": np.dtype("uint32"),
+        "lds_byte_offset": np.dtype("uint32"),
+    }
+    length: int | None = None
+    for name, dtype in dtypes.items():
+        array = arrays[name]
+        _require(array.ndim == 1 and array.dtype == dtype, f"inverse fixture array {name} has wrong shape or dtype")
+        if length is None:
+            length = int(array.size)
+        _require(array.size == length and array.size > 0, "inverse fixture arrays have inconsistent lengths")
+    assert length is not None
+    expected_source_n = np.asarray(FROZEN_SOURCE_N, dtype=np.uint32)
+    expected_source_k = np.asarray(FROZEN_SOURCE_K, dtype=np.uint32)
+    expected_source_f16 = np.asarray(FROZEN_SOURCE_F16, dtype=np.uint16)
+    _require(np.array_equal(arrays["source_n"], expected_source_n), "inverse fixture frozen coordinate set mismatch")
+    _require(np.array_equal(arrays["source_k"], expected_source_k), "inverse fixture frozen coordinate set mismatch")
+    _require(np.array_equal(arrays["source_f16"], expected_source_f16), "inverse fixture value round trip mismatch")
+
+    source_n = arrays["source_n"]
+    source_k = arrays["source_k"]
+    _require(bool(np.all(source_n < 8192)) and bool(np.all(source_k < 2048)), "inverse fixture source coordinate is out of bounds")
+    expected_physical = np.asarray(
+        [
+            (((int(n) // 16) * 128 + (int(k) // 16)) * 512)
+            + (((int(k) % 16) * 16 + (int(n) % 16)) * 2)
+            for n, k in zip(source_n, source_k, strict=True)
+        ],
+        dtype=np.uint64,
+    )
+    expected_tile = np.asarray(
+        [((int(k) % 16) * 16 + (int(n) % 16)) * 2 for n, k in zip(source_n, source_k, strict=True)],
+        dtype=np.uint32,
+    )
+    _require(np.array_equal(arrays["physical_byte_offset"], expected_physical), "inverse round trip physical byte offset mismatch")
+    _require(np.array_equal(arrays["b_tile_offset"], expected_tile), "inverse round trip B tile mismatch")
+    _require(np.array_equal(arrays["lds_byte_offset"], expected_tile), "inverse round trip LDS offset mismatch")
+    decoded_n, decoded_k, decoded_source_f16 = _decode_physical_inverse(
+        arrays["physical_byte_offset"],
+        arrays["physical_f16"],
+    )
+    _require(np.array_equal(decoded_n, source_n), "inverse decoded N coordinate mismatch")
+    _require(np.array_equal(decoded_k, source_k), "inverse decoded K coordinate mismatch")
+    _require(np.array_equal(decoded_source_f16, arrays["source_f16"]), "inverse decoded physical value mismatch")
+
+    def array_digest(names: Iterable[str]) -> str:
+        digest = hashlib.sha256()
+        for name in names:
+            array = np.ascontiguousarray(arrays[name])
+            digest.update(name.encode("ascii"))
+            digest.update(b"\0")
+            digest.update(array.dtype.str.encode("ascii"))
+            digest.update(b"\0")
+            digest.update(str(tuple(array.shape)).encode("ascii"))
+            digest.update(b"\0")
+            digest.update(array.tobytes(order="C"))
+        return digest.hexdigest()
+
+    inverse_input_digest = array_digest(("source_n", "source_k", "source_f16"))
+    inverse_output_digest = array_digest(("physical_byte_offset", "physical_f16", "b_tile_offset", "lds_byte_offset"))
+    input_digest = hashlib.sha256(
+        _canonical_json(
+            {
+                "source_layout_version": SOURCE_LAYOUT_VERSION,
+                "physical_layout_version": PHYSICAL_LAYOUT_VERSION,
+                "source_digests": source_digests,
+                "layout_spec_sha256": _file_sha256(Path(args.layout_spec), "layout spec"),
+                "inverse_fixture_sha256": fixture_sha256,
+                "image_sha256": image_sha256,
+            }
+        )
+    ).hexdigest()
+    output_digest = hashlib.sha256(
+        _canonical_json(
+            {
+                "layout_mapping": mapping,
+                "layout_strides": strides,
+                "inverse_fixture_input_digest": inverse_input_digest,
+                "inverse_fixture_output_digest": inverse_output_digest,
+            }
+        )
+    ).hexdigest()
+    result = {
+        "source_tensor_layout_version": SOURCE_LAYOUT_VERSION,
+        "physical_layout_version": PHYSICAL_LAYOUT_VERSION,
+        "layout_spec_path": _relative_path(Path(args.layout_spec), cwd),
+        "layout_spec_sha256": _file_sha256(Path(args.layout_spec), "layout spec"),
+        "inverse_fixture_path": _relative_path(fixture_path, cwd),
+        "inverse_fixture_sha256": fixture_sha256,
+        "layout_mapping": mapping,
+        "layout_strides": strides,
+        "alignment_bytes": 16,
+        "padding_bytes": 0,
+        "swizzle": "none",
+        "layout_origin": spec["layout_origin"],
+        "inverse_fixture_input_digest": inverse_input_digest,
+        "inverse_fixture_output_digest": inverse_output_digest,
+        "inverse_n": [int(value) for value in decoded_n],
+        "inverse_k": [int(value) for value in decoded_k],
+        "inverse_source_f16": [int(value) for value in decoded_source_f16],
+        "layout_status": "pass",
+        "failure_stage": "none",
+        "exit_status": 0,
+        "wrapper_exit_status": 0,
+    }
+    return result, pack_sha256, input_digest + output_digest
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="f2-wmma-layout-proof",
+        description="Verify the versioned F2 WMMA physical layout and offline admission record.",
+        allow_abbrev=False,
+    )
+    parser.add_argument("--source-layout-version", required=True)
+    parser.add_argument("--physical-layout-version", required=True)
+    parser.add_argument("--rocwmma-source", action="append", required=True)
+    parser.add_argument("--rocwmma-symbols", required=True)
+    parser.add_argument("--aiter-source", required=True)
+    parser.add_argument("--calculator-source", required=True)
+    parser.add_argument("--local-source", required=True)
+    parser.add_argument("--source-pin-record", required=True)
+    parser.add_argument("--resource-report", required=True)
+    parser.add_argument("--isa-report", required=True)
+    parser.add_argument("--layout-spec", required=True)
+    parser.add_argument("--inverse-fixture", required=True)
+    parser.add_argument("--output", required=True)
+    return parser
+
+
+def _atomic_write(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(value, stream, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def _remove_output(path_string: str) -> None:
+    try:
+        Path(path_string).unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    output_path = Path(args.output)
+    try:
+        spec_path = Path(args.layout_spec)
+        fixture_path = Path(args.inverse_fixture)
+        _require(spec_path.is_file() and not spec_path.is_dir(), "layout spec is missing")
+        spec = _read_json(spec_path, "layout spec")
+        _require(frozenset(spec) == SPEC_FIELDS, "layout spec has unknown or missing fields")
+        layout, pack_sha256, digest_pair = _validate_layout(spec, args, fixture_path, Path.cwd())
+        input_digest, output_digest = digest_pair[:64], digest_pair[64:]
+        tool_digest = _file_sha256(Path(__file__), "proof tool")
+        proof: dict[str, Any] = {
+            "record_path": _relative_path(output_path, Path.cwd()),
+            "record_kind": RECORD_KIND,
+            "evidence_slot": EVIDENCE_SLOT,
+            "record_id": RECORD_ID,
+            "record_sha256": "",
+            "subject_target": TARGET,
+            "image_sha256": spec["admission_record"]["image"]["sha256"],
+            "pack_sha256": pack_sha256,
+            "producer_kind": "",
+            "tool_digest": tool_digest,
+            "input_digest": input_digest,
+            "output_digest": output_digest,
+            **layout,
+        }
+        proof["record_sha256"] = _canonical_record_sha256(proof)
+        _atomic_write(output_path, proof)
+        return 0
+    except ProofError as exc:
+        _remove_output(str(output_path))
+        print(f"f2-wmma-layout-proof: {exc}", file=sys.stderr)
+        return 1
+    except (OSError, TypeError, ValueError, UnicodeError) as exc:
+        _remove_output(str(output_path))
+        print(f"f2-wmma-layout-proof: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

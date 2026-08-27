@@ -23,6 +23,7 @@ def compile_catalog_probe(tmp_path: Path) -> Path:
 #include <vector>
 
 #include "kernel_catalog.h"
+#include "kernel_pack.h"
 
 namespace {
 
@@ -75,6 +76,43 @@ int main() {
           "upper-case-digest",
           "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF")})) {
     return 7;
+  }
+  constexpr const char* kLlamaNames[] = {
+      "llama_k_projection_f16",
+      "llama_v_projection_f16",
+      "llama_rmsnorm_f16",
+      "llama_rmsnorm_zero_store_f16",
+      "llama_rmsnorm_epsilon_arithmetic_f16",
+      "llama_rope_kv_f16",
+      "llama_causal_attention_score_f16",
+      "llama_causal_attention_softmax_f32",
+      "llama_causal_attention_context_f16",
+      "llama_o_projection_f16",
+      "llama_gated_mlp_f16",
+      "llama_gate_up_projection_f16",
+      "llama_mlp_down_f16",
+  };
+  const native_r9700::KernelPackSpan<native_r9700::KernelPackRecord> packs =
+      native_r9700::llama_kernel_pack_records();
+  if (packs.data == nullptr || packs.size != sizeof(kLlamaNames) / sizeof(kLlamaNames[0])) {
+    return 9;
+  }
+  for (std::size_t index = 0; index < packs.size; ++index) {
+    if (packs.data[index].identity.schema_version != 1 ||
+        packs.data[index].identity.name != kLlamaNames[index] ||
+        packs.data[index].identity.version != "1.0.0" ||
+        packs.data[index].entries.size != 1 ||
+        packs.data[index].entries.data == nullptr ||
+        packs.data[index].entries.data[0].symbol != kLlamaNames[index]) {
+      return 10;
+    }
+    for (std::size_t prior = 0; prior < index; ++prior) {
+      if (packs.data[prior].identity.name == packs.data[index].identity.name ||
+          packs.data[prior].entries.data[0].symbol ==
+              packs.data[index].entries.data[0].symbol) {
+        return 11;
+      }
+    }
   }
   if (native_r9700::find_kernel("not-a-catalog-kernel") != nullptr) return 8;
   return 0;

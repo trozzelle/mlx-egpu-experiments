@@ -14,6 +14,7 @@ import json
 import math
 import shlex
 import sys
+import statistics
 import time
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
@@ -213,6 +214,7 @@ def benchmark_row_from_serving_result(
     row = {
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "prompt_name": str(result.get("prompt_name") or "request"),
+        "request_id": str(result.get("request_id") or ""),
         "prompt_tokens": _token_count_from_entry(result),
         "producer_kind": producer_kind,
         "gate_result": str(result.get("gate_result") or result.get("status") or ""),
@@ -344,6 +346,38 @@ def render_benchmark_report(result: Mapping[str, Any]) -> str:
             )
         )
     lines.append("")
+    aggregates = [
+        row
+        for row in rows
+        if isinstance(row, Mapping) and row.get("record_kind") == "scope_aggregate"
+    ]
+    if aggregates:
+        lines.extend(
+            [
+                f"raw_warm_sample_count: {result.get('raw_warm_sample_count', 0)}",
+                f"scope_aggregate_count: {result.get('scope_aggregate_count', 0)}",
+                f"records_by_scope: {_format_log_value(result.get('records_by_scope', {}))}",
+                f"total_record_count: {result.get('total_record_count', 0)}",
+                "",
+                "| Scope | Samples | Median sec | MAD sec | Minimum sec | Maximum sec | Warm-up |",
+                "|---|---:|---:|---:|---:|---:|---|",
+            ]
+        )
+        for aggregate in aggregates:
+            lines.append(
+                "| {scope} | {count} | {median} | {mad} | {minimum} | {maximum} | {warmup} |".format(
+                    scope=aggregate.get("scope", ""),
+                    count=aggregate.get("aggregate_sample_count", ""),
+                    median=aggregate.get("aggregate_median_elapsed_sec", ""),
+                    mad=aggregate.get(
+                        "aggregate_median_absolute_deviation_sec", ""
+                    ),
+                    minimum=aggregate.get("aggregate_minimum_elapsed_sec", ""),
+                    maximum=aggregate.get("aggregate_maximum_elapsed_sec", ""),
+                    warmup=aggregate.get("warm_up_policy", ""),
+                )
+            )
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -368,6 +402,10 @@ def write_benchmark_log(path: str | Path, result: Mapping[str, Any]) -> None:
         ("status", result.get("status")),
         ("exit_status", result.get("exit_status")),
         ("error", result.get("error")),
+        ("raw_warm_sample_count", result.get("raw_warm_sample_count")),
+        ("scope_aggregate_count", result.get("scope_aggregate_count")),
+        ("records_by_scope", result.get("records_by_scope")),
+        ("total_record_count", result.get("total_record_count")),
     ]
     rows = result.get("rows") if isinstance(result.get("rows"), list) else []
     for row in rows:
@@ -376,6 +414,10 @@ def write_benchmark_log(path: str | Path, result: Mapping[str, Any]) -> None:
         lines.extend(
             [
                 ("prompt_name", row.get("prompt_name")),
+                ("request_id", row.get("request_id")),
+                ("record_kind", row.get("record_kind")),
+                ("scope", row.get("scope")),
+                ("aggregate_identity", row.get("aggregate_identity")),
                 ("row_role", row.get("row_role")),
                 ("producer_kind", row.get("producer_kind")),
                 ("gate_result", row.get("gate_result")),
@@ -399,7 +441,203 @@ def _iter_serving_rows(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
         return [_as_mapping(row, "rows[]") for row in payload["rows"]]
     if isinstance(payload.get("prompt_results"), list):
         return [_as_mapping(row, "prompt_results[]") for row in payload["prompt_results"]]
+    if isinstance(payload.get("samples"), list):
+        return [_as_mapping(row, "samples[]") for row in payload["samples"]]
     return [payload]
+
+
+def _positive_timing_stats(scope: str, values: Sequence[float]) -> dict[str, Any]:
+    if not values or any(not math.isfinite(value) or value <= 0 for value in values):
+        raise BenchmarkError(f"{scope} timing samples must be finite and positive")
+    median_elapsed = float(statistics.median(values))
+    absolute_deviations = [abs(value - median_elapsed) for value in values]
+    return {
+        "aggregate_sample_count": len(values),
+        "aggregate_median_elapsed_sec": median_elapsed,
+        "aggregate_median_absolute_deviation_sec": float(
+            statistics.median(absolute_deviations)
+        ),
+        "aggregate_minimum_elapsed_sec": min(values),
+        "aggregate_maximum_elapsed_sec": max(values),
+    }
+
+
+def _aggregate_native_row(
+    scope: str,
+    rows: Sequence[Mapping[str, Any]],
+    elapsed_values: Sequence[float],
+    *,
+    source_request_ids: Sequence[str],
+) -> dict[str, Any]:
+    if len(rows) != len(source_request_ids):
+        raise BenchmarkError(f"{scope} aggregate source identities are invalid")
+    aggregate = dict(rows[0])
+    for field_name in _TIMING_FIELDS:
+        aggregate[field_name] = float(
+            statistics.median(float(row[field_name]) for row in rows)
+        )
+    for field_name in _TRANSFER_BYTE_FIELDS:
+        median_bytes = float(
+            statistics.median(int(row[field_name]) for row in rows)
+        )
+        if not median_bytes.is_integer():
+            raise BenchmarkError(f"{scope} aggregate transfer median is not integral")
+        aggregate[field_name] = int(median_bytes)
+
+    stats = _positive_timing_stats(scope, elapsed_values)
+    median_elapsed = stats["aggregate_median_elapsed_sec"]
+    if scope == "cold_process":
+        aggregate["total_elapsed_sec"] = median_elapsed
+        aggregate["tokens_per_sec_end_to_end"] = (
+            aggregate["prompt_tokens"] / median_elapsed
+        )
+    elif scope == "warm_prefill":
+        aggregate["prefill_elapsed_sec"] = median_elapsed
+        prefix_tokens = aggregate["prompt_tokens"] - 1
+        if prefix_tokens <= 0:
+            raise BenchmarkError("warm_prefill aggregate prefix length is invalid")
+        aggregate["tokens_per_sec_prefill"] = prefix_tokens / median_elapsed
+    elif scope == "gpu_compute":
+        aggregate["kernel_elapsed_usec"] = median_elapsed * 1_000_000.0
+
+    aggregate.update(
+        {
+            "scope": scope,
+            "record_kind": "scope_aggregate",
+            "aggregate_identity": f"{scope}_median_mad_v1",
+            "warm_up_policy": "none; all measured samples included",
+            "source_request_ids": list(source_request_ids),
+            **stats,
+        }
+    )
+    validate_benchmark_row(aggregate)
+    return aggregate
+
+
+def _has_persistent_worker_result(
+    serving_result_paths: Sequence[str | Path],
+) -> bool:
+    return any(
+        _load_json(path).get("schema_version") == "r9700_native_worker_v1"
+        for path in serving_result_paths
+    )
+
+
+def scope_aggregates_from_serving_results(
+    serving_result_paths: Sequence[str | Path],
+    *,
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    worker_payloads: list[Mapping[str, Any]] = []
+    for path in serving_result_paths:
+        payload = _load_json(path)
+        if payload.get("schema_version") == "r9700_native_worker_v1":
+            worker_payloads.append(payload)
+    if len(worker_payloads) != 1:
+        raise BenchmarkError(
+            "native promotion requires exactly one persistent warm worker result"
+        )
+    payload = worker_payloads[0]
+    samples = payload.get("samples")
+    metrics = payload.get("metrics")
+    expected_operations = ["LoadModel", *["Prefill"] * 10, "UnloadModel"]
+    if (
+        payload.get("mode") != "warm"
+        or payload.get("producer_kind") != R9700_NATIVE_PRODUCER_KIND
+        or payload.get("status") != "pass"
+        or payload.get("exit_status") != 0
+        or payload.get("operations") != expected_operations
+        or payload.get("sample_count") != 10
+        or payload.get("raw_warm_sample_count") != 10
+        or not isinstance(samples, list)
+        or len(samples) != 10
+        or not isinstance(metrics, Mapping)
+        or metrics.get("cold_process_sample_count") != 1
+        or metrics.get("load_preparation_count") != 1
+        or metrics.get("prefill_count") != 10
+        or metrics.get("warm_prefill_weight_reload_count") != 0
+    ):
+        raise BenchmarkError("persistent warm worker scope evidence is invalid")
+
+    for row in rows:
+        validate_benchmark_row(row)
+
+    cold_value = metrics.get("cold_process_elapsed_sec")
+    if isinstance(cold_value, bool):
+        raise BenchmarkError("cold_process timing sample is invalid")
+    try:
+        cold_values = [float(cold_value)]
+    except (TypeError, ValueError) as exc:
+        raise BenchmarkError("cold_process timing sample is invalid") from exc
+
+    request_ids: list[str] = []
+    warm_values: list[float] = []
+    gpu_values: list[float] = []
+    for sample in samples:
+        row = _as_mapping(sample, "samples[]")
+        request_id = row.get("request_id")
+        comparison = row.get("comparison")
+        if (
+            not isinstance(request_id, str)
+            or not request_id
+            or request_id in request_ids
+            or row.get("prompt_name") != "prompt-128"
+            or row.get("S", row.get("prompt_token_count")) != 129
+            or row.get("N") != 128
+            or row.get("producer_kind") != R9700_NATIVE_PRODUCER_KIND
+            or row.get("route") != "native_producer"
+            or row.get("accepted_cache") is not True
+            or bool(row.get("fallback_reason"))
+            or not isinstance(comparison, Mapping)
+            or comparison.get("exact_match") is not True
+        ):
+            raise BenchmarkError("persistent warm sample identity is invalid")
+        request_ids.append(request_id)
+        try:
+            warm_values.append(float(row["prefill_elapsed_sec"]))
+            gpu_values.append(float(row["kernel_elapsed_usec"]) / 1_000_000.0)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise BenchmarkError("persistent warm sample timing is invalid") from exc
+
+    request_id_set = set(request_ids)
+    worker_rows = [
+        row for row in rows if row.get("request_id") in request_id_set
+    ]
+    if [row.get("request_id") for row in worker_rows] != request_ids:
+        raise BenchmarkError("persistent warm benchmark row identities are invalid")
+
+    aggregate_records = [
+        _aggregate_native_row(
+            "cold_process",
+            worker_rows[:1],
+            cold_values,
+            source_request_ids=request_ids[:1],
+        ),
+        _aggregate_native_row(
+            "warm_prefill",
+            worker_rows,
+            warm_values,
+            source_request_ids=request_ids,
+        ),
+        _aggregate_native_row(
+            "gpu_compute",
+            worker_rows,
+            gpu_values,
+            source_request_ids=request_ids,
+        ),
+    ]
+    return {
+        "raw_warm_sample_count": len(samples),
+        "scope_aggregate_count": len(aggregate_records),
+        "records_by_scope": {
+            "cold_process": 1,
+            "warm_prefill": len(samples) + 1,
+            "gpu_compute": 1,
+        },
+        "total_record_count": len(samples) + len(aggregate_records),
+        "scope_aggregate_records": aggregate_records,
+        "raw_request_ids": request_ids,
+    }
 
 
 def load_benchmark_rows(
@@ -431,9 +669,54 @@ def build_benchmark_result(
     producer_kind: str,
     command: str,
     started: float | None = None,
+    scope_evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    validate_benchmark_rows(rows, require_native=producer_kind == R9700_NATIVE_PRODUCER_KIND)
-    native_rows = [row for row in rows if row.get("producer_kind") == R9700_NATIVE_PRODUCER_KIND]
+    validate_benchmark_rows(
+        rows, require_native=producer_kind == R9700_NATIVE_PRODUCER_KIND
+    )
+    result_rows = [dict(row) for row in rows]
+    if scope_evidence is not None:
+        scope_fields = dict(scope_evidence)
+        aggregate_records = scope_fields.pop("scope_aggregate_records", None)
+        raw_request_ids = scope_fields.pop("raw_request_ids", None)
+        if (
+            not isinstance(aggregate_records, Sequence)
+            or len(aggregate_records) != 3
+            or not isinstance(raw_request_ids, Sequence)
+            or len(raw_request_ids) != 10
+        ):
+            raise BenchmarkError("scope aggregate records are invalid")
+        raw_request_id_set = set(raw_request_ids)
+        result_rows = [
+            (
+                {
+                    **row,
+                    "scope": "warm_prefill",
+                    "record_kind": "raw_sample",
+                    "aggregate_identity": None,
+                }
+                if row.get("request_id") in raw_request_id_set
+                else row
+            )
+            for row in result_rows
+        ]
+        result_rows.extend(dict(row) for row in aggregate_records)
+        validate_benchmark_rows(
+            result_rows,
+            require_native=producer_kind == R9700_NATIVE_PRODUCER_KIND,
+        )
+    else:
+        scope_fields = {
+            "raw_warm_sample_count": len(result_rows),
+            "scope_aggregate_count": 0,
+            "records_by_scope": {},
+            "total_record_count": len(result_rows),
+        }
+    native_rows = [
+        row
+        for row in result_rows
+        if row.get("producer_kind") == R9700_NATIVE_PRODUCER_KIND
+    ]
     started = time.time() if started is None else started
     gate_result = "pass" if native_rows else "baseline"
     return {
@@ -448,9 +731,10 @@ def build_benchmark_result(
         "report_path": report_path,
         "log_path": log_path,
         "command": command,
-        "rows": [dict(row) for row in rows],
-        "row_count": len(rows),
+        "rows": result_rows,
+        "row_count": len(result_rows),
         "native_row_count": len(native_rows),
+        **scope_fields,
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
         "ended_at_utc": datetime.now(timezone.utc).isoformat(),
         "duration_ms": int((time.time() - started) * 1000),
@@ -474,6 +758,10 @@ def _blocked_result(args: argparse.Namespace, command: str, exc: Exception, star
         "rows": [],
         "row_count": 0,
         "native_row_count": 0,
+        "raw_warm_sample_count": 0,
+        "scope_aggregate_count": 0,
+        "records_by_scope": {},
+        "total_record_count": 0,
         "error": {"type": exc.__class__.__name__, "message": str(exc)},
         "ended_at_utc": datetime.now(timezone.utc).isoformat(),
         "duration_ms": int((time.time() - started) * 1000),
@@ -517,6 +805,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not args.serving_result:
             raise BenchmarkError("benchmark requires at least one --serving-result JSON from accepted C2 serving")
         rows = load_benchmark_rows(args.serving_result, model_dir=args.model, fixtures_dir=args.fixtures_dir)
+        scope_evidence = (
+            scope_aggregates_from_serving_results(
+                args.serving_result,
+                rows=rows,
+            )
+            if (
+                args.producer_kind == R9700_NATIVE_PRODUCER_KIND
+                and _has_persistent_worker_result(args.serving_result)
+            )
+            else None
+        )
         result = build_benchmark_result(
             rows,
             model_dir=args.model,
@@ -528,6 +827,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             producer_kind=args.producer_kind,
             command=command,
             started=started,
+            scope_evidence=scope_evidence,
         )
         write_benchmark_json(args.json, result)
         write_benchmark_report(args.report, result)

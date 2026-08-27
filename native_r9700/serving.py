@@ -1,10 +1,10 @@
-"""C2 mlx-lm serving wrapper for the native R9700 prompt-cache producer.
+"""C2 mlx-lm serving wrapper for native R9700 prompt-cache production.
 
-The wrapper keeps the producer boundary local and reviewable: tokenize a request,
-run the C1 subprocess/file handoff for long prompts, validate the complete C1
-prompt-cache ABI before acceptance, then give mlx-lm only the final prompt token
-plus the imported S-1 cache. Short prompts and pre-acceptance producer/cache
-failures stay on the normal mlx-lm full-prompt path.
+Persistent production serving keeps one public model-service session around
+the complete invocation, validates each imported cache before acceptance, and
+hands mlx-lm only the final prompt token plus the imported S-1 cache. CPU
+reference/legacy subprocess diagnostics remain available only without a
+persistent session.
 """
 
 from __future__ import annotations
@@ -24,6 +24,10 @@ from subprocess import TimeoutExpired
 from typing import Any, Mapping, Optional, Sequence
 
 import numpy as np
+from . import native_worker
+from .model_service import verify_model_identity
+
+
 
 _EXPECTED_NUM_LAYERS = 16
 _EXPECTED_N_KV_HEADS = 8
@@ -33,20 +37,43 @@ _DEFAULT_PRODUCER_TIMEOUT_S = 300
 _DEFAULT_MAX_NEW_TOKENS = 4
 PATH_C2_HEADING = "## Path C2 — mlx-lm imported-cache serving wrapper"
 _SAFE_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_SHA256_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _REDACTED_ARG_VALUE = "<redacted>"
 _SENSITIVE_ARG_FLAGS = frozenset(("--prompt", "--token-ids-json"))
 _CPU_REFERENCE_PRODUCER_KIND = "cpu_reference"
 _R9700_NATIVE_PRODUCER_KIND = "r9700_native"
 _SUPPORTED_PRODUCER_KINDS = (_CPU_REFERENCE_PRODUCER_KIND, _R9700_NATIVE_PRODUCER_KIND)
 _NATIVE_PREFILL_ACCEPTANCE_PASS = "pass"
+_NATIVE_RUNTIME_SUBSTRATE = "TinyGPU.app/APLRemotePCIDevice/PCIIface"
+_NATIVE_COMPLETION_POLICY = "terminal"
+_NATIVE_BARRIER_POLICY = "full"
 _NATIVE_EVIDENCE_KEYS = (
     "producer_kind",
+    "producer_fingerprint",
     "native_prefill_acceptance",
+    "native_prefill_full_layer_loop_status",
+    "runtime_substrate",
     "hardware_log_path",
+    "compute_completion_policy",
+    "compute_barrier_policy",
     "prefill_npz_path",
     "kernel_count",
     "transfer_bytes",
+    "block_tokens",
+    "block_count",
+    "failure_stage",
+    "failure_text",
+    "exit_status",
 )
+
+_PUBLIC_PROTOCOL_VERSION = "r9700_prefill_service_v1"
+_EXPECTED_ROPE_SCALING = {
+    "rope_type": "llama3",
+    "factor": 32.0,
+    "high_freq_factor": 4.0,
+    "low_freq_factor": 1.0,
+    "original_max_position_embeddings": 8192,
+}
 
 
 def _normalize_producer_kind(producer_kind: str) -> str:
@@ -66,6 +93,23 @@ class NativePrefillError(RuntimeError):
     def __init__(self, message: str, *, result: Mapping[str, Any] | None = None):
         super().__init__(message)
         self.result = dict(result) if result is not None else None
+def _verified_native_model_identity(model_uri: os.PathLike[str] | str) -> tuple[str, str]:
+    try:
+        verified = verify_model_identity(os.fspath(model_uri))
+    except Exception as exc:
+        raise NativePrefillError("native model identity verification failed") from exc
+    canonical_uri = getattr(verified, "canonical_uri", None)
+    digest = getattr(verified, "digest", None)
+    if (
+        not isinstance(canonical_uri, str)
+        or not canonical_uri
+        or not isinstance(digest, str)
+        or _SHA256_DIGEST_RE.fullmatch(digest) is None
+    ):
+        raise NativePrefillError(
+            "verified native model identity must contain a canonical URI and sha256 digest"
+        )
+    return canonical_uri, digest
 
 
 @dataclass(frozen=True)
@@ -301,12 +345,89 @@ def _native_prefill_evidence_problems(
     evidence: Mapping[str, Any],
     prefill_path: Path,
     prefill_log_path: Path,
+    *,
+    expected_n_prefix: int | None = None,
+    expected_model: str | None = None,
 ) -> list[str]:
+    """Return fail-closed native evidence problems for one request.
+
+    The legacy one-shot diagnostic caller intentionally keeps its historical
+    minimum checks.  Persistent serving supplies ``expected_n_prefix`` and
+    ``expected_model`` and therefore gets the complete native acceptance
+    contract plus strict request-bound NPZ validation.
+    """
+
     problems: list[str] = []
+    persistent = expected_n_prefix is not None
     if evidence.get("producer_kind") != _R9700_NATIVE_PRODUCER_KIND:
         problems.append("producer_kind=r9700_native")
     if evidence.get("native_prefill_acceptance") != _NATIVE_PREFILL_ACCEPTANCE_PASS:
         problems.append("native_prefill_acceptance=pass")
+
+    if persistent:
+        producer_fingerprint = evidence.get("producer_fingerprint")
+        if not isinstance(producer_fingerprint, str) or not producer_fingerprint:
+            problems.append("producer_fingerprint")
+        if evidence.get("native_prefill_full_layer_loop_status") != _NATIVE_PREFILL_ACCEPTANCE_PASS:
+            problems.append("native_prefill_full_layer_loop_status=pass")
+        if evidence.get("runtime_substrate") != _NATIVE_RUNTIME_SUBSTRATE:
+            problems.append("runtime_substrate")
+        if evidence.get("compute_completion_policy") != _NATIVE_COMPLETION_POLICY:
+            problems.append("compute_completion_policy=terminal")
+        if evidence.get("compute_barrier_policy") != _NATIVE_BARRIER_POLICY:
+            problems.append("compute_barrier_policy=full")
+        if evidence.get("failure_stage") != "none":
+            problems.append("failure_stage=none")
+        if evidence.get("failure_text") != "none":
+            problems.append("failure_text=none")
+
+        for key in ("kernel_count", "transfer_bytes", "block_tokens", "block_count", "exit_status"):
+            value = evidence.get(key)
+            if type(value) is not int or value < 0:
+                problems.append(f"{key}=exact non-negative integer")
+        if type(evidence.get("exit_status")) is int and evidence.get("exit_status") != 0:
+            problems.append("exit_status=0")
+
+        try:
+            n_prefix = int(expected_n_prefix)
+        except (TypeError, ValueError):
+            n_prefix = -1
+            problems.append("expected_n_prefix is an integer")
+        if n_prefix < 0:
+            problems.append("expected_n_prefix is non-negative")
+        elif n_prefix == 0:
+            if evidence.get("kernel_count") != 0:
+                problems.append("kernel_count=0 for N=0")
+            if evidence.get("transfer_bytes") != 0:
+                problems.append("transfer_bytes=0 for N=0")
+            if evidence.get("block_tokens") != 0:
+                problems.append("block_tokens=0 for N=0")
+            if evidence.get("block_count") != 0:
+                problems.append("block_count=0 for N=0")
+        else:
+            if type(evidence.get("kernel_count")) is int and evidence.get("kernel_count") <= 0:
+                problems.append("positive kernel_count for N>0")
+            if type(evidence.get("transfer_bytes")) is int and evidence.get("transfer_bytes") <= 0:
+                problems.append("positive transfer_bytes for N>0")
+            block_tokens = evidence.get("block_tokens")
+            block_count = evidence.get("block_count")
+            if type(block_tokens) is int and block_tokens <= 0:
+                problems.append("positive block_tokens for N>0")
+            if type(block_count) is int and block_count <= 0:
+                problems.append("positive block_count for N>0")
+            if (
+                type(block_tokens) is int
+                and block_tokens > 0
+                and type(block_count) is int
+                and block_count != (n_prefix + block_tokens - 1) // block_tokens
+            ):
+                problems.append("block_count matches N/block_tokens")
+    else:
+        if _evidence_int(evidence, "kernel_count") <= 0:
+            problems.append("nonzero kernel_count")
+        if _evidence_int(evidence, "transfer_bytes") <= 0:
+            problems.append("nonzero transfer_bytes")
+
     reported_hardware_log = str(evidence.get("hardware_log_path") or "")
     if not reported_hardware_log:
         problems.append("hardware_log_path")
@@ -318,25 +439,46 @@ def _native_prefill_evidence_problems(
                 problems.append("hardware_log_path matching requested prefill log")
             elif not hardware_log_path.is_file():
                 problems.append("hardware_log_path exists")
+            elif hardware_log_path.stat().st_size > 1 << 20:
+                problems.append("hardware_log_path is bounded")
             else:
                 hardware_log_path.read_text(encoding="utf-8")
-        except (OSError, RuntimeError, ValueError):
+        except (OSError, RuntimeError, ValueError, UnicodeError):
             problems.append("hardware_log_path is readable")
+
     reported_npz = str(evidence.get("prefill_npz_path") or "")
     if not reported_npz:
         problems.append("prefill_npz_path")
     else:
         try:
-            paths_match = Path(reported_npz).resolve() == prefill_path.resolve()
+            npz_path = Path(reported_npz)
+            paths_match = npz_path.resolve() == prefill_path.resolve()
         except (OSError, RuntimeError, ValueError):
+            npz_path = None
             paths_match = False
         if not paths_match:
             problems.append("prefill_npz_path matching requested output")
-    if _evidence_int(evidence, "kernel_count") <= 0:
-        problems.append("nonzero kernel_count")
-    if _evidence_int(evidence, "transfer_bytes") <= 0:
-        problems.append("nonzero transfer_bytes")
+        elif npz_path is None or not npz_path.is_file():
+            problems.append("prefill_npz_path exists")
+        elif persistent and expected_model is not None:
+            try:
+                npz_problems = native_worker.validate_native_prefill_npz(
+                    npz_path,
+                    int(expected_n_prefix),
+                    expected_model,
+                )
+            except Exception:
+                npz_problems = ["unreadable strict NPZ"]
+            if npz_problems:
+                problems.append("prefill_npz_path is a readable strict NPZ")
     return problems
+
+
+def _bounded_native_evidence_detail(problems: Sequence[str]) -> str:
+    detail = "persistent native evidence rejected: " + "; ".join(str(problem) for problem in problems)
+    if len(detail.encode("utf-8", "replace")) <= 2048:
+        return detail
+    return "persistent native evidence rejected"
 
 
 def _add_native_prefill_evidence(result: dict[str, Any], evidence: Mapping[str, Any]) -> None:
@@ -476,6 +618,8 @@ def _require_finite_prompt_cache_array(
 
 
 def _validate_prompt_cache(cache: Sequence[Any], metadata: Mapping[str, Any], n_prefix: int) -> None:
+    if not isinstance(cache, Sequence) or isinstance(cache, (str, bytes, bytearray)):
+        raise NativePrefillError("prompt cache must be an ordered sequence of KVCache layers")
     if not isinstance(metadata, Mapping):
         raise NativePrefillError("prompt cache metadata must be a mapping")
     if _metadata_int(metadata, "offset") != n_prefix:
@@ -508,6 +652,8 @@ def _validate_prompt_cache(cache: Sequence[Any], metadata: Mapping[str, Any], n_
             raise NativePrefillError(f"prompt cache layer {layer_index} offset mismatch")
         if _layer_size(layer) != n_prefix:
             raise NativePrefillError(f"prompt cache layer {layer_index} size mismatch")
+        if getattr(layer, "meta_state", "") != "":
+            raise NativePrefillError(f"prompt cache layer {layer_index} meta_state must be empty")
 
 
 def _base_result(
@@ -546,6 +692,15 @@ def _base_result(
         "requested_prompt_cache_path": None,
         "prompt_cache_path": None,
         "native_prefill_acceptance": None,
+        "producer_fingerprint": None,
+        "native_prefill_full_layer_loop_status": None,
+        "runtime_substrate": None,
+        "compute_completion_policy": None,
+        "compute_barrier_policy": None,
+        "block_tokens": 0,
+        "block_count": 0,
+        "failure_stage": None,
+        "failure_text": None,
         "hardware_log_path": None,
         "kernel_count": 0,
         "transfer_bytes": 0,
@@ -595,6 +750,621 @@ def _with_fallback(
     return _finish_result(result, started)
 
 
+class _PersistentRouteFallback(Exception):
+    """A persistent service rejection that is safe to serve with full prompt."""
+
+    def __init__(self, reason: str, detail: str):
+        super().__init__(detail)
+        self.reason = reason
+        self.detail = detail
+
+
+class _PersistentRouteTerminal(Exception):
+    """A persistent child/device failure that must not be repaired by fallback."""
+
+    def __init__(self, error: Mapping[str, Any]):
+        self.error = dict(error)
+        super().__init__(str(self.error.get("message") or "persistent service failed"))
+
+
+def _persistent_operation_request(
+    request_id: str,
+    operation: str,
+    body: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "protocol_version": _PUBLIC_PROTOCOL_VERSION,
+        "request_id": request_id,
+        "operation": operation,
+        "body": dict(body),
+    }
+
+
+def _persistent_operation_id(request_id: str, suffix: str) -> str:
+    return _safe_request_id(f"{request_id}.{suffix}")
+
+
+def _persistent_service_error(
+    response: Any,
+    *,
+    operation: str,
+    request_id: str,
+) -> dict[str, Any]:
+    if not isinstance(response, Mapping):
+        return {
+            "domain": "invalid_request",
+            "message": "persistent service response is invalid",
+            "failure_stage": "response_validation",
+        }
+    error = response.get("error")
+    if isinstance(error, Mapping):
+        return {
+            "domain": str(error.get("domain") or "invalid_request"),
+            "message": str(error.get("message") or "persistent service operation failed"),
+            "failure_stage": str(error.get("failure_stage") or "response_validation"),
+        }
+    return {
+        "domain": "invalid_request",
+        "message": f"persistent service {operation} request {request_id!r} was rejected",
+        "failure_stage": "response_validation",
+    }
+
+
+def _persistent_exchange(
+    dispatch: Any,
+    request: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any]]:
+    try:
+        response = dispatch(dict(request))
+    except Exception as exc:
+        raise _PersistentRouteFallback(
+            "producer_failed",
+            f"persistent service dispatch failed: {exc}",
+        ) from exc
+    operation = str(request["operation"])
+    request_id = str(request["request_id"])
+    if not isinstance(response, Mapping):
+        raise _PersistentRouteFallback(
+            "producer_failed",
+            "persistent service response is not an object",
+        )
+    if (
+        response.get("protocol_version") != _PUBLIC_PROTOCOL_VERSION
+        or response.get("request_id") != request_id
+        or response.get("operation") != operation
+    ):
+        raise _PersistentRouteFallback(
+            "producer_failed",
+            f"persistent service {operation} response identity is invalid",
+        )
+    if response.get("status") != "pass":
+        error = _persistent_service_error(response, operation=operation, request_id=request_id)
+        if error["domain"] in {
+            "device_lost_or_faulted",
+            "executable_rejection",
+            "numerical_rejection",
+            "consumer_decode_failure",
+        }:
+            raise _PersistentRouteTerminal(error)
+        reason = "cache_validation_failed" if error["domain"] == "cache_rejection" else "producer_failed"
+        raise _PersistentRouteFallback(reason, str(error["message"]))
+    operation_result = response.get("result")
+    if not isinstance(operation_result, Mapping):
+        raise _PersistentRouteFallback(
+            "producer_failed",
+            f"persistent service {operation} result is invalid",
+        )
+    evidence = response.get("evidence")
+    return (
+        dict(operation_result),
+        None,
+        dict(evidence) if isinstance(evidence, Mapping) else {},
+    )
+
+
+
+
+def _persistent_metadata_value(
+    metadata: Mapping[str, Any],
+    key: str,
+    *,
+    required: bool = True,
+) -> Any:
+    if key in metadata:
+        return metadata[key]
+    prefixed_key = f"1.{key}"
+    if prefixed_key in metadata:
+        return metadata[prefixed_key]
+    aliases = {
+        "offset": "1.offset",
+        "num_layers": "1.num_layers",
+        "n_kv_heads": "1.n_kv_heads",
+        "head_dim": "1.head_dim",
+    }
+    alias = aliases.get(key)
+    if alias is not None and alias in metadata:
+        return metadata[alias]
+    if required:
+        raise NativePrefillError(f"prompt cache metadata missing {key!r}")
+    return None
+
+
+def _persistent_metadata_int(metadata: Mapping[str, Any], key: str) -> int:
+    value = _persistent_metadata_value(metadata, key)
+    if isinstance(value, (bool, np.bool_)):
+        raise NativePrefillError(f"prompt cache metadata {key!r} must be an integer")
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise NativePrefillError(
+            f"prompt cache metadata {key!r} must be an integer, got {value!r}"
+        ) from exc
+
+
+def _persistent_rope_scaling(metadata: Mapping[str, Any]) -> Any:
+    value = _persistent_metadata_value(metadata, "rope_scaling")
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError) as exc:
+            raise NativePrefillError("prompt cache metadata rope_scaling is invalid") from exc
+    return value
+
+
+def _persistent_meta_state(metadata: Mapping[str, Any]) -> None:
+    """Validate optional producer-side metadata state.
+
+    ``mlx_lm.models.cache.load_prompt_cache`` consumes the ``0.*`` state
+    entries into each reconstructed ``KVCache`` and returns only the ``1.*``
+    user metadata projection.  Therefore this state is checked when present,
+    but its absence in returned metadata is the expected representation.
+    """
+
+    typed_state = metadata.get("meta_state")
+    if typed_state is not None:
+        if (
+            not isinstance(typed_state, Sequence)
+            or isinstance(typed_state, (str, bytes, bytearray))
+            or len(typed_state) != _EXPECTED_NUM_LAYERS
+            or any(value != "" for value in typed_state)
+        ):
+            raise NativePrefillError("prompt cache metadata meta_state must contain 16 empty values")
+    layer_keys = {str(key) for key in metadata if str(key).startswith("0.")}
+    if layer_keys:
+        expected_keys = {f"0.{index}" for index in range(_EXPECTED_NUM_LAYERS)}
+        if layer_keys != expected_keys or any(metadata[key] != "" for key in expected_keys):
+            raise NativePrefillError("prompt cache metadata must contain exactly 16 empty meta_state values")
+
+
+def _validate_persistent_model_fingerprint(model_fingerprint: Mapping[str, Any]) -> None:
+    expected_geometry = {
+        "num_layers": _EXPECTED_NUM_LAYERS,
+        "num_heads": 32,
+        "n_kv_heads": _EXPECTED_N_KV_HEADS,
+        "head_dim": _EXPECTED_HEAD_DIM,
+        "hidden_size": 2048,
+        "intermediate_size": 8192,
+        "vocab_size": 128256,
+        "max_position_embeddings": 131072,
+    }
+    if not isinstance(model_fingerprint, Mapping):
+        raise NativePrefillError("loaded model fingerprint is invalid")
+    if model_fingerprint.get("format") != "safetensors":
+        raise NativePrefillError("loaded model fingerprint format mismatch")
+    if model_fingerprint.get("quantization") != "fp16":
+        raise NativePrefillError("loaded model fingerprint quantization mismatch")
+    if model_fingerprint.get("model_family") != "llama":
+        raise NativePrefillError("loaded model fingerprint family mismatch")
+    if model_fingerprint.get("model_type") != "llama":
+        raise NativePrefillError("loaded model fingerprint type mismatch")
+    if model_fingerprint.get("architectures") != ["LlamaForCausalLM"]:
+        raise NativePrefillError("loaded model fingerprint architecture mismatch")
+    if model_fingerprint.get("geometry") != expected_geometry:
+        raise NativePrefillError("loaded model fingerprint geometry mismatch")
+    if model_fingerprint.get("rms_norm_eps") != 0.00001:
+        raise NativePrefillError("loaded model fingerprint RMS norm mismatch")
+    if model_fingerprint.get("rope_theta") != 500000.0:
+        raise NativePrefillError("loaded model fingerprint rope_theta mismatch")
+    if model_fingerprint.get("rope_scaling") != _EXPECTED_ROPE_SCALING:
+        raise NativePrefillError("loaded model fingerprint rope_scaling mismatch")
+
+
+def _validate_persistent_metadata(
+    metadata: Mapping[str, Any],
+    *,
+    n_prefix: int,
+    request_id: str,
+    producer_kind: str,
+    producer_fingerprint: str,
+    model_fingerprint: Mapping[str, Any],
+) -> None:
+    if not isinstance(metadata, Mapping):
+        raise NativePrefillError("prompt cache metadata must be a mapping")
+    if _persistent_metadata_value(metadata, "schema_version") != "mlx_lm_prompt_cache_v1":
+        raise NativePrefillError("prompt cache metadata schema_version mismatch")
+    if _persistent_metadata_value(metadata, "producer_kind") != producer_kind:
+        raise NativePrefillError("prompt cache metadata producer_kind mismatch")
+    if _persistent_metadata_value(metadata, "producer_fingerprint") != producer_fingerprint:
+        raise NativePrefillError("prompt cache metadata producer_fingerprint mismatch")
+    if _persistent_metadata_value(metadata, "request_id") != request_id:
+        raise NativePrefillError("prompt cache metadata request_id mismatch")
+
+    expected_digest = model_fingerprint.get("model_digest")
+    if not isinstance(expected_digest, str) or not expected_digest:
+        raise NativePrefillError("loaded model fingerprint is missing model_digest")
+    if _persistent_metadata_value(metadata, "model_digest") != expected_digest:
+        raise NativePrefillError("prompt cache metadata model_digest mismatch")
+
+    if _persistent_metadata_int(metadata, "num_layers") != _EXPECTED_NUM_LAYERS:
+        raise NativePrefillError("prompt cache metadata num_layers mismatch")
+    if _persistent_metadata_int(metadata, "batch") != 1:
+        raise NativePrefillError("prompt cache metadata batch mismatch")
+    if _persistent_metadata_int(metadata, "n_kv_heads") != _EXPECTED_N_KV_HEADS:
+        raise NativePrefillError("prompt cache metadata n_kv_heads mismatch")
+    if _persistent_metadata_int(metadata, "sequence_length") != n_prefix:
+        raise NativePrefillError("prompt cache metadata sequence_length mismatch")
+    if _persistent_metadata_int(metadata, "head_dim") != _EXPECTED_HEAD_DIM:
+        raise NativePrefillError("prompt cache metadata head_dim mismatch")
+    if _persistent_metadata_int(metadata, "offset") != n_prefix:
+        raise NativePrefillError("prompt cache metadata offset mismatch")
+    if _persistent_metadata_int(metadata, "absolute_start_position") != 0:
+        raise NativePrefillError("prompt cache metadata absolute_start_position mismatch")
+    if _persistent_metadata_int(metadata, "absolute_end_position") != n_prefix:
+        raise NativePrefillError("prompt cache metadata absolute_end_position mismatch")
+
+    expected_rope_theta = model_fingerprint.get("rope_theta", 500000.0)
+    if _persistent_metadata_value(metadata, "rope_theta") != expected_rope_theta:
+        try:
+            if float(_persistent_metadata_value(metadata, "rope_theta")) != float(expected_rope_theta):
+                raise NativePrefillError("prompt cache metadata rope_theta mismatch")
+        except (TypeError, ValueError) as exc:
+            raise NativePrefillError("prompt cache metadata rope_theta mismatch") from exc
+    expected_rope_scaling = model_fingerprint.get("rope_scaling", _EXPECTED_ROPE_SCALING)
+    if _persistent_rope_scaling(metadata) != expected_rope_scaling:
+        raise NativePrefillError("prompt cache metadata rope_scaling mismatch")
+
+    if _persistent_metadata_value(metadata, "dtype") != "float16":
+        raise NativePrefillError("prompt cache metadata dtype mismatch")
+    if _persistent_metadata_value(metadata, "physical_layout") != "B,H,S,D":
+        raise NativePrefillError("prompt cache metadata physical_layout mismatch")
+    if _persistent_metadata_value(metadata, "cache_class") != "KVCache":
+        raise NativePrefillError("prompt cache metadata cache_class mismatch")
+    if _persistent_metadata_value(metadata, "cache_variant") != "llama3.2_1b_fp16":
+        raise NativePrefillError("prompt cache metadata cache_variant mismatch")
+    _persistent_meta_state(metadata)
+
+
+_PERSISTENT_METRIC_FIELDS = frozenset(
+    {
+        "prefill_elapsed_sec",
+        "kernel_elapsed_usec",
+        "transfer_elapsed_sec",
+        "cache_emit_elapsed_sec",
+        "total_elapsed_sec",
+        "tokens_per_sec_prefill",
+        "transfer_h2d_bytes",
+        "transfer_d2h_bytes",
+    }
+)
+
+
+def _persistent_metrics(value: Any) -> dict[str, float | int]:
+    if not isinstance(value, Mapping) or set(value) != _PERSISTENT_METRIC_FIELDS:
+        raise _PersistentRouteFallback(
+            "producer_failed",
+            "persistent service Prefill metrics are invalid",
+        )
+    normalized: dict[str, float | int] = {}
+    integer_fields = {"kernel_elapsed_usec", "transfer_h2d_bytes", "transfer_d2h_bytes"}
+    for field_name in _PERSISTENT_METRIC_FIELDS:
+        field_value = value[field_name]
+        if field_name in integer_fields:
+            if (
+                not isinstance(field_value, int)
+                or isinstance(field_value, (bool, np.bool_))
+                or field_value < 0
+            ):
+                raise _PersistentRouteFallback(
+                    "producer_failed",
+                    "persistent service Prefill metrics are invalid",
+                )
+            normalized[field_name] = int(field_value)
+            continue
+        try:
+            number = float(field_value)
+        except (TypeError, ValueError) as exc:
+            raise _PersistentRouteFallback(
+                "producer_failed",
+                "persistent service Prefill metrics are invalid",
+            ) from exc
+        if isinstance(field_value, (bool, np.bool_)) or not np.isfinite(number) or number < 0:
+            raise _PersistentRouteFallback(
+                "producer_failed",
+                "persistent service Prefill metrics are invalid",
+            )
+        normalized[field_name] = number
+    return normalized
+
+
+class PersistentPrefillSession:
+    """One loaded public prefill-service model shared by warm generations."""
+
+    def __init__(
+        self,
+        dispatch: Any,
+        *,
+        model_uri: str,
+        model_digest: str,
+        model_format: str = "safetensors",
+        quantization: str = "fp16",
+    ) -> None:
+        if not callable(dispatch):
+            raise TypeError("persistent service dispatch must be callable")
+        if not isinstance(model_uri, str) or not model_uri:
+            raise ValueError("persistent session model_uri must be a non-empty string")
+        if not isinstance(model_digest, str) or not model_digest:
+            raise ValueError("persistent session model_digest must be a non-empty string")
+        if model_format != "safetensors" or quantization != "fp16":
+            raise ValueError("persistent session model format/quantization is unsupported")
+
+        self._dispatch = dispatch
+        self.model_uri = model_uri
+        self.model_digest = model_digest
+        self.model_format = model_format
+        self.quantization = quantization
+        self._closed = False
+        self._model_handle: str | None = None
+        self._model_fingerprint: dict[str, Any] | None = None
+        self._request_id = _safe_request_id(f"session-{id(self):x}")
+
+        request = _persistent_operation_request(
+            _persistent_operation_id(self._request_id, "load"),
+            "LoadModel",
+            {
+                "model_uri": model_uri,
+                "model_digest": model_digest,
+                "format": model_format,
+                "quantization": quantization,
+            },
+        )
+        try:
+            load_result, _load_error, _load_evidence = _persistent_exchange(dispatch, request)
+        except (_PersistentRouteFallback, _PersistentRouteTerminal) as exc:
+            raise NativePrefillError(str(exc)) from exc
+        if not isinstance(load_result, Mapping):
+            raise NativePrefillError("persistent service LoadModel result is invalid")
+
+        model_handle = load_result.get("model_handle")
+        if not isinstance(model_handle, str) or not model_handle:
+            raise NativePrefillError(
+                "persistent service LoadModel did not return a model handle"
+            )
+        model_fingerprint = load_result.get("model_fingerprint")
+        if not isinstance(model_fingerprint, Mapping):
+            raise NativePrefillError(
+                "persistent service LoadModel did not return a model fingerprint"
+            )
+        response_model_uri = load_result.get("model_uri", model_fingerprint.get("model_uri"))
+        if response_model_uri is not None and response_model_uri != model_uri:
+            raise NativePrefillError(
+                "persistent service LoadModel model URI does not match the session"
+            )
+        if model_fingerprint.get("model_digest") != model_digest:
+            raise NativePrefillError(
+                "persistent service LoadModel model identity does not match the session"
+            )
+        try:
+            _validate_persistent_model_fingerprint(model_fingerprint)
+        except Exception as exc:
+            raise NativePrefillError(str(exc)) from exc
+
+        self._model_handle = model_handle
+        self._model_fingerprint = dict(model_fingerprint)
+
+    @property
+    def model_handle(self) -> str:
+        handle = self._model_handle
+        if self._closed or not isinstance(handle, str) or not handle:
+            raise NativePrefillError("persistent prefill session is closed")
+        return handle
+
+    @property
+    def model_fingerprint(self) -> Mapping[str, Any]:
+        fingerprint = self._model_fingerprint
+        if self._closed or fingerprint is None:
+            raise NativePrefillError("persistent prefill session is closed")
+        return fingerprint
+
+    def prefill(
+        self,
+        prompt_tokens: Sequence[int],
+        *,
+        native: NativePrefillConfig,
+        prompt_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Prefill one complete public prompt on the resident model."""
+
+        if self._closed:
+            raise NativePrefillError("persistent prefill session is closed")
+        request_id = _request_id(native, prompt_name)
+        token_ids = [int(token_id) for token_id in prompt_tokens]
+        request = _persistent_operation_request(
+            request_id,
+            "Prefill",
+            {
+                "model_handle": self.model_handle,
+                "token_ids": token_ids,
+                "cache_spec": {
+                    "schema_version": "mlx_lm_prompt_cache_v1",
+                    "cache_class": "KVCache",
+                    "transport": "file",
+                },
+                "request_options": {
+                    "timeout_ms": max(
+                        1,
+                        min(
+                            300_000,
+                            int(float(native.producer_timeout_s) * 1000),
+                        ),
+                    ),
+                },
+            },
+        )
+        prefill_result, _prefill_error, prefill_evidence = _persistent_exchange(
+            self._dispatch,
+            request,
+        )
+        if not isinstance(prefill_result, Mapping):
+            raise _PersistentRouteFallback(
+                "producer_failed",
+                "persistent service Prefill result is invalid",
+            )
+
+        response_handle = prefill_result.get("model_handle")
+        if response_handle != self.model_handle:
+            raise _PersistentRouteFallback(
+                "producer_failed",
+                "persistent service Prefill model handle does not match the loaded session",
+            )
+        prompt_token_count = prefill_result.get("prompt_token_count")
+        if prompt_token_count is not None:
+            try:
+                valid_prompt_count = (
+                    not isinstance(prompt_token_count, (bool, np.bool_))
+                    and int(prompt_token_count) == len(token_ids)
+                )
+            except (TypeError, ValueError):
+                valid_prompt_count = False
+            if not valid_prompt_count:
+                raise _PersistentRouteFallback(
+                    "producer_failed",
+                    "persistent service Prefill prompt token count is invalid",
+                )
+        prefix_token_count = prefill_result.get("prefix_token_count")
+        n_prefix = max(len(token_ids) - 1, 0)
+        if prefix_token_count is not None:
+            try:
+                valid_prefix_count = (
+                    not isinstance(prefix_token_count, (bool, np.bool_))
+                    and int(prefix_token_count) == n_prefix
+                )
+            except (TypeError, ValueError):
+                valid_prefix_count = False
+            if not valid_prefix_count:
+                raise _PersistentRouteFallback(
+                    "producer_failed",
+                    "persistent service Prefill prefix token count is invalid",
+                )
+        metrics = _persistent_metrics(prefill_result.get("metrics"))
+
+        cache = prefill_result.get("cache")
+        if not isinstance(cache, Mapping):
+            raise _PersistentRouteFallback(
+                "cache_validation_failed",
+                "persistent service Prefill did not return a cache projection",
+            )
+        cache_path = cache.get("prompt_cache_path")
+        npz_path = cache.get("prefill_npz_path")
+        prefill_log_path = cache.get("prefill_log_path")
+        cache_log_path = cache.get("kv_cache_log_path")
+        if not all(
+            isinstance(value, str) and value
+            for value in (cache_path, npz_path, prefill_log_path, cache_log_path)
+        ):
+            raise _PersistentRouteFallback(
+                "cache_validation_failed",
+                "persistent service cache artifact paths are invalid",
+            )
+
+        requested_producer_kind = _normalize_producer_kind(native.producer_kind)
+        if requested_producer_kind != _R9700_NATIVE_PRODUCER_KIND:
+            raise _PersistentRouteFallback(
+                "cache_validation_failed",
+                "persistent service Prefill producer_kind does not match the request",
+            )
+        evidence_problems = _native_prefill_evidence_problems(
+            prefill_evidence,
+            Path(npz_path),
+            Path(prefill_log_path),
+            expected_n_prefix=n_prefix,
+            expected_model=self.model_uri,
+        )
+        if evidence_problems:
+            raise _PersistentRouteFallback(
+                "cache_validation_failed",
+                _bounded_native_evidence_detail(evidence_problems),
+            )
+
+        producer_fingerprint = str(prefill_evidence["producer_fingerprint"])
+        producer_kind = str(prefill_evidence["producer_kind"])
+
+        cache_metadata = cache.get("metadata")
+        if not isinstance(cache_metadata, Mapping):
+            raise _PersistentRouteFallback(
+                "cache_validation_failed",
+                "persistent service Prefill cache metadata is invalid",
+            )
+        try:
+            _validate_persistent_metadata(
+                cache_metadata,
+                n_prefix=n_prefix,
+                request_id=request_id,
+                producer_kind=str(producer_kind),
+                producer_fingerprint=producer_fingerprint,
+                model_fingerprint=self.model_fingerprint,
+            )
+        except Exception as exc:
+            raise _PersistentRouteFallback("cache_validation_failed", str(exc)) from exc
+
+        return {
+            "model_handle": self.model_handle,
+            "model_fingerprint": dict(self.model_fingerprint),
+            "producer_kind": str(producer_kind),
+            "producer_fingerprint": producer_fingerprint,
+            "evidence": dict(prefill_evidence),
+            "metrics": metrics,
+            "cache": dict(cache),
+            "metadata": dict(cache_metadata),
+            "cache_path": str(cache_path),
+            "npz_path": str(npz_path),
+            "prefill_log_path": str(prefill_log_path),
+            "cache_log_path": str(cache_log_path),
+        }
+
+    def close(self) -> None:
+        """Unload the resident model once; repeated closes are idempotent."""
+
+        if self._closed:
+            return
+        handle = self._model_handle
+        self._closed = True
+        if not isinstance(handle, str) or not handle:
+            raise NativePrefillError("persistent prefill session has no model handle")
+        request = _persistent_operation_request(
+            _persistent_operation_id(self._request_id, "unload"),
+            "UnloadModel",
+            {"model_handle": handle},
+        )
+        try:
+            unload_result, _unload_error, _unload_evidence = _persistent_exchange(
+                self._dispatch,
+                request,
+            )
+        except (_PersistentRouteFallback, _PersistentRouteTerminal) as exc:
+            raise NativePrefillError(str(exc)) from exc
+        if not isinstance(unload_result, Mapping) or unload_result.get("model_handle") != handle:
+            raise NativePrefillError("persistent service UnloadModel response is invalid")
+
+    def __enter__(self) -> "PersistentPrefillSession":
+        if self._closed:
+            raise NativePrefillError("persistent prefill session is closed")
+        return self
+
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> bool:
+        self.close()
+        return False
+
+
 def generate_with_native_prefill(
     model: Any,
     tokenizer: Any,
@@ -606,6 +1376,7 @@ def generate_with_native_prefill(
     prompt_name: str | None = None,
     generate_step_fn: Any = None,
     load_prompt_cache_fn: Any = None,
+    service_session: PersistentPrefillSession | None = None,
     **generate_kwargs: Any,
 ) -> dict[str, Any]:
     """Generate through mlx-lm, optionally importing a C1 native S-1 cache."""
@@ -619,7 +1390,13 @@ def generate_with_native_prefill(
         tokenizer,
         require_uint32=_normalize_producer_kind(native.producer_kind) == _R9700_NATIVE_PRODUCER_KIND,
     )
-    result = _base_result(prompt_tokens=prompt_tokens, native=native, prompt_name=prompt_name, started_at=started_at, command=None)
+    result = _base_result(
+        prompt_tokens=prompt_tokens,
+        native=native,
+        prompt_name=prompt_name,
+        started_at=started_at,
+        command=None,
+    )
     paths = _producer_artifact_paths(native, prompt_name)
 
     if len(prompt_tokens) < int(native.threshold_tokens):
@@ -637,7 +1414,7 @@ def generate_with_native_prefill(
             ),
         )
 
-    if len(prompt_tokens) < 2:
+    if len(prompt_tokens) < 2 and service_session is None:
         return _write_result_log(
             log_path,
             _with_fallback(
@@ -656,7 +1433,133 @@ def generate_with_native_prefill(
     result["prefill_log_path"] = str(paths["prefill_log"])
     result["kv_cache_log_path"] = str(paths["cache_log"])
     result["requested_prompt_cache_path"] = str(paths["cache"])
-    cache_path, producer_statuses, fallback_reason, fallback_detail, evidence = _run_producer(native, prompt_tokens, paths)
+
+    if service_session is not None:
+        try:
+            service_state = service_session.prefill(
+                prompt_tokens,
+                native=native,
+                prompt_name=prompt_name,
+            )
+        except _PersistentRouteTerminal as exc:
+            result["route"] = "native_producer"
+            result["accepted_cache"] = False
+            result["status"] = "error"
+            result["exit_status"] = 1
+            result["error"] = dict(exc.error)
+            finished = _write_result_log(log_path, _finish_result(result, started))
+            raise NativePrefillError(str(exc), result=finished) from exc
+        except _PersistentRouteFallback as exc:
+            return _write_result_log(
+                log_path,
+                _with_fallback(
+                    result,
+                    reason=exc.reason,
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    max_tokens=max_tokens,
+                    generate_step_fn=generate_step_fn,
+                    generate_kwargs=generate_kwargs,
+                    started=started,
+                    detail=exc.detail,
+                ),
+            )
+
+        evidence = service_state["evidence"]
+        cache_path = service_state["cache_path"]
+        result["prefill_npz_path"] = service_state["npz_path"]
+        result["prefill_log_path"] = service_state["prefill_log_path"]
+        result["kv_cache_log_path"] = service_state["cache_log_path"]
+        result["producer_commands"] = [{"operation": "Prefill", "returncode": 0}]
+        _add_native_prefill_evidence(result, evidence)
+        result.update(service_state["metrics"])
+        cache_import_started = time.time()
+        try:
+            _validate_persistent_model_fingerprint(service_state["model_fingerprint"])
+            cache, metadata = load_prompt_cache_fn(cache_path, return_metadata=True)
+            result["cache_import_elapsed_sec"] = max(
+                0.0, time.time() - cache_import_started
+            )
+            _validate_prompt_cache(cache, metadata, len(prompt_tokens) - 1)
+            _validate_persistent_metadata(
+                service_state["metadata"],
+                n_prefix=len(prompt_tokens) - 1,
+                request_id=_request_id(native, prompt_name),
+                producer_kind=service_state["producer_kind"],
+                producer_fingerprint=service_state["producer_fingerprint"],
+                model_fingerprint=service_state["model_fingerprint"],
+            )
+            _validate_persistent_metadata(
+                metadata,
+                n_prefix=len(prompt_tokens) - 1,
+                request_id=_request_id(native, prompt_name),
+                producer_kind=service_state["producer_kind"],
+                producer_fingerprint=service_state["producer_fingerprint"],
+                model_fingerprint=service_state["model_fingerprint"],
+            )
+        except Exception as exc:
+            return _write_result_log(
+                log_path,
+                _with_fallback(
+                    result,
+                    reason="cache_validation_failed",
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    max_tokens=max_tokens,
+                    generate_step_fn=generate_step_fn,
+                    generate_kwargs=generate_kwargs,
+                    started=started,
+                    detail=str(exc),
+                ),
+            )
+
+        result["route"] = "native_producer"
+        result["fallback_reason"] = None
+        result["accepted_cache"] = True
+        result["prompt_cache_path"] = cache_path
+        result["producer_kind"] = service_state["producer_kind"]
+        result["producer_fingerprint"] = service_state["producer_fingerprint"]
+        result["model_fingerprint"] = service_state["model_fingerprint"]
+        result["model_digest"] = service_state["model_fingerprint"].get("model_digest")
+        result["metadata"] = dict(metadata)
+        decode_started = time.time()
+        try:
+            result["decoded_tokens"] = _collect_generated_tokens(
+                model,
+                [prompt_tokens[-1]],
+                max_tokens,
+                prompt_cache=cache,
+                generate_step_fn=generate_step_fn,
+                generate_kwargs=generate_kwargs,
+            )
+            result["decode_elapsed_sec"] = max(0.0, time.time() - decode_started)
+        except Exception as exc:
+            result["status"] = "error"
+            result["exit_status"] = 1
+            result["error"] = {"type": exc.__class__.__name__, "message": str(exc)}
+            finished = _write_result_log(log_path, _finish_result(result, started))
+            raise NativePrefillError(str(exc), result=finished) from exc
+        total_elapsed = max(0.0, time.time() - started)
+        result["total_elapsed_sec"] = total_elapsed
+        result["tokens_per_sec_end_to_end"] = (
+            len(prompt_tokens) / total_elapsed if total_elapsed > 0 else 0.0
+        )
+        return _write_result_log(log_path, _finish_result(result, started))
+
+    if _normalize_producer_kind(native.producer_kind) == _R9700_NATIVE_PRODUCER_KIND:
+        message = "r9700_native serving requires a PersistentPrefillSession"
+        result["route"] = "native_producer"
+        result["status"] = "blocked"
+        result["exit_status"] = 2
+        result["error"] = {"type": "NativePrefillError", "message": message}
+        finished = _write_result_log(log_path, _finish_result(result, started))
+        raise NativePrefillError(message, result=finished)
+
+    cache_path, producer_statuses, fallback_reason, fallback_detail, evidence = _run_producer(
+        native,
+        prompt_tokens,
+        paths,
+    )
     result["producer_commands"] = producer_statuses
     _add_native_prefill_evidence(result, evidence)
     if fallback_reason is not None or cache_path is None:
@@ -745,6 +1648,7 @@ def _write_result_log(log_path: os.PathLike[str] | str | None, result: dict[str,
         ("producer_timeout_s", result.get("producer_timeout_s")),
         ("requested_producer_kind", result.get("requested_producer_kind")),
         ("producer_kind", result.get("producer_kind")),
+        ("producer_fingerprint", result.get("producer_fingerprint")),
         ("route", result.get("route")),
         ("fallback_reason", result.get("fallback_reason")),
         ("accepted_cache", result.get("accepted_cache")),
@@ -754,9 +1658,17 @@ def _write_result_log(log_path: os.PathLike[str] | str | None, result: dict[str,
         ("requested_prompt_cache_path", result.get("requested_prompt_cache_path")),
         ("prompt_cache_path", result.get("prompt_cache_path")),
         ("native_prefill_acceptance", result.get("native_prefill_acceptance")),
+        ("native_prefill_full_layer_loop_status", result.get("native_prefill_full_layer_loop_status")),
+        ("runtime_substrate", result.get("runtime_substrate")),
         ("hardware_log_path", result.get("hardware_log_path")),
+        ("compute_completion_policy", result.get("compute_completion_policy")),
+        ("compute_barrier_policy", result.get("compute_barrier_policy")),
+        ("block_tokens", result.get("block_tokens")),
+        ("block_count", result.get("block_count")),
         ("kernel_count", result.get("kernel_count")),
         ("transfer_bytes", result.get("transfer_bytes")),
+        ("failure_stage", result.get("failure_stage")),
+        ("failure_text", result.get("failure_text")),
         ("producer_commands", result.get("producer_commands")),
         ("metadata", result.get("metadata")),
         ("decoded_tokens", result.get("decoded_tokens")),
@@ -909,6 +1821,18 @@ def _render_path_c2_section(result: Mapping[str, Any]) -> str:
         f"artifacts_dir: {result.get('artifacts_dir', '')}",
         f"exit_status: {result.get('exit_status', '')}",
         f"native_prefill_acceptance: {result.get('native_prefill_acceptance', '')}",
+        f"prefill_npz_path: {result.get('prefill_npz_path', '')}",
+        f"prefill_log_path: {result.get('prefill_log_path', '')}",
+        f"kv_cache_log_path: {result.get('kv_cache_log_path', '')}",
+        f"producer_fingerprint: {result.get('producer_fingerprint', '')}",
+        f"native_prefill_full_layer_loop_status: {result.get('native_prefill_full_layer_loop_status', '')}",
+        f"runtime_substrate: {result.get('runtime_substrate', '')}",
+        f"compute_completion_policy: {result.get('compute_completion_policy', '')}",
+        f"compute_barrier_policy: {result.get('compute_barrier_policy', '')}",
+        f"block_tokens: {result.get('block_tokens', '')}",
+        f"block_count: {result.get('block_count', '')}",
+        f"failure_stage: {result.get('failure_stage', '')}",
+        f"failure_text: {result.get('failure_text', '')}",
         f"hardware_log_path: {result.get('hardware_log_path', '')}",
         f"kernel_count: {result.get('kernel_count', '')}",
         f"transfer_bytes: {result.get('transfer_bytes', '')}",
@@ -970,6 +1894,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run C2 mlx-lm serving with an optional native R9700 prompt-cache producer")
     parser.add_argument("--model", required=True, help="consumer mlx-lm model directory")
     parser.add_argument("--producer-model", help="native producer model directory; defaults to --model")
+    parser.add_argument("--native-runner", help="explicit owner-executable native_r9700_runner path")
     parser.add_argument("--prompt", help="literal prompt text")
     parser.add_argument("--token-ids-json", help="request token ids as a JSON array")
     parser.add_argument("--fixtures-dir", help="directory containing prompts.json")
@@ -1021,6 +1946,7 @@ def _suite_result(args: argparse.Namespace, command: str, prompt_results: list[d
         "gate_result": gate_result,
         "model_dir": args.model,
         "producer_model_dir": args.producer_model or args.model,
+        "native_runner": args.native_runner,
         "fixtures_dir": args.fixtures_dir,
         "artifacts_dir": args.artifacts_dir,
         "threshold_tokens": int(args.threshold_tokens),
@@ -1047,6 +1973,7 @@ def _blocked_result(args: argparse.Namespace, command: str, exc: Exception, star
         "status": "blocked",
         "gate_result": "blocked",
         "model_dir": getattr(args, "model", ""),
+        "native_runner": getattr(args, "native_runner", None),
         "producer_model_dir": getattr(args, "producer_model", None) or getattr(args, "model", ""),
         "fixtures_dir": getattr(args, "fixtures_dir", None),
         "artifacts_dir": getattr(args, "artifacts_dir", ""),
@@ -1078,6 +2005,7 @@ def _write_run_log(path: os.PathLike[str] | str, result: Mapping[str, Any]) -> N
     lines = [
         ("command", result.get("command")),
         ("gate_result", result.get("gate_result")),
+        ("native_runner", result.get("native_runner")),
         ("model", result.get("model_dir")),
         ("producer_model_dir", result.get("producer_model_dir")),
         ("fixtures_dir", result.get("fixtures_dir")),
@@ -1086,6 +2014,15 @@ def _write_run_log(path: os.PathLike[str] | str, result: Mapping[str, Any]) -> N
         ("producer_timeout_s", result.get("producer_timeout_s")),
         ("requested_producer_kind", result.get("requested_producer_kind")),
         ("producer_kind", result.get("producer_kind")),
+        ("producer_fingerprint", result.get("producer_fingerprint")),
+        ("native_prefill_full_layer_loop_status", result.get("native_prefill_full_layer_loop_status")),
+        ("runtime_substrate", result.get("runtime_substrate")),
+        ("compute_completion_policy", result.get("compute_completion_policy")),
+        ("compute_barrier_policy", result.get("compute_barrier_policy")),
+        ("block_tokens", result.get("block_tokens")),
+        ("block_count", result.get("block_count")),
+        ("failure_stage", result.get("failure_stage")),
+        ("failure_text", result.get("failure_text")),
         ("native_prefill_acceptance", result.get("native_prefill_acceptance")),
         ("hardware_log_path", result.get("hardware_log_path")),
         ("kernel_count", result.get("kernel_count")),
@@ -1113,6 +2050,15 @@ def _write_run_log(path: os.PathLike[str] | str, result: Mapping[str, Any]) -> N
                 ("accepted_cache", entry.get("accepted_cache")),
                 ("requested_producer_kind", entry.get("requested_producer_kind")),
                 ("producer_kind", entry.get("producer_kind")),
+                ("producer_fingerprint", entry.get("producer_fingerprint")),
+                ("native_prefill_full_layer_loop_status", entry.get("native_prefill_full_layer_loop_status")),
+                ("runtime_substrate", entry.get("runtime_substrate")),
+                ("compute_completion_policy", entry.get("compute_completion_policy")),
+                ("compute_barrier_policy", entry.get("compute_barrier_policy")),
+                ("block_tokens", entry.get("block_tokens")),
+                ("block_count", entry.get("block_count")),
+                ("failure_stage", entry.get("failure_stage")),
+                ("failure_text", entry.get("failure_text")),
                 ("prefill_npz_path", entry.get("prefill_npz_path")),
                 ("prefill_log_path", entry.get("prefill_log_path")),
                 ("kv_cache_log_path", entry.get("kv_cache_log_path")),
@@ -1155,75 +2101,131 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     actual_argv = list(sys.argv[1:] if argv is None else argv)
     command = _command_line(actual_argv)
     started = time.time()
+    registry = None
+    service_session: PersistentPrefillSession | None = None
     try:
-        _normalize_producer_kind(args.producer_kind)
-        prompts = _resolve_cli_prompts(args)
-        baselines = _load_baseline_tokens(args.fixtures_dir, int(args.max_new_tokens))
-        model, tokenizer = load_model(args.model)
-        native_base = NativePrefillConfig(
-            producer_model_dir=args.producer_model or args.model,
-            python_executable=sys.executable,
-            threshold_tokens=int(args.threshold_tokens),
-            producer_timeout_s=args.producer_timeout_s,
-            artifacts_dir=args.artifacts_dir,
-            producer_kind=args.producer_kind,
-        )
-        prompt_results: list[dict[str, Any]] = []
-        for prompt_name, prompt in prompts:
-            native = NativePrefillConfig(
-                producer_model_dir=native_base.producer_model_dir,
-                python_executable=native_base.python_executable,
-                threshold_tokens=native_base.threshold_tokens,
-                producer_timeout_s=native_base.producer_timeout_s,
-                artifacts_dir=native_base.artifacts_dir,
-                request_id=prompt_name,
-                producer_kind=native_base.producer_kind,
+        try:
+            _normalize_producer_kind(args.producer_kind)
+            prompts = _resolve_cli_prompts(args)
+            baselines = _load_baseline_tokens(args.fixtures_dir, int(args.max_new_tokens))
+            native_base = NativePrefillConfig(
+                producer_model_dir=args.producer_model or args.model,
+                python_executable=sys.executable,
+                threshold_tokens=int(args.threshold_tokens),
+                producer_timeout_s=args.producer_timeout_s,
+                artifacts_dir=args.artifacts_dir,
+                producer_kind=args.producer_kind,
             )
-            try:
-                result = generate_with_native_prefill(
-                    model,
-                    tokenizer,
-                    prompt,
-                    native=native,
-                    max_tokens=args.max_new_tokens,
-                    prompt_name=prompt_name,
+
+            producer_model_uri: str | None = None
+            native_model_digest: str | None = None
+            if args.producer_kind == _R9700_NATIVE_PRODUCER_KIND:
+                if not args.native_runner:
+                    raise NativePrefillError(
+                        "--native-runner is required for r9700_native serving"
+                    )
+                _consumer_model_uri, consumer_model_digest = _verified_native_model_identity(
+                    args.model
                 )
-            except NativePrefillError as exc:
-                if exc.result is None:
-                    raise
-                result = dict(exc.result)
+                producer_model_uri, producer_digest = _verified_native_model_identity(
+                    native_base.producer_model_dir
+                )
+                if consumer_model_digest != producer_digest:
+                    raise NativePrefillError(
+                        "consumer and producer model digest mismatch"
+                    )
+                native_model_digest = producer_digest
+
+            model, tokenizer = load_model(args.model)
+
+            if args.producer_kind == _R9700_NATIVE_PRODUCER_KIND:
+                if producer_model_uri is None or native_model_digest is None:
+                    raise NativePrefillError("verified native model identity is unavailable")
+                registry = native_worker.build_registry(
+                    runner_path=args.native_runner,
+                    artifact_dir=args.artifacts_dir,
+                )
+                service_session = PersistentPrefillSession(
+                    registry.dispatch,
+                    model_uri=producer_model_uri,
+                    model_digest=native_model_digest,
+                )
+
+            prompt_results: list[dict[str, Any]] = []
+            for prompt_name, prompt in prompts:
+                native = NativePrefillConfig(
+                    producer_model_dir=native_base.producer_model_dir,
+                    python_executable=native_base.python_executable,
+                    threshold_tokens=native_base.threshold_tokens,
+                    producer_timeout_s=native_base.producer_timeout_s,
+                    artifacts_dir=native_base.artifacts_dir,
+                    request_id=prompt_name,
+                    producer_kind=native_base.producer_kind,
+                )
+                generation_kwargs: dict[str, Any] = {}
+                if service_session is not None:
+                    generation_kwargs["service_session"] = service_session
+                try:
+                    result = generate_with_native_prefill(
+                        model,
+                        tokenizer,
+                        prompt,
+                        native=native,
+                        max_tokens=args.max_new_tokens,
+                        prompt_name=prompt_name,
+                        **generation_kwargs,
+                    )
+                except NativePrefillError as exc:
+                    if exc.result is None:
+                        raise
+                    result = dict(exc.result)
+                result["model_dir"] = args.model
+                result["producer_model_dir"] = native.producer_model_dir
+                result["fixtures_dir"] = args.fixtures_dir
+                result["artifacts_dir"] = args.artifacts_dir
+                result["native_runner"] = args.native_runner
+                result["threshold_tokens"] = int(args.threshold_tokens)
+                result["producer_timeout_s"] = args.producer_timeout_s
+                result["requested_producer_kind"] = native.producer_kind
+                result["max_new_tokens"] = int(args.max_new_tokens)
+                result["command"] = command
+                _apply_baseline_comparison(result, prompt_name, baselines)
+                prompt_results.append(result)
+
+            result = (
+                prompt_results[0]
+                if len(prompt_results) == 1
+                else _suite_result(args, command, prompt_results, started)
+            )
             result["model_dir"] = args.model
-            result["producer_model_dir"] = native.producer_model_dir
+            result["producer_model_dir"] = args.producer_model or args.model
             result["fixtures_dir"] = args.fixtures_dir
             result["artifacts_dir"] = args.artifacts_dir
+            result["native_runner"] = args.native_runner
             result["threshold_tokens"] = int(args.threshold_tokens)
             result["producer_timeout_s"] = args.producer_timeout_s
-            result["requested_producer_kind"] = native.producer_kind
             result["max_new_tokens"] = int(args.max_new_tokens)
+            result.setdefault("prompt_count", len(prompt_results))
+            result["json_path"] = args.json
+            result["log_path"] = args.log
+            result["report_path"] = args.report
             result["command"] = command
-            _apply_baseline_comparison(result, prompt_name, baselines)
-            prompt_results.append(result)
-
-        result = prompt_results[0] if len(prompt_results) == 1 else _suite_result(args, command, prompt_results, started)
-        result["model_dir"] = args.model
-        result["producer_model_dir"] = args.producer_model or args.model
-        result["fixtures_dir"] = args.fixtures_dir
-        result["artifacts_dir"] = args.artifacts_dir
-        result["threshold_tokens"] = int(args.threshold_tokens)
-        result["producer_timeout_s"] = args.producer_timeout_s
-        result["max_new_tokens"] = int(args.max_new_tokens)
-        result.setdefault("prompt_count", len(prompt_results))
-        result["json_path"] = args.json
-        result["log_path"] = args.log
-        result["report_path"] = args.report
-        result["command"] = command
-        _set_single_prompt_gate(result)
-        write_result_json(args.json, result)
-        if args.report:
-            append_or_replace_path_c2_report(args.report, result)
-        _write_run_log(args.log, result)
-        print(f"C2 serving status={result.get('status')} prompts={result.get('prompt_count', 1)}")
-        return int(result.get("exit_status", 1))
+            _set_single_prompt_gate(result)
+            write_result_json(args.json, result)
+            if args.report:
+                append_or_replace_path_c2_report(args.report, result)
+            _write_run_log(args.log, result)
+            print(f"C2 serving status={result.get('status')} prompts={result.get('prompt_count', 1)}")
+            return int(result.get("exit_status", 1))
+        finally:
+            if service_session is not None:
+                try:
+                    service_session.close()
+                finally:
+                    if registry is not None:
+                        registry.close()
+            elif registry is not None:
+                registry.close()
     except Exception as exc:
         result = _blocked_result(args, command, exc, started)
         write_result_json(args.json, result)

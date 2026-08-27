@@ -31,6 +31,7 @@ RUNNER_SOURCES = [
         "llama_layer_executor.cpp",
         "kernel_assets.cpp",
         "runtime.cpp",
+        "native_resource_worker.cpp",
         "runner.cpp",
     )
 ]

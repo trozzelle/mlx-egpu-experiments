@@ -29,6 +29,10 @@ MAX_CODE_BYTES = 4096
 ELFCLASS64 = 2
 ELFDATA2LSB = 1
 EM_AMDGPU = 224
+SHT_HASH = 5
+SHT_DYNAMIC = 6
+SHT_NOBITS = 8
+SHT_GNU_HASH = 0x6FFFFFF6
 SHT_PROGBITS = 1
 SHT_SYMTAB = 2
 SHT_STRTAB = 3
@@ -38,7 +42,39 @@ SHT_REL = 9
 SHT_DYNSYM = 11
 NT_AMDGPU_METADATA = 32
 SHF_ALLOC = 0x2
+SHF_WRITE = 0x1
+SHF_EXECINSTR = 0x4
+DT_NULL = 0
+DT_HASH = 4
+DT_STRTAB = 5
+DT_SYMTAB = 6
+DT_STRSZ = 10
+DT_SYMENT = 11
+DT_GNU_HASH = 0x6FFFFEF5
+ELF_DYNAMIC_ENTRY_SIZE = 16
+COMGR_DYNAMIC_SIZE = 7 * ELF_DYNAMIC_ENTRY_SIZE
+COMGR_BSS_SENTINEL_SIZE = 1
+MAX_METADATA_SECTION_SIZE = 64 * 1024
 KERNEL_CODE_PROPERTIES = 0x408
+
+# COMGR wraps the raw kernel in an ELF envelope.  These are the only allocated
+# sections emitted by the reviewed direct-COMGR profile.  The metadata entries
+# are admitted for validation only and are stripped; raw output contains only
+# the executable .text and descriptor .rodata payloads.  Keep every accepted
+# envelope section explicit and typed so unknown allocated code or data remains
+# inadmissible.
+ADMITTED_ALLOCATED_SECTION_PROFILE = {
+    ".note": (SHT_NOTE, SHF_ALLOC),  # AMDGPU resource metadata consumed below.
+    ".dynsym": (SHT_DYNSYM, SHF_ALLOC),  # Kernel symbol table for entry admission.
+    ".gnu.hash": (SHT_GNU_HASH, SHF_ALLOC),  # Dynamic-loader symbol metadata.
+    ".hash": (SHT_HASH, SHF_ALLOC),  # Legacy dynamic-loader symbol metadata.
+    ".dynstr": (SHT_STRTAB, SHF_ALLOC),  # Dynamic-loader symbol names.
+    ".rodata": (SHT_PROGBITS, SHF_ALLOC),  # The one AMDHSA descriptor payload.
+    ".text": (SHT_PROGBITS, SHF_ALLOC | SHF_EXECINSTR),  # The raw executable.
+    ".dynamic": (SHT_DYNAMIC, SHF_ALLOC | SHF_WRITE),  # Fixed no-dependency table.
+    ".relro_padding": (SHT_NOBITS, SHF_ALLOC | SHF_WRITE),  # Zero-filled linker gap.
+    ".bss": (SHT_NOBITS, SHF_ALLOC | SHF_WRITE),  # One-byte linker sentinel.
+}
 KERNARG_SCHEMA = {
     "name": "llama-embed-row-f16-v1",
     "bytes": 24,
@@ -66,7 +102,7 @@ class ElfSection:
     content: bytes
     link: int
     entry_size: int
-
+    size: int | None = None
 
 def _source_without_comments(source_text: str) -> str:
     """Replace comments with whitespace without treating quoted text as comments."""
@@ -295,13 +331,25 @@ def _parse_elf(hsaco: bytes) -> tuple[tuple[Any, ...], list[ElfSection]]:
     sections: list[ElfSection] = []
     for index, raw in enumerate(headers):
         name_offset, section_type, flags, address, content_offset, content_size, link, _, _, entry_size = raw
-        if section_type == 8:
+        if section_type == SHT_NOBITS:
             content = b""
         else:
             if content_offset + content_size > len(hsaco):
                 raise GenerationError(f"COMGR ELF section {index} exceeds the file")
             content = hsaco[content_offset:content_offset + content_size]
-        sections.append(ElfSection(index, name_at(name_offset), section_type, flags, address, content, link, entry_size))
+        sections.append(
+            ElfSection(
+                index,
+                name_at(name_offset),
+                section_type,
+                flags,
+                address,
+                content,
+                link,
+                entry_size,
+                content_size,
+            )
+        )
     return header, sections
 
 
@@ -312,15 +360,100 @@ def _required_section(sections: list[ElfSection], name: str) -> ElfSection:
     return matches[0]
 
 
+def _section_size(section: ElfSection) -> int:
+    """Return the ELF-declared size, retaining compatibility with test doubles."""
+    return len(section.content) if section.size is None else section.size
+
+
+def _validate_dynamic_metadata(sections: list[ElfSection], dynamic: ElfSection) -> None:
+    """Allow only COMGR's fixed loader metadata table with no dependencies."""
+    if _section_size(dynamic) != COMGR_DYNAMIC_SIZE or dynamic.entry_size != ELF_DYNAMIC_ENTRY_SIZE:
+        raise GenerationError("COMGR ELF .dynamic must be the fixed 112-byte metadata table")
+    if len(dynamic.content) != COMGR_DYNAMIC_SIZE:
+        raise GenerationError("COMGR ELF .dynamic must contain its declared bytes")
+    by_name = {section.name: section for section in sections if section.flags & SHF_ALLOC}
+    required = (".dynsym", ".dynstr", ".gnu.hash", ".hash")
+    if any(name not in by_name for name in required):
+        raise GenerationError("COMGR ELF .dynamic references missing loader metadata")
+    entries = [
+        struct.unpack_from("<QQ", dynamic.content, offset)
+        for offset in range(0, COMGR_DYNAMIC_SIZE, ELF_DYNAMIC_ENTRY_SIZE)
+    ]
+    expected = [
+        (DT_SYMTAB, by_name[".dynsym"].address),
+        (DT_SYMENT, 24),
+        (DT_STRTAB, by_name[".dynstr"].address),
+        (DT_STRSZ, _section_size(by_name[".dynstr"])),
+        (DT_GNU_HASH, by_name[".gnu.hash"].address),
+        (DT_HASH, by_name[".hash"].address),
+        (DT_NULL, 0),
+    ]
+    if entries != expected:
+        formatted_entries = [(f"{tag:#x}", f"{value:#x}") for tag, value in entries]
+        raise GenerationError(
+            "COMGR ELF .dynamic contains an unexpected dependency or relocation tag: "
+            f"{formatted_entries}"
+        )
+
+
 def _admit_sections(sections: list[ElfSection]) -> tuple[ElfSection, ElfSection]:
     relocations = [section.name for section in sections if section.section_type in (SHT_REL, SHT_RELA)]
     if relocations:
         raise GenerationError(f"COMGR ELF contains forbidden relocation sections: {relocations}")
     allocated = [section for section in sections if section.flags & SHF_ALLOC]
-    allowed = {(".text", SHT_PROGBITS), (".rodata", SHT_PROGBITS)}
-    if len(allocated) != len(allowed) or {(section.name, section.section_type) for section in allocated} != allowed:
-        raise GenerationError("COMGR ELF contains unexpected allocated sections")
-    return _required_section(sections, ".text"), _required_section(sections, ".rodata")
+    expected_names = set(ADMITTED_ALLOCATED_SECTION_PROFILE)
+    allocated_names = {section.name for section in allocated}
+    if allocated_names != expected_names:
+        missing = sorted(expected_names - allocated_names)
+        unexpected = sorted(allocated_names - expected_names)
+        raise GenerationError(
+            "COMGR ELF allocated section set mismatch: "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+    unexpected: list[str] = []
+    seen_names: set[str] = set()
+    for section in allocated:
+        profile = ADMITTED_ALLOCATED_SECTION_PROFILE.get(section.name)
+        if profile is None:
+            unexpected.append(section.name)
+            continue
+        expected_type, expected_flags = profile
+        if section.section_type != expected_type:
+            raise GenerationError(
+                f"COMGR ELF allocated section {section.name!r} has type "
+                f"{section.section_type}, expected {expected_type}"
+            )
+        if section.flags != expected_flags:
+            raise GenerationError(
+                f"COMGR ELF allocated section {section.name!r} has flags "
+                f"{section.flags:#x}, expected {expected_flags:#x}"
+            )
+        if section.name in seen_names:
+            raise GenerationError(f"COMGR ELF duplicates allocated section {section.name!r}")
+        seen_names.add(section.name)
+        size = _section_size(section)
+        if size <= 0:
+            raise GenerationError(f"COMGR ELF allocated section {section.name!r} is empty")
+        if size > MAX_METADATA_SECTION_SIZE:
+            raise GenerationError(f"COMGR ELF allocated section {section.name!r} is too large")
+        if section.section_type == SHT_NOBITS:
+            if section.content:
+                raise GenerationError(
+                    f"COMGR ELF allocated NOBITS section {section.name!r} has payload bytes"
+                )
+        elif len(section.content) != size:
+            raise GenerationError(
+                f"COMGR ELF allocated section {section.name!r} size disagrees with its payload"
+            )
+        if section.name == ".bss" and size != COMGR_BSS_SENTINEL_SIZE:
+            raise GenerationError("COMGR ELF .bss must be the one-byte NOBITS sentinel")
+        if section.name == ".dynamic":
+            _validate_dynamic_metadata(sections, section)
+    if unexpected:
+        raise GenerationError(f"COMGR ELF contains unadmitted allocated sections: {unexpected}")
+    text = _required_section(allocated, ".text")
+    rodata = _required_section(allocated, ".rodata")
+    return text, rodata
 
 
 def _symbol_name(table: ElfSection, offset: int) -> str:

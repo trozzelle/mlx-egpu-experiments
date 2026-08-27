@@ -396,13 +396,10 @@ bool set_llama_block_stage_state(
   return true;
 }
 
-bool build_llama_layer_weight_table(const std::string& model_dir,
-                                    LlamaLayerWeightTable* table,
-                                    std::string* error_text) {
+bool bind_llama_layer_weight_table(ModelWeightBinder& binder,
+                                   LlamaLayerWeightTable* table,
+                                   std::string* error_text) {
   if (table == nullptr) return fail(error_text, "Llama layer weight table is required");
-
-  ModelWeightBinder binder;
-  if (!binder.open(model_dir, error_text)) return false;
 
   LlamaLayer0WeightSpans layer0;
   if (!binder.bind_llama_layer0(kLlama32OneBGeometry, &layer0, error_text)) return false;
@@ -419,6 +416,14 @@ bool build_llama_layer_weight_table(const std::string& model_dir,
   }
   *table = std::move(candidate);
   return true;
+}
+
+bool build_llama_layer_weight_table(const std::string& model_dir,
+                                    LlamaLayerWeightTable* table,
+                                    std::string* error_text) {
+  ModelWeightBinder binder;
+  if (!binder.open(model_dir, error_text)) return false;
+  return bind_llama_layer_weight_table(binder, table, error_text);
 }
 
 bool build_llama_layer0_stage_trace_dispatch(const std::string& model_dir, uint32_t token_id,
@@ -488,24 +493,27 @@ bool build_llama_persistent_dispatch(const LlamaLayerWeightTable& weights,
   LlamaPersistentDispatch candidate;
   candidate.block_capacity = block_capacity;
   candidate.layer_weight_metadata = weights;
-  const LlamaLayerWeightSpans& window = weights.layers.front();
-  const Fp16WeightSpan* spans[] = {
-      &window.input_layernorm, &window.post_attention_layernorm, &window.q_proj,
-      &window.k_proj, &window.v_proj, &window.o_proj, &window.gate_proj,
-      &window.up_proj, &window.down_proj};
-  LlamaLayerResidentBufferIndices window_indices{};
-  uint32_t* slots[] = {&window_indices.input_layernorm, &window_indices.post_attention_layernorm,
-                       &window_indices.q_projection, &window_indices.k_projection,
-                       &window_indices.v_projection, &window_indices.o_projection,
-                       &window_indices.gate_projection, &window_indices.up_projection,
-                       &window_indices.down_projection};
-  for (size_t index = 0; index < 9; ++index) {
-    *slots[index] = static_cast<uint32_t>(candidate.request.buffers.size());
-    if (!append_resident_weight(*spans[index], &candidate.request, error_text)) return false;
-    candidate.request.buffers.back().allow_post_prepare_upload = true;
+  candidate.layer_buffers.reserve(kLlamaStageLayerCount);
+  for (const LlamaLayerWeightSpans& layer_weights : weights.layers) {
+    const Fp16WeightSpan* spans[] = {
+        &layer_weights.input_layernorm, &layer_weights.post_attention_layernorm,
+        &layer_weights.q_proj,          &layer_weights.k_proj,
+        &layer_weights.v_proj,          &layer_weights.o_proj,
+        &layer_weights.gate_proj,       &layer_weights.up_proj,
+        &layer_weights.down_proj};
+    LlamaLayerResidentBufferIndices layer_indices{};
+    uint32_t* slots[] = {
+        &layer_indices.input_layernorm, &layer_indices.post_attention_layernorm,
+        &layer_indices.q_projection,    &layer_indices.k_projection,
+        &layer_indices.v_projection,    &layer_indices.o_projection,
+        &layer_indices.gate_projection, &layer_indices.up_projection,
+        &layer_indices.down_projection};
+    for (size_t index = 0; index < 9; ++index) {
+      *slots[index] = static_cast<uint32_t>(candidate.request.buffers.size());
+      if (!append_resident_weight(*spans[index], &candidate.request, error_text)) return false;
+    }
+    candidate.layer_buffers.push_back(layer_indices);
   }
-
-  candidate.layer_buffers.assign(kLlamaStageLayerCount, window_indices);
   auto append_scratch = [&](const char* name, uint64_t bytes, uint64_t readback_bytes = 0) {
     const uint32_t index = static_cast<uint32_t>(candidate.request.buffers.size());
     candidate.request.buffers.push_back({name, {}, bytes, readback_bytes});

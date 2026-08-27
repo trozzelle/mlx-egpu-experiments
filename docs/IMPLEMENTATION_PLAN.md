@@ -1,6 +1,6 @@
 # R9700 Products High-Level Implementation Plan
 
-> This is the approved program-level implementation plan. It defines workstreams, change surfaces, dependencies, integration gates, and validation ownership. It is not an executable task packet; create phase-specific task documents with `plan-to-agent-task-docs` when a phase is ready.
+> This is the approved program-level plan. Executable supervisor/swarm packets now live in [`docs/tasks/r9700-products/`](tasks/r9700-products/README.md); they preserve this plan's workstreams, dependencies, gates, validation ownership, and source references.
 
 **Goal:** Deliver a persistent, high-performance R9700 Prefill Service and a reusable Portable Inference Device Platform without regressing the accepted native Llama producer/cache path.
 
@@ -12,6 +12,8 @@
 
 - Target hardware: AMD Radeon AI PRO R9700, PCI `1002:7551`, RDNA4 `gfx1201`, 32 GB, Apple Silicon macOS over Thunderbolt.
 - TinyGPU remains the sole production device owner.
+- TinyGPU source, build, and task authority is the in-repository `tinygpu/` tree on `feature/r9700-products-wave-a`; no external TinyGPU checkout or branch is writable.
+- Upstream Tinygrad is read-only Port/Adapt provenance and never an active implementation source.
 - The native producer path remains tinygrad-free; tinygrad is a reference/differential oracle only.
 - Preserve `S-1` prompt-cache semantics and final-token injection for mlx-lm.
 - Producer KV is authoritative until handoff; consumer fallback is legal only before cache acceptance.
@@ -55,10 +57,11 @@ flowchart LR
     F2 --> F3
     F3 --> F4[F4 Tiled attention/context]
     F4 --> F5[F5 Fusion/direct handoff]
-    F5 --> F6[F6 Quantized/model promotion]
 
     B0 --> P1[P1 TinyGPU ownership]
-    P1 --> P2[P2 Inference HAL]
+    B0 --> P1ABI[P1 stable ABI]
+    P1ABI --> P2[P2 Inference HAL]
+    P1 -. promotion .-> P2
     B0 --> P3[P3 Kernel Packs]
     P2 --> P4[P4 Service adopts platform]
     P3 --> P4
@@ -70,7 +73,51 @@ flowchart LR
     F4 --> F6
 ```
 
-Recommended first execution tranche: F1, F2, P1, P3, and Q1 may proceed independently. F3 waits for F2 and the resident/prepacking decisions from F1. P2 waits for a stable P1 device-owner boundary. F2 owns the shared G0 WMMA conformance record; P1, P2, and P3 may start without it but cannot promote by creating duplicate proofs. P4 remains the first production-runtime convergence point. F4/F5/F6 and P5 remain downstream capability promotions.
+The first tranche produced F1 promotion plus partial F2/P1/P3/Q1 foundations. Continuing execution uses the task-set waves below rather than treating whole phases as simultaneously runnable.
+
+### Wave B0 — immediate independent unblockers
+
+Five lanes are ready now:
+
+1. **F2 task set 3A:** materialize pinned rocWMMA/AITER sources and select one candidate gfx1201 image.
+2. **P1 task set 1A:** re-freeze the infeasible import transport through security/architecture review.
+3. **P1 task set 2A:** bind cold-firmware revisions, hashes, licenses, ASIC/IP scope, and bundle policy.
+4. **Q1 task set 7:** close immutable base revision and license provenance.
+5. **P2 task set 1:** freeze the portable HAL against the accepted stable P1 subset, explicitly deferring import/device-local/private-VM operations.
+
+The five reports/source-input sets may develop concurrently. One P1↔P2 contract owner serializes edits to both phase packets and the active validation ledger. One upstream-manifest owner serializes F2/P1/Q1 provenance changes after each lane's disjoint report is ready. No B0 lane runs R9700 hardware.
+
+### Wave B1 — source implementation after local freezes
+
+- F2 task set 3B consumes 3A and binds real ISA/resource/physical-layout evidence. Task set 4 then implements the admitted family; task set 5 may develop the frozen numerical/tail harness beside task set 4. Task set 6 serializes the hardware benchmark and G0 publication.
+- P1 task set 2B consumes cold-firmware provenance. Task set 3 resumes import/device-local/private-VM work only after both 1A and 2B.
+- P2 task sets 2 and 3A run concurrently after its task-set-1 freeze: portable/mock objects versus the stable host-visible buffer/executable AMD backend.
+- Q1 provenance closure remains independent.
+
+### Wave B2 — G0 consumers and backend completion
+
+After G0, F3 projection work and P3's exact G0 Kernel Pack migration run concurrently. P2 task set 3B consumes the amended/accepted P1 import and mapping contract; P2 task set 4 follows 3A/3B. P2 may implement before P1/G0 acceptance but cannot promote without both.
+
+One F2→P3 integration owner serializes shared catalog/generated-asset files. F3 owns projection graph files and consumes F1's already-promoted model-handle/prepacking contract.
+
+### Wave C1 — graph and platform completion
+
+F4 tiled attention, P2 command/queue/fence completion, and P3 final promotion may run concurrently after their direct dependencies. Their source work is disjoint; all R9700 hardware commands serialize through the hardware lock.
+
+### Wave C2 — product/platform convergence
+
+P4 begins production migration only after accepted P2/P3 and the selected F2–F4 graph. F4→P4 handoff uses one graph/runtime/service integration owner; P4 does not race F4 in shared runtime or service evidence files.
+
+### Wave D — downstream measured options
+
+F5 fusion/direct-handoff work may begin after F4. F6 quantized/Qwen work begins only after both F4 and Q1 task set 7; once both prerequisites hold, F5/F6 may investigate concurrently with serialized integration where they touch Kernel Packs, model residency, or Engine Adapters. P5 begins only after P4 and an evidence-selected, human-approved need.
+
+### Parallelism and promotion rules
+
+- Parallelize source/research lanes with disjoint ownership; serialize shared contract/catalog/runtime integration through named owners.
+- Serialize every DEXT install and R9700 hardware command, regardless of source-wave concurrency.
+- G0 is produced once by F2 and consumed verbatim by P1/P2/P3/F3.
+- Promotion gates remain strict: partial/mock/offline work never substitutes for P1 hardware ownership, F2 native WMMA evidence, P3 exact artifact migration, or Q1 provenance.
 
 ## Repository and file responsibility map
 
@@ -96,16 +143,16 @@ New focused modules are justified only at clear ownership boundaries:
 
 Do not create these modules as scaffolds. Each appears only in the task set that delivers working behavior and focused tests.
 
-### TinyGPU source repository
+### In-repository TinyGPU product source
 
-Device-owner work belongs in the existing TinyGPU DEXT source, not a new DEXT:
+`tinygpu/` is the sole writable TinyGPU source, build, and task authority on branch `feature/r9700-products-wave-a`. Upstream Tinygrad remains read-only Port/Adapt provenance only. Device-owner work belongs in this in-repository TinyGPU DEXT source, not a separate checkout or new DEXT:
 
-- `extra/usbgpu/tbgpu/installer/TinyGPUDriverExtension/TinyGPUDriver.cpp`
-- `TinyGPUDriver.iig`
-- `TinyGPUDriverUserClient.cpp`
-- `TinyGPUDriverUserClient.iig`
+- `tinygpu/TinyGPUDriverExtension/`
+- `tinygpu/Conformance/`
+- `tinygpu/Shared/`
+- `tinygpu/TinyGPUDriverExtension.xcodeproj/`
 
-The `egpu` repository owns conformance clients, integration, and accepted inference evidence. TinyGPU owns DriverKit lifecycle, resource, user-client, and security behavior. Cross-repository task documents must freeze request/response structures before either side implements against them.
+The products worktree owns phase/task ledgers, validation commands, and accepted inference evidence. `tinygpu/` owns DriverKit lifecycle, resource, user-client, conformance-client, packaging, and security behavior. All TinyGPU Xcode/build/install commands run from `tinygpu/` and write binaries under `tinygpu/build/`; in-repository task documents must freeze request/response structures before implementation.
 
 ### Read-only/adaptation references
 
@@ -168,12 +215,12 @@ An independently admitted and measured gfx1201 FP16 WMMA linear family executes 
 
 ### Work packages
 
-1. Generate the expected gfx1201 lane/register layout with the pinned AMD matrix calculator.
-2. Execute an independent lane-map proof through the local loader; reject any narrative-only mapping.
-3. Admit the first full WMMA GEMM image with exact source/image provenance and resources.
-4. Compare full tiles and masked/padded M tails against NumPy and the scalar/native projection.
-5. Record FP32 accumulation/FP16 cast tolerance, effective TFLOP/s, bandwidth, and resource use.
-6. Publish the family to the existing catalog without selecting it for model execution yet.
+1. Freeze expected gfx1201 lane/register layout, family ABI, numerical policy, ownership, and commands.
+2. Execute the independent lane-map proof.
+3. Materialize exact pinned rocWMMA/AITER sources, complete file-level license review, and select one candidate image with source/build digest.
+4. Bind the real image's ISA, descriptors, resources, and physical layout through offline admission.
+5. Implement the first WMMA family while developing its frozen full-tile/tail numerical harness.
+6. Run native numerical/performance evidence and publish the immutable G0 record/catalog family without model selection.
 
 ### Validation and cutover
 
@@ -302,12 +349,12 @@ TinyGPU cold-initializes and safely owns R9700 buffers, VA, queues, executable s
 
 ### Work packages
 
-1. Freeze ABI versioning, opaque handles, bounded structures, status/error domains, and entitlement scopes.
-2. Add cold lifecycle stages and differential register/evidence capture.
-3. Add buffer/VA and queue ownership with client-death reclamation.
-4. Add validated executable/command submission, fences, timestamps, and fault attribution.
-5. Add queue/device reset and recovery policy.
-6. Run fresh power-on → BO/VM → SDMA → constant-store → WMMA → sustained inference.
+1. Preserve the accepted stable ABI/security/role boundary and re-freeze the infeasible import transport through a focused amendment.
+2. Bind every required cold-firmware input to revision, SHA-256, WHENCE/license, ASIC/IP scope, and approved DEXT bundle/load policy.
+3. Complete cold lifecycle ownership and differential register/evidence capture without accepting pre-warmed state.
+4. Complete import, device-local/private-VM, and queue ownership with client-death reclamation.
+5. Add validated executable/command submission, fences, timestamps, faults, queue/device reset, and recovery.
+6. Run fresh power-on → BO/VM → SDMA → constant-store → G0 WMMA → sustained inference.
 
 ### Validation and cutover
 
@@ -327,12 +374,12 @@ Portable Device/Buffer/Executable/CommandBuffer/Queue/Fence semantics execute ov
 
 ### Work packages
 
-1. Freeze object lifetimes, capabilities, memory domains, command semantics, and error propagation.
-2. Implement buffer and executable objects over TinyGPU handles.
-3. Implement command recording and validated submit with wait/signal fences.
-4. Implement timestamps, timeout, fault, and reset observation.
-5. Run copy/fill/constant-store/WMMA/barrier/error conformance.
-6. Remove every AMD packet/register type from portable headers.
+1. Freeze the portable ABI now against the accepted stable P1 subset, with a separate deferred import/device-local/private-VM operation matrix.
+2. Implement portable objects/mock conformance and the stable AMD host-visible buffer/executable backend in parallel.
+3. Extend the AMD backend with import/device-local/private-VM semantics only after P1 accepts them.
+4. Implement command recording, validated submit, wait/signal fences, timestamps, timeout, fault, and reset observation.
+5. Run direct/HAL copy/fill/constant-store/G0 WMMA/barrier/error equivalence after P1/G0 acceptance.
+6. Remove every AMD packet/register type from portable headers; P4 alone owns service migration.
 
 ### Validation and cutover
 
@@ -415,12 +462,12 @@ Use and tighten existing `qwen_*` modules and Qwen tests. Do not add R9700-nativ
 
 ### Work packages
 
-1. Pin model/config/tensor identity and quantized interpretation.
-2. Define every hybrid cache component's shape, dtype, owner, update, position, and serialization/adapter behavior.
-3. Produce deterministic CPU/MLX oracle fixtures and failure-localizing comparisons.
-4. Map shared versus Qwen-specific native shape families.
-5. Define the F6 native acceptance corpus and hardware evidence requirements.
-6. Keep all Q1 artifacts labeled `cpu_reference` or oracle-only.
+1. Preserve the accepted model/config/tensor identity, quantized interpretation, hybrid-cache ownership, recurrence, fixtures, shape map, and F6 corpus.
+2. Resolve the immutable base-model revision through source-verified evidence; never infer a commit from conversion output.
+3. Bind the applicable base-model license, source scope, and redistribution conditions.
+4. Update the source pin/model fingerprint only if verified identity changes, regenerating fixtures only when required.
+5. Rerun source-pin, tensor, hybrid-state, oracle parity, and package-review gates.
+6. Keep all Q1 artifacts labeled `cpu_reference` or oracle-only; native work remains F6.
 
 # Integration and review gates
 

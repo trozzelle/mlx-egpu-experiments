@@ -26,6 +26,7 @@ Qwen3.8-27B remains a separate target-expansion contract because it uses MLX-VLM
 
 - `native_r9700/` — current service, producer/oracle, cache, parity, benchmark, runtime, model-binding, Kernel Pack foundation, and Qwen contract code.
 - `tinygrad_kv_worker/` — historical Path A harness/exporter retained as a correctness control.
+- `tinygpu/` — sole writable TinyGPU source, build, task, conformance, packaging, and DriverKit authority on `feature/r9700-products-wave-a`; run TinyGPU commands there and keep local binaries under `tinygpu/build/`.
 - `tests/native_r9700/` — regression and contract tests for accepted C1R/C2R behavior plus current runtime, benchmark, kernel, and Qwen work.
 - `tests/native_r9700/fixtures/` — committed Llama/Qwen oracle fixture data and schemas.
 - `tests/` — Path A controls plus native AMDev/runtime contract coverage.
@@ -33,6 +34,7 @@ Qwen3.8-27B remains a separate target-expansion contract because it uses MLX-VLM
 - `docs/archive/` — completed/superseded task packets, implementation plans, design specs, and diagnostic handoffs; historical evidence only.
 - `.superpowers/swarm/` — swarm ledger/reports. Use `progress.md` for freshest status when it conflicts with older reports.
 - `experiments/native-r9700-runtime/` — native runtime probes and stale negative controls.
+- Upstream Tinygrad — read-only Port/Adapt provenance only; do not edit or use another TinyGPU checkout/branch as an active source.
 - `logs/`, `build/`, `mlx_models/`, `artifacts/` — local/generated; do not commit unless a task explicitly promotes a fixture/report.
 
 ## Development Commands
@@ -125,6 +127,7 @@ DEV=AMD JITBEAM=2 HF_HOME=${HOME}/Development/ml/models \
 - `docs/DESIGN.md` — TinyGPU/HAL/Kernel Pack/service/cache/numerical/security contracts.
 - `docs/ROADMAP.md` — current F1–F6, P1–P5, Q1 capability ordering and G0–G3 integration gates.
 - `docs/IMPLEMENTATION_PLAN.md` — current two-track high-level implementation plan.
+- `docs/tasks/r9700-products/README.md` — current supervisor/swarm task packet index and concurrency map.
 - `docs/REFERENCES.md` and `docs/upstream-reference-manifest.yaml` — source-reuse roles and immutable upstream pins.
 - `docs/adr/0006-two-products-independent-tracks.md` — co-equal product and independent-track decision.
 - `docs/adr/0007-tinygpu-owner-portable-hal.md` — TinyGPU ownership and portable HAL decision.

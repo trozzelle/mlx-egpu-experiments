@@ -167,3 +167,172 @@ def test_native_benchmark_result_requires_at_least_one_accepted_native_row():
 
     with pytest.raises(benchmark.BenchmarkError, match="accepted r9700_native C2 row"):
         benchmark.validate_benchmark_rows([cpu_row], require_native=True)
+
+
+def test_persistent_worker_evidence_expands_rows_and_separates_scope_aggregates(
+    tmp_path,
+):
+    benchmark = _benchmark_module()
+    serving_path = tmp_path / "warm-serving.json"
+    samples = [
+        _accepted_native_serving_result(
+            request_id=f"worker-warm-prefill-{index}",
+            prompt_name="prompt-128",
+            prompt_token_count=129,
+            S=129,
+            N=128,
+            prefill_elapsed_sec=float(index),
+            kernel_elapsed_usec=index * 1_000_000,
+        )
+        for index in range(1, 11)
+    ]
+    worker_payload = {
+        "schema_version": "r9700_native_worker_v1",
+        "mode": "warm",
+        "producer_kind": _R9700_NATIVE_PRODUCER_KIND,
+        "status": "pass",
+        "exit_status": 0,
+        "sample_count": 10,
+        "raw_warm_sample_count": 10,
+        "operations": ["LoadModel", *["Prefill"] * 10, "UnloadModel"],
+        "metrics": {
+            "cold_process_sample_count": 1,
+            "cold_process_elapsed_sec": 2.5,
+            "load_preparation_count": 1,
+            "prefill_count": 10,
+            "warm_prefill_weight_reload_count": 0,
+        },
+        "samples": samples,
+    }
+    serving_path.write_text(json.dumps(worker_payload), encoding="utf-8")
+
+    rows = benchmark.load_benchmark_rows(
+        [serving_path],
+        model_dir="model-dir",
+        fixtures_dir="fixtures-dir",
+    )
+    scopes = benchmark.scope_aggregates_from_serving_results(
+        [serving_path],
+        rows=rows,
+    )
+    result = benchmark.build_benchmark_result(
+        rows,
+        model_dir="model-dir",
+        fixtures_dir="fixtures-dir",
+        artifacts_dir="artifacts",
+        json_path="benchmark.json",
+        report_path="benchmark.md",
+        log_path="benchmark.log",
+        producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+        command="benchmark",
+        scope_evidence=scopes,
+    )
+
+    assert scopes["raw_warm_sample_count"] == 10
+    assert scopes["scope_aggregate_count"] == 3
+    assert scopes["total_record_count"] == 13
+    assert scopes["records_by_scope"] == {
+        "cold_process": 1,
+        "warm_prefill": 11,
+        "gpu_compute": 1,
+    }
+    aggregates = scopes["scope_aggregate_records"]
+    assert [row["scope"] for row in aggregates] == [
+        "cold_process",
+        "warm_prefill",
+        "gpu_compute",
+    ]
+    assert all(row["record_kind"] == "scope_aggregate" for row in aggregates)
+    assert all(row["row_role"] == "native_benchmark" for row in aggregates)
+    for row in aggregates:
+        benchmark.validate_benchmark_row(row)
+    cold, warm, gpu = aggregates
+    assert cold["aggregate_sample_count"] == 1
+    assert cold["aggregate_median_elapsed_sec"] == 2.5
+    assert warm["aggregate_sample_count"] == gpu["aggregate_sample_count"] == 10
+    assert (
+        warm["aggregate_median_elapsed_sec"]
+        == gpu["aggregate_median_elapsed_sec"]
+        == 5.5
+    )
+    assert warm["aggregate_median_absolute_deviation_sec"] == 2.5
+    assert result["row_count"] == result["native_row_count"] == 13
+    assert len(result["rows"]) == 13
+    assert sum(row["record_kind"] == "raw_sample" for row in result["rows"]) == 10
+    raw_rows = [row for row in result["rows"] if row["record_kind"] == "raw_sample"]
+    assert [row["request_id"] for row in raw_rows] == [
+        f"worker-warm-prefill-{index}" for index in range(1, 11)
+    ]
+    assert warm["tokens_per_sec_prefill"] == pytest.approx(128 / 5.5)
+    scoped_log_path = tmp_path / "scoped-benchmark.log"
+    benchmark.write_benchmark_log(scoped_log_path, result)
+    scoped_log = scoped_log_path.read_text(encoding="utf-8")
+    assert (
+        'records_by_scope: {"cold_process": 1, "gpu_compute": 1, "warm_prefill": 11}'
+        in scoped_log
+    )
+    assert scoped_log.count("record_kind: raw_sample") == 10
+    assert scoped_log.count("record_kind: scope_aggregate") == 3
+    assert "scope: cold_process" in scoped_log
+    assert "scope: warm_prefill" in scoped_log
+    assert "scope: gpu_compute" in scoped_log
+    assert "aggregate_identity: warm_prefill_median_mad_v1" in scoped_log
+
+    for invalid_update in (
+        {"status": "error", "exit_status": 2},
+        {
+            "operations": [
+                "LoadModel",
+                *["Prefill"] * 5,
+                "LoadModel",
+                *["Prefill"] * 5,
+                "UnloadModel",
+            ]
+        },
+    ):
+        invalid_payload = {**worker_payload, **invalid_update}
+        serving_path.write_text(json.dumps(invalid_payload), encoding="utf-8")
+        with pytest.raises(
+            benchmark.BenchmarkError,
+            match="persistent warm worker scope evidence is invalid",
+        ):
+            benchmark.scope_aggregates_from_serving_results(
+                [serving_path],
+                rows=rows,
+            )
+
+
+def test_native_cli_keeps_ordinary_accepted_serving_rows_unscoped(tmp_path):
+    benchmark = _benchmark_module()
+    serving_path = tmp_path / "serving.json"
+    output_path = tmp_path / "benchmark.json"
+    serving_path.write_text(
+        json.dumps(_accepted_native_serving_result()),
+        encoding="utf-8",
+    )
+
+    exit_status = benchmark.main(
+        [
+            "--model",
+            "model-dir",
+            "--fixtures-dir",
+            "fixtures-dir",
+            "--artifacts-dir",
+            str(tmp_path / "artifacts"),
+            "--json",
+            str(output_path),
+            "--report",
+            str(tmp_path / "benchmark.md"),
+            "--log",
+            str(tmp_path / "benchmark.log"),
+            "--producer-kind",
+            _R9700_NATIVE_PRODUCER_KIND,
+            "--serving-result",
+            str(serving_path),
+        ]
+    )
+
+    assert exit_status == 0
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["row_count"] == payload["native_row_count"] == 1
+    assert payload["scope_aggregate_count"] == 0

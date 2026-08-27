@@ -9,6 +9,7 @@ AMDEV_SESSION_SOURCE = Path("native_r9700/amdev_session.cpp")
 AMDEV_PACKET_SOURCE = Path("native_r9700/amdev_packets.cpp")
 KERNEL_CATALOG_SOURCE = Path("native_r9700/kernel_catalog.cpp")
 DEVICE_MEMORY_SOURCE = Path("native_r9700/device_memory.cpp")
+HARDWARE_LOCK_SOURCE = Path("native_r9700/hardware_lock.cpp")
 VRAM_CLOSURE_SOURCES = (
     Path("native_r9700/vram_layout.cpp"),
     Path("native_r9700/vram_allocator.cpp"),
@@ -20,6 +21,7 @@ NATIVE_INCLUDE_DIR = Path("native_r9700")
 
 
 def compile_memory_probe(tmp_path: Path) -> Path:
+    assert HARDWARE_LOCK_SOURCE.is_file(), "native_r9700 hardware-lock source is missing"
     probe_source = tmp_path / "device_memory_probe.cpp"
     probe_source.write_text(
         r"""
@@ -125,6 +127,7 @@ int main() {
             str(AMDEV_PACKET_SOURCE),
             str(KERNEL_CATALOG_SOURCE),
             str(DEVICE_MEMORY_SOURCE),
+            str(HARDWARE_LOCK_SOURCE),
             *map(str, VRAM_CLOSURE_SOURCES),
             "-I",
             str(NATIVE_INCLUDE_DIR),

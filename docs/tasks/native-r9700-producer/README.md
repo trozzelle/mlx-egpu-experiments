@@ -12,5 +12,6 @@ Current implementation authority:
 - [`docs/ROADMAP.md`](../../ROADMAP.md)
 - [`docs/IMPLEMENTATION_PLAN.md`](../../IMPLEMENTATION_PLAN.md)
 - [`docs/REFERENCES.md`](../../REFERENCES.md)
+- [`docs/tasks/r9700-products/README.md`](../r9700-products/README.md) — current B0, F1–F6, P1–P5, Q1, and G0–G3 supervisor/swarm packets.
 
-Create new executable task packets from a ready F1–F6, P1–P5, or Q1 phase with `plan-to-agent-task-docs`. Do not reactivate archived packets by editing them in place.
+Supervisors execute current work from the `r9700-products` packet set and update only the assigned ledger rows. Do not reactivate archived packets by editing them in place.

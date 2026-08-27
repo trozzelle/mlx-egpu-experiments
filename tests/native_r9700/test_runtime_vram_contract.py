@@ -14,6 +14,7 @@ from native_r9700.llama_stage_oracle import STAGE_SPECS
 
 AMDEV_SESSION_SOURCE = Path("native_r9700/amdev_session.cpp")
 
+HARDWARE_LOCK_SOURCE = Path("native_r9700/hardware_lock.cpp")
 RUNNER_SOURCES = (
     Path("native_r9700/amdev_packets.cpp"),
     Path("native_r9700/runtime_contract.cpp"),
@@ -26,12 +27,14 @@ RUNNER_SOURCES = (
     Path("native_r9700/vram_smoke_asset.cpp"),
     Path("native_r9700/kernel_assets.cpp"),
     Path("native_r9700/device_memory.cpp"),
+    HARDWARE_LOCK_SOURCE,
     Path("native_r9700/llama_stage_layout.cpp"),
     Path("native_r9700/llama_layer_executor.cpp"),
     Path("native_r9700/model_weight_binder.cpp"),
     Path("native_r9700/amdev_session.cpp"),
     Path("native_r9700/kernel_catalog.cpp"),
     Path("native_r9700/runtime.cpp"),
+    Path("native_r9700/native_resource_worker.cpp"),
     Path("native_r9700/runner.cpp"),
 )
 
@@ -67,6 +70,7 @@ VRAM_SMOKE_RESULT_FIELDS = frozenset(
 
 def compile_runner(tmp_path: Path) -> Path:
     """Compile the runner plus every resident-VRAM production dependency."""
+    assert HARDWARE_LOCK_SOURCE in RUNNER_SOURCES, "runner closure must link HardwareLock"
     assert all(source.exists() for source in RUNNER_SOURCES), (
         "native_r9700 resident-VRAM runner sources missing"
     )
@@ -155,7 +159,7 @@ def test_fixed_vm_gc_flush_uses_req_ack_without_semaphore() -> None:
     assert "regs_gfx1201::kGcInvalidateEng17Ack" in flush_body
     assert "regs_gfx1201::kGcInvalidateEng17Sem" not in flush_body
     assert flush_body.index("kGcInvalidateEng17Req") < flush_body.index("kGcInvalidateEng17Ack")
-    assert "flush_gc_tlb_vmid0_native(client, log, &error)" in setup_body
+    assert "flush_gc_tlb_vmid0_native(client, log, &error, hdp_flush_usec)" in setup_body
 
 def test_vram_smoke_readback_mismatch_reports_observed_value() -> None:
     """A resident-compute mismatch must identify the first divergent word."""

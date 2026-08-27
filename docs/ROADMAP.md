@@ -7,6 +7,7 @@ This roadmap sequences capabilities for `ARCHITECTURE.md` and `DESIGN.md`. It is
 - The R9700 Prefill Service and Portable Inference Device Platform are co-equal products with independent tracks (ADR 0006).
 - Current native C1R/C2R correctness is the baseline; future phases must not relabel completed acceptance as unfinished work.
 - Prefill optimization continues on the proven TinyGPU/AMDev path while platform contracts mature.
+- Active TinyGPU source/build/task authority is the in-repository `tinygpu/` tree on `feature/r9700-products-wave-a`; upstream Tinygrad remains read-only Port/Adapt provenance only.
 - Cross-track adoption occurs only through explicit integration gates.
 - Warm prefill is the primary product performance metric; cold process and GPU compute remain separate evidence scopes.
 - Final decoded tokens remain exact. Optimized intermediate K/V and logits use reviewed Kernel Pack tolerances.
@@ -249,6 +250,8 @@ The 2026-08-25 diagnosis reports 18.012 seconds / 7.11 prefix tok/s for prompt-1
 
 **Outcome:** TinyGPU provides the production-safe device lifecycle and user-client authority required by independent inference clients.
 
+The P1 implementation boundary is `tinygpu/` in the products worktree. Every TinyGPU Xcode/build/install/conformance command runs from that tree and writes local binaries under `tinygpu/build/`; no external TinyGPU checkout or branch is an active source authority.
+
 ### Capabilities
 
 - Cold enclosure/device initialization without tinygrad warm-up.
@@ -295,7 +298,7 @@ The 2026-08-25 diagnosis reports 18.012 seconds / 7.11 prefix tok/s for prompt-1
 - P1 stable device-owner operations.
 - `DESIGN.md` HAL semantics.
 - IREE and PJRT as Pattern references only.
-- P2 may begin after P1 ABI freeze; P2 promotion requires Gate G0 rather than a duplicate HAL-specific WMMA proof.
+- P2 task set 1 may begin now because the stable P1 ABI subset is frozen. Portable/mock and stable host-visible/executable backend work may proceed before P1 completion; import/device-local/private-VM work waits for the reviewed P1 amendment. P2 promotion requires accepted P1 plus Gate G0 rather than a duplicate HAL-specific proof.
 
 ### Promotion gate
 
@@ -470,7 +473,7 @@ For Llama 3.2 1B prompt-128 warm prefill, 100, 500, 1,000, and 2,000 tok/s are d
 
 ## Handoff to task docs
 
-When a phase is ready, use `plan-to-agent-task-docs` to create executable task packets from:
+Current executable task packets are indexed at [`docs/tasks/r9700-products/README.md`](tasks/r9700-products/README.md). When a phase contract changes or a new phase is added, update/regenerate its packet with `plan-to-agent-task-docs` from:
 
 - this phase outcome and promotion gate;
 - `DESIGN.md` contracts;

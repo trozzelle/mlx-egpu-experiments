@@ -416,6 +416,60 @@ bool release_all_unmap_failure_quarantines_failed_range() {
                  "the later allocation must coexist with the stale release-all mapping");
 }
 
+bool maps_and_reclaims_four_gibibytes_of_resident_ranges() {
+  constexpr uint64_t kOneGiB = 1ULL << 30;
+  constexpr uint64_t kResidentBytes = 4ULL * kOneGiB;
+  const native_r9700::VramLayout base_layout =
+      layout_with_owned_pages(kResidentBytes / kPageBytes);
+  native_r9700::VramLayout layout = base_layout;
+  layout.resident_gpu_va_limit = kResidentVaBase + kResidentBytes;
+  native_r9700::VramAllocator allocator(layout);
+  FakePageMapper mapper;
+  native_r9700::ResidentMemory memory = resident_memory(layout, allocator, &mapper);
+  native_r9700::ResidentBuffer first{};
+  native_r9700::ResidentBuffer second{};
+  native_r9700::ResidentBuffer third{};
+  std::string error_text;
+
+  const uint64_t first_bytes = kOneGiB + kPageBytes;
+  const uint64_t second_bytes = 2ULL * kOneGiB;
+  const uint64_t third_bytes = kOneGiB - kPageBytes;
+  if (!require(memory.allocate("first-gib", first_bytes, &first, &error_text),
+               "first multi-GiB resident allocation must succeed") ||
+      !require(memory.allocate("middle-gib", second_bytes, &second, &error_text),
+               "middle multi-GiB resident allocation must succeed") ||
+      !require(memory.allocate("last-gib", third_bytes, &third, &error_text),
+               "last multi-GiB resident allocation must succeed")) {
+    return false;
+  }
+
+  if (!require(first.gpu_va == kResidentVaBase,
+               "multi-GiB allocation must start at the resident base") ||
+      !require(second.gpu_va == first.gpu_va + first.size_bytes &&
+                   third.gpu_va == second.gpu_va + second.size_bytes,
+               "multi-GiB resident ranges must be contiguous and monotonic") ||
+      !require(third.gpu_va + third.size_bytes == layout.resident_gpu_va_limit,
+               "multi-GiB resident ranges must end at the expanded limit") ||
+      !require(mapper.map_attempts == kResidentBytes / kPageBytes,
+               "every multi-GiB resident page must be mapped exactly once") ||
+      !require(mapper.mapped_page_count() == kResidentBytes / kPageBytes,
+               "all multi-GiB resident pages must remain uniquely mapped")) {
+    return false;
+  }
+
+  memory.release_all();
+  native_r9700::ResidentBuffer reused{};
+  return require(mapper.unmap_attempts == kResidentBytes / kPageBytes,
+                 "release must unmap every multi-GiB resident page") &&
+         require(mapper.mapped_page_count() == 0,
+                 "release must leave no multi-GiB resident mapping") &&
+         require(memory.allocate("reused", kPageBytes, &reused, &error_text),
+                 "released multi-GiB allocation space must be reusable") &&
+         require(reused.gpu_va == kResidentVaBase &&
+                     reused.allocation.physical_offset == kOwnedBase,
+                 "multi-GiB release must restore the first VA and physical page");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -433,6 +487,8 @@ int main(int argc, char** argv) {
   if (mode == "release-all") return release_all_unmaps_and_reclaims_everything() ? 0 : 6;
   if (mode == "release-all-unmap-failure")
     return release_all_unmap_failure_quarantines_failed_range() ? 0 : 7;
+  if (mode == "multi-gib-resident")
+    return maps_and_reclaims_four_gibibytes_of_resident_ranges() ? 0 : 11;
   return 10;
 }
 '''.lstrip(),
@@ -527,3 +583,9 @@ def test_resident_memory_quarantines_range_when_release_all_unmap_fails(
 ) -> None:
     """A stale release-all mapping cannot alias a later VA or physical allocation."""
     run_resident_memory_probe(tmp_path, "release-all-unmap-failure")
+
+def test_resident_memory_maps_and_reclaims_four_gibibytes_without_host_payloads(
+    tmp_path: Path,
+) -> None:
+    """Resident metadata/page callbacks span four GiB without allocating host payloads."""
+    run_resident_memory_probe(tmp_path, "multi-gib-resident")

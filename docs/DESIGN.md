@@ -45,6 +45,8 @@ It defines the implementation-facing contracts for the R9700 Prefill Service and
 
 TinyGPU owns all operations that can affect device integrity or another client:
 
+The sole writable TinyGPU source/build/task authority is the in-repository `tinygpu/` tree on `feature/r9700-products-wave-a`, including the DriverKit extension, conformance client, shared app, and Xcode project. Run all TinyGPU Xcode/build/install commands from `tinygpu/`; local binaries belong under `tinygpu/build/`. Upstream Tinygrad is read-only Port/Adapt provenance and cannot become a second implementation source.
+
 - attachment, power, cold initialization, firmware lifecycle, reset, and recovery;
 - BAR and register mappings;
 - buffer-object and GPU-virtual-address authority;

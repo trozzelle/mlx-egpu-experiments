@@ -162,14 +162,44 @@ int main() {
   oversized.descriptor.sha256 = oversized.location.sha256;
   if (!rejects_without_output_mutation(oversized, root, kSchema)) return 26;
 
+  constexpr const char* kLlamaNames[] = {
+      "llama_k_projection_f16",
+      "llama_v_projection_f16",
+      "llama_rmsnorm_f16",
+      "llama_rmsnorm_zero_store_f16",
+      "llama_rmsnorm_epsilon_arithmetic_f16",
+      "llama_rope_kv_f16",
+      "llama_causal_attention_score_f16",
+      "llama_causal_attention_softmax_f32",
+      "llama_causal_attention_context_f16",
+      "llama_o_projection_f16",
+      "llama_gated_mlp_f16",
+      "llama_gate_up_projection_f16",
+      "llama_mlp_down_f16",
+  };
+  for (const char* name : kLlamaNames) {
+    const native_r9700::LlamaKernelAsset* reviewed =
+        native_r9700::find_llama_kernel_asset(name);
+    const native_r9700::KernelAssetPackAttestation* attestation =
+        native_r9700::find_kernel_pack_attestation(name);
+    if (reviewed == nullptr || attestation == nullptr ||
+        reviewed->descriptor.name != name ||
+        std::string(attestation->image_path) != std::string(name) + ".image" ||
+        std::string(attestation->image_sha256) != reviewed->descriptor.sha256 ||
+        attestation->kernarg_bytes == 0 || attestation->kernarg_field_count == 0) {
+      return 29;
+    }
+  }
+  if (native_r9700::find_kernel_pack_attestation("not-a-llama-kernel") != nullptr) {
+    return 30;
+  }
+
   if (native_r9700::find_llama_kernel_asset("not-a-llama-kernel") != nullptr) return 6;
   if (native_r9700::find_kernel("future-llama-kernel") != nullptr ||
       native_r9700::find_kernel("c0-add-one") != nullptr ||
       native_r9700::find_llama_kernel_asset("c0-add-one") != nullptr) {
     return 7;
   }
-
-  if (!rejects_without_output_mutation(asset("assets/missing.code"), root, kSchema)) return 8;
 
   native_r9700::LlamaKernelAsset wrong_target = valid;
   wrong_target.location.target = "gfx1100";

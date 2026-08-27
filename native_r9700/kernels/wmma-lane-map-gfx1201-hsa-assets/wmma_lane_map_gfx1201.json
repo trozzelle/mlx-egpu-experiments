@@ -1,0 +1,227 @@
+{
+  "descriptor_offset": 1600,
+  "descriptor_rsrc1": 3222208515,
+  "descriptor_rsrc2": 132,
+  "descriptor_rsrc3": 112,
+  "diagnostic_only": true,
+  "elf_admission": {
+    "admitted_allocated_sections": [
+      ".note",
+      ".dynsym",
+      ".gnu.hash",
+      ".hash",
+      ".dynstr",
+      ".rodata",
+      ".text",
+      ".dynamic",
+      ".relro_padding",
+      ".bss"
+    ],
+    "relocation_count": 0,
+    "section_count": 10,
+    "symbol_record_count": 2,
+    "symbol_target_count": 1
+  },
+  "entry_offset": 5888,
+  "expected_lane_map": {
+    "A": {
+      "bits_formula": "[16*(k mod 2) + 15 : 16*(k mod 2)]",
+      "gpr_formula": "2*floor(k/8) + (floor(k/2) mod 2)",
+      "lane_formula": "16*(floor(k/4) mod 2) + i",
+      "register_count": 4
+    },
+    "B": {
+      "bits_formula": "[16*(k mod 2) + 15 : 16*(k mod 2)]",
+      "gpr_formula": "2*floor(k/8) + (floor(k/2) mod 2)",
+      "lane_formula": "16*(floor(k/4) mod 2) + j",
+      "register_count": 4
+    },
+    "D": {
+      "bits_formula": "[31:0]",
+      "gpr_formula": "i mod 8",
+      "lane_formula": "16*floor(i/8) + j",
+      "register_count": 8
+    }
+  },
+  "expected_lane_map_points": {
+    "A[0][0]": "v0{0}.[15:0]",
+    "A[0][1]": "v0{0}.[31:16]",
+    "A[0][4]": "v0{16}.[15:0]",
+    "A[0][8]": "v2{0}.[15:0]",
+    "B[0][0]": "v0{0}.[15:0]",
+    "B[1][0]": "v0{0}.[31:16]",
+    "B[4][0]": "v0{16}.[15:0]",
+    "B[8][0]": "v2{0}.[15:0]",
+    "D[0][0]": "v0{0}",
+    "D[15][15]": "v7{31}",
+    "D[8][0]": "v0{16}"
+  },
+  "global_x": 32,
+  "global_y": 1,
+  "global_z": 1,
+  "group_segment_bytes": 0,
+  "image_layout": [
+    {
+      "address": 568,
+      "image_offset": 568,
+      "name": ".note",
+      "size": 756
+    },
+    {
+      "address": 1328,
+      "image_offset": 1328,
+      "name": ".dynsym",
+      "size": 96
+    },
+    {
+      "address": 1424,
+      "image_offset": 1424,
+      "name": ".gnu.hash",
+      "size": 40
+    },
+    {
+      "address": 1464,
+      "image_offset": 1464,
+      "name": ".hash",
+      "size": 40
+    },
+    {
+      "address": 1504,
+      "image_offset": 1504,
+      "name": ".dynstr",
+      "size": 76
+    },
+    {
+      "address": 1600,
+      "image_offset": 1600,
+      "name": ".rodata",
+      "size": 64
+    },
+    {
+      "address": 5888,
+      "image_offset": 5888,
+      "name": ".text",
+      "size": 1280
+    },
+    {
+      "address": 11264,
+      "image_offset": 11264,
+      "name": ".dynamic",
+      "size": 112
+    },
+    {
+      "address": 11376,
+      "image_offset": 11376,
+      "name": ".relro_padding",
+      "size": 912
+    },
+    {
+      "address": 15472,
+      "image_offset": 15472,
+      "name": ".bss",
+      "size": 1
+    }
+  ],
+  "image_path": "wmma_lane_map_gfx1201.image",
+  "image_sha256": "f25c071cb0909b890a6470a403c15002563039b5bed33bd2d99a2f79a41fd0a6",
+  "image_size": 15473,
+  "instruction": "v_wmma_f32_16x16x16_f16",
+  "kernarg_alignment": 8,
+  "kernarg_bytes": 32,
+  "kernarg_preload_bytes": 0,
+  "kernarg_schema": {
+    "bytes": 32,
+    "fields": [
+      {
+        "name": "a",
+        "offset": 0,
+        "type": "uint64"
+      },
+      {
+        "name": "b",
+        "offset": 8,
+        "type": "uint64"
+      },
+      {
+        "name": "c",
+        "offset": 16,
+        "type": "uint64"
+      },
+      {
+        "name": "observations",
+        "offset": 24,
+        "type": "uint64"
+      }
+    ],
+    "name": "wmma-lane-map-gfx1201-v1"
+  },
+  "kernel_code_properties": 1032,
+  "model_selectable": false,
+  "name": "wmma_lane_map_gfx1201",
+  "numerical_policy": "F2_WMMA_FP16_FP32_ACC_SINGLE_CAST_V1",
+  "observation_cases": [
+    "a_map",
+    "b_map",
+    "d_map"
+  ],
+  "private_segment_bytes": 0,
+  "raw_word_order": [
+    "A0",
+    "A1",
+    "A2",
+    "A3",
+    "B0",
+    "B1",
+    "B2",
+    "B3",
+    "D0",
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D6",
+    "D7"
+  ],
+  "raw_words_per_lane": 16,
+  "readback_bytes": 2048,
+  "result_register_mapping": {
+    "a_register_count": 4,
+    "b_register_count": 4,
+    "d_register_count": 8,
+    "lane_stride_bytes": 64,
+    "raw_word_order": [
+      "A0",
+      "A1",
+      "A2",
+      "A3",
+      "B0",
+      "B1",
+      "B2",
+      "B3",
+      "D0",
+      "D1",
+      "D2",
+      "D3",
+      "D4",
+      "D5",
+      "D6",
+      "D7"
+    ],
+    "readback_bytes": 2048,
+    "word_bytes": 4,
+    "words_per_lane": 16
+  },
+  "rsrc1": 3222208515,
+  "rsrc2": 132,
+  "rsrc3": 112,
+  "schema_version": 1,
+  "source_path": "native_r9700/kernels/wmma_lane_map_gfx1201.cpp",
+  "source_sha256": "7e04ddbd2edc2247fa8dadecb9882d2077c2faaacf8861bc3c17d2c12d0fae57",
+  "tail_padding_bytes": 0,
+  "target": "gfx1201",
+  "wave_size": 32,
+  "workgroup_x": 32,
+  "workgroup_y": 1,
+  "workgroup_z": 1
+}

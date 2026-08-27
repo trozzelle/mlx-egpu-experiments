@@ -37,6 +37,7 @@ _R9700_NATIVE_PRODUCER_KIND = "r9700_native"
 _PUBLIC_API = (
     "NativePrefillError",
     "NativePrefillConfig",
+    "PersistentPrefillSession",
     "generate_with_native_prefill",
     "append_or_replace_path_c2_report",
     "main",
@@ -60,6 +61,7 @@ def _serving_module():
         assert hasattr(module, api_name), f"native_r9700.serving missing public API: {api_name}"
     assert issubclass(module.NativePrefillError, Exception)
     assert callable(module.NativePrefillConfig)
+    assert callable(module.PersistentPrefillSession)
     assert callable(module.generate_with_native_prefill)
     assert callable(module.append_or_replace_path_c2_report)
     assert callable(module.main)
@@ -132,6 +134,17 @@ def _valid_metadata(n_prefix: int) -> dict[str, str]:
 
 def _completed(cmd, returncode: int = 0, stdout: str = "ok", stderr: str = ""):
     return subprocess.CompletedProcess(cmd, returncode, stdout=stdout, stderr=stderr)
+
+
+def _cache_rejection(message: str, failure_stage: str) -> dict[str, object]:
+    return {
+        "status": "blocked",
+        "error": {
+            "domain": "cache_rejection",
+            "message": message,
+            "failure_stage": failure_stage,
+        },
+    }
 
 
 def _install_producer_run(monkeypatch, serving, *, fail_prefill: bool = False, omit_cache_artifact: bool = False, native_evidence: bool = False):
@@ -244,7 +257,18 @@ def test_r9700_native_request_falls_back_but_cannot_pass_without_hardware_eviden
         request_id="native-missing-evidence",
         producer_kind=_R9700_NATIVE_PRODUCER_KIND,
     )
-    producer_calls = _install_producer_run(monkeypatch, serving)
+    service = _LiveServiceDispatcher(
+        tmp_path / "service-artifacts",
+        prefill_error=_cache_rejection(
+            "native evidence missing",
+            "native_evidence_validation",
+        ),
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
     observed = {"generate_calls": 0}
 
     def fake_generate(prompt_arg, model, **kwargs):
@@ -253,19 +277,40 @@ def test_r9700_native_request_falls_back_but_cannot_pass_without_hardware_eviden
         assert kwargs.get("prompt_cache") is None
         yield np.int64(900)
 
-    result = serving.generate_with_native_prefill(
-        "resident-model",
-        FakeTokenizer({prompt: prompt_tokens}),
-        prompt,
-        native=native,
-        max_tokens=1,
-        generate_step_fn=fake_generate,
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "persistent native evidence rejection must not call subprocess.run"
+        ),
     )
+    with session:
+        result = serving.generate_with_native_prefill(
+            "resident-model",
+            FakeTokenizer({prompt: prompt_tokens}),
+            prompt,
+            native=native,
+            max_tokens=1,
+            generate_step_fn=fake_generate,
+            service_session=session,
+        )
 
-    assert len(producer_calls) == 1
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
+    assert service.last_prefill_response is not None
+    assert service.last_prefill_response["status"] == "blocked"
+    assert service.last_prefill_response["error"] == {
+        "domain": "cache_rejection",
+        "message": "native evidence missing",
+        "failure_stage": "native_evidence_validation",
+    }
     assert observed["generate_calls"] == 1
     assert result["route"] == "native_mlx_fallback"
-    assert result["fallback_reason"] == "native_evidence_missing"
+    assert result["fallback_reason"] == "cache_validation_failed"
+    assert result["fallback_detail"] == "native evidence missing"
     assert result["accepted_cache"] is False
     assert result["status"] == "blocked"
     assert result["exit_status"] == 2
@@ -400,29 +445,57 @@ def test_r9700_native_accepts_cache_only_with_hardware_evidence(tmp_path, monkey
         request_id=request_id,
         producer_kind=_R9700_NATIVE_PRODUCER_KIND,
     )
-    producer_calls = _install_producer_run(monkeypatch, serving, native_evidence=True)
+    service = _LiveServiceDispatcher(
+        tmp_path,
+        evidence_override={"kernel_count": 3},
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
     cache_objects = _valid_cache(n_prefix)
 
     def fake_load_prompt_cache(path, return_metadata=False):
         assert return_metadata is True
-        return cache_objects, _valid_metadata(n_prefix)
+        return cache_objects, _task4_metadata(n_prefix, request_id)
 
     def fake_generate_step(prompt_arg, model, **kwargs):
         assert _as_int_list(prompt_arg) == [prompt_tokens[-1]]
         assert kwargs["prompt_cache"] is cache_objects
         yield np.int64(601)
 
-    result = serving.generate_with_native_prefill(
-        "resident-model",
-        FakeTokenizer({prompt: prompt_tokens}),
-        prompt,
-        native=native,
-        max_tokens=1,
-        generate_step_fn=fake_generate_step,
-        load_prompt_cache_fn=fake_load_prompt_cache,
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "persistent native evidence acceptance must not call subprocess.run"
+        ),
     )
+    with session:
+        result = serving.generate_with_native_prefill(
+            "resident-model",
+            FakeTokenizer({prompt: prompt_tokens}),
+            prompt,
+            native=native,
+            max_tokens=1,
+            generate_step_fn=fake_generate_step,
+            load_prompt_cache_fn=fake_load_prompt_cache,
+            service_session=session,
+        )
 
-    assert len(producer_calls) == 2
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
+    assert service.last_prefill_response is not None
+    assert service.last_prefill_response["evidence"]["hardware_log_path"] == str(
+        tmp_path / f"{request_id}.prefill.log"
+    )
+    assert service.last_prefill_response["evidence"]["native_prefill_acceptance"] == "pass"
+    assert service.last_prefill_response["evidence"]["kernel_count"] == 3
+    assert service.last_prefill_response["evidence"]["transfer_bytes"] == 4096
     assert result["route"] == "native_producer"
     assert result["accepted_cache"] is True
     assert result["status"] == "pass"
@@ -450,33 +523,23 @@ def test_r9700_native_hardware_log_must_exist_and_bind_to_requested_prefill_log(
         request_id=f"hardware-log-{case}",
         producer_kind=_R9700_NATIVE_PRODUCER_KIND,
     )
-    observed = {"producer_calls": 0, "generate_calls": 0}
-
-    def fake_run(cmd, **kwargs):
-        observed["producer_calls"] += 1
-        assert cmd[2] == "native_r9700.prefill"
-        prefill_path = Path(cmd[cmd.index("--out") + 1])
-        prefill_log_path = Path(cmd[cmd.index("--log") + 1])
-        hardware_log_path = tmp_path / f"{case}.hardware.log"
-        prefill_path.parent.mkdir(parents=True, exist_ok=True)
-        prefill_path.write_bytes(b"prefill-npz")
-        if case == "unbound":
-            hardware_log_path.write_text("stale hardware evidence\n", encoding="utf-8")
-        prefill_log_path.write_text(
-            "\n".join(
-                (
-                    "producer_kind: r9700_native",
-                    "native_prefill_acceptance: pass",
-                    f"hardware_log_path: {hardware_log_path}",
-                    f"prefill_npz_path: {prefill_path}",
-                    "kernel_count: 3",
-                    "transfer_bytes: 4096",
-                )
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        return _completed(cmd, stdout="prefill ok")
+    failure_messages = {
+        "missing": "hardware_log_path is missing from native evidence",
+        "unbound": "hardware_log_path is not bound to the requested prefill log",
+    }
+    service = _LiveServiceDispatcher(
+        tmp_path / "service-artifacts",
+        prefill_error=_cache_rejection(
+            failure_messages[case],
+            "hardware_log_validation",
+        ),
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    observed = {"generate_calls": 0}
 
     def fake_generate_step(prompt_arg, model, **kwargs):
         observed["generate_calls"] += 1
@@ -484,26 +547,46 @@ def test_r9700_native_hardware_log_must_exist_and_bind_to_requested_prefill_log(
         assert kwargs.get("prompt_cache") is None
         yield np.int64(701)
 
-    monkeypatch.setattr(serving, "subprocess", SimpleNamespace(run=fake_run), raising=False)
-    result = serving.generate_with_native_prefill(
-        "resident-model",
-        FakeTokenizer({prompt: prompt_tokens}),
-        prompt,
-        native=native,
-        max_tokens=1,
-        generate_step_fn=fake_generate_step,
-        load_prompt_cache_fn=lambda *args, **kwargs: pytest.fail(
-            "hardware-log rejection must precede cache loading"
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "persistent hardware-log rejection must not call subprocess.run"
         ),
     )
+    with session:
+        result = serving.generate_with_native_prefill(
+            "resident-model",
+            FakeTokenizer({prompt: prompt_tokens}),
+            prompt,
+            native=native,
+            max_tokens=1,
+            generate_step_fn=fake_generate_step,
+            load_prompt_cache_fn=lambda *args, **kwargs: pytest.fail(
+                "hardware-log rejection must precede cache loading"
+            ),
+            service_session=session,
+        )
 
-    assert observed == {"producer_calls": 1, "generate_calls": 1}
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
+    assert service.last_prefill_response is not None
+    assert service.last_prefill_response["status"] == "blocked"
+    assert service.last_prefill_response["error"] == {
+        "domain": "cache_rejection",
+        "message": failure_messages[case],
+        "failure_stage": "hardware_log_validation",
+    }
+    assert observed == {"generate_calls": 1}
     assert result["route"] == "native_mlx_fallback"
-    assert result["fallback_reason"] == "native_evidence_missing"
+    assert result["fallback_reason"] == "cache_validation_failed"
+    assert result["fallback_detail"] == failure_messages[case]
     assert result["accepted_cache"] is False
     assert result["status"] == "blocked"
     assert result["exit_status"] == 2
-
 
 def test_r9700_native_unreadable_hardware_log_falls_back_before_cache_acceptance(
     tmp_path, monkeypatch
@@ -517,30 +600,20 @@ def test_r9700_native_unreadable_hardware_log_falls_back_before_cache_acceptance
         request_id="unreadable-hardware-log",
         producer_kind=_R9700_NATIVE_PRODUCER_KIND,
     )
-    observed = {"producer_calls": 0, "generate_calls": 0}
-
-    def fake_run(cmd, **kwargs):
-        observed["producer_calls"] += 1
-        assert cmd[2] == "native_r9700.prefill"
-        prefill_path = Path(cmd[cmd.index("--out") + 1])
-        prefill_log_path = Path(cmd[cmd.index("--log") + 1])
-        prefill_path.parent.mkdir(parents=True, exist_ok=True)
-        prefill_path.write_bytes(b"prefill-npz")
-        prefill_log_path.write_text(
-            "\n".join(
-                (
-                    "producer_kind: r9700_native",
-                    "native_prefill_acceptance: pass",
-                    f"hardware_log_path: {prefill_log_path}",
-                    f"prefill_npz_path: {prefill_path}",
-                    "kernel_count: 3",
-                    "transfer_bytes: 4096",
-                )
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        return _completed(cmd, stdout="prefill ok")
+    failure_message = "hardware_log_path is unreadable"
+    service = _LiveServiceDispatcher(
+        tmp_path / "service-artifacts",
+        prefill_error=_cache_rejection(
+            failure_message,
+            "hardware_log_validation",
+        ),
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    observed = {"generate_calls": 0}
 
     def fake_generate_step(prompt_arg, model, **kwargs):
         observed["generate_calls"] += 1
@@ -548,30 +621,43 @@ def test_r9700_native_unreadable_hardware_log_falls_back_before_cache_acceptance
         assert kwargs.get("prompt_cache") is None
         yield np.int64(702)
 
-    original_read_text = Path.read_text
-
-    def unreadable_read_text(path, *args, **kwargs):
-        if path.name == "unreadable-hardware-log.prefill.log":
-            raise PermissionError("hardware log is unreadable")
-        return original_read_text(path, *args, **kwargs)
-
-    monkeypatch.setattr(serving, "subprocess", SimpleNamespace(run=fake_run), raising=False)
-    monkeypatch.setattr(Path, "read_text", unreadable_read_text)
-    result = serving.generate_with_native_prefill(
-        "resident-model",
-        FakeTokenizer({prompt: prompt_tokens}),
-        prompt,
-        native=native,
-        max_tokens=1,
-        generate_step_fn=fake_generate_step,
-        load_prompt_cache_fn=lambda *args, **kwargs: pytest.fail(
-            "unreadable hardware-log rejection must precede cache loading"
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "persistent hardware-log rejection must not call subprocess.run"
         ),
     )
+    with session:
+        result = serving.generate_with_native_prefill(
+            "resident-model",
+            FakeTokenizer({prompt: prompt_tokens}),
+            prompt,
+            native=native,
+            max_tokens=1,
+            generate_step_fn=fake_generate_step,
+            load_prompt_cache_fn=lambda *args, **kwargs: pytest.fail(
+                "unreadable hardware-log rejection must precede cache loading"
+            ),
+            service_session=session,
+        )
 
-    assert observed == {"producer_calls": 1, "generate_calls": 1}
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
+    assert service.last_prefill_response is not None
+    assert service.last_prefill_response["status"] == "blocked"
+    assert service.last_prefill_response["error"] == {
+        "domain": "cache_rejection",
+        "message": failure_message,
+        "failure_stage": "hardware_log_validation",
+    }
+    assert observed == {"generate_calls": 1}
     assert result["route"] == "native_mlx_fallback"
-    assert result["fallback_reason"] == "native_evidence_missing"
+    assert result["fallback_reason"] == "cache_validation_failed"
+    assert result["fallback_detail"] == failure_message
     assert result["accepted_cache"] is False
     assert result["status"] == "blocked"
     assert result["exit_status"] == 2
@@ -599,7 +685,12 @@ def test_r9700_native_rejects_non_uint32_tokens_before_producer_or_fallback(
         request_id="invalid-native-tokens",
         producer_kind=_R9700_NATIVE_PRODUCER_KIND,
     )
-
+    service = _LiveServiceDispatcher(tmp_path / "service-artifacts")
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
     monkeypatch.setattr(
         serving,
         "subprocess",
@@ -611,19 +702,25 @@ def test_r9700_native_rejects_non_uint32_tokens_before_producer_or_fallback(
         raising=False,
     )
 
-    with pytest.raises(serving.NativePrefillError, match="unsigned 32-bit integer"):
-        serving.generate_with_native_prefill(
-            "resident-model",
-            None,
-            token_ids,
-            native=native,
-            generate_step_fn=lambda *args, **kwargs: pytest.fail(
-                "invalid native tokens must not use fallback generation"
-            ),
-        )
+    with session:
+        with pytest.raises(serving.NativePrefillError, match="unsigned 32-bit integer"):
+            serving.generate_with_native_prefill(
+                "resident-model",
+                None,
+                token_ids,
+                native=native,
+                generate_step_fn=lambda *args, **kwargs: pytest.fail(
+                    "invalid native tokens must not use fallback generation"
+                ),
+                service_session=session,
+            )
 
     assert not list(tmp_path.glob("*.prefill.npz"))
     assert not list(tmp_path.glob("*.prompt-cache.safetensors"))
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "UnloadModel",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -751,12 +848,21 @@ def test_generate_failure_after_cache_acceptance_does_not_retry_full_prompt_fall
         request_id="accepted-cache-failure",
         producer_kind=_R9700_NATIVE_PRODUCER_KIND,
     )
-    _install_producer_run(monkeypatch, serving, native_evidence=True)
+    service = _LiveServiceDispatcher(
+        tmp_path / "service-artifacts",
+        evidence_override={"kernel_count": 3},
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
     observed = {"generate_calls": 0}
 
     def fake_load_prompt_cache(path, return_metadata=False):
         assert return_metadata is True
-        return _valid_cache(n_prefix), _valid_metadata(n_prefix)
+        assert service.last_metadata is not None
+        return _valid_cache(n_prefix), dict(service.last_metadata)
 
     def fake_generate_step(prompt_arg, model, **kwargs):
         observed["generate_calls"] += 1
@@ -766,31 +872,47 @@ def test_generate_failure_after_cache_acceptance_does_not_retry_full_prompt_fall
         assert _as_int_list(prompt_arg) == [prompt_tokens[-1]]
         raise RuntimeError("decode exploded after cache acceptance")
         yield 0
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "persistent accepted-cache decode must not call subprocess.run"
+        ),
+    )
 
-    try:
-        result = serving.generate_with_native_prefill(
-            "resident-model",
-            FakeTokenizer({prompt: prompt_tokens}),
-            prompt,
-            native=native,
-            max_tokens=1,
-            generate_step_fn=fake_generate_step,
-            load_prompt_cache_fn=fake_load_prompt_cache,
-        )
-    except serving.NativePrefillError as exc:
-        result = getattr(exc, "result", None)
-        assert result is not None, "NativePrefillError must carry a result dict after accepted-cache decode failure"
-        assert "decode exploded" in result["error"]["message"]
-    else:
-        assert result["status"] in {"error", "blocked"}
-        assert result["exit_status"] != 0
-        assert "decode exploded" in result["error"]["message"]
+    with session:
+        try:
+            result = serving.generate_with_native_prefill(
+                "resident-model",
+                FakeTokenizer({prompt: prompt_tokens}),
+                prompt,
+                native=native,
+                max_tokens=1,
+                generate_step_fn=fake_generate_step,
+                load_prompt_cache_fn=fake_load_prompt_cache,
+                service_session=session,
+            )
+        except serving.NativePrefillError as exc:
+            result = getattr(exc, "result", None)
+            assert result is not None, "NativePrefillError must carry a result dict after accepted-cache decode failure"
+            assert "decode exploded" in result["error"]["message"]
+        else:
+            assert result["status"] in {"error", "blocked"}
+            assert result["exit_status"] != 0
+            assert "decode exploded" in result["error"]["message"]
 
     assert observed["generate_calls"] == 1
     assert result["route"] == "native_producer"
     assert result["accepted_cache"] is True
     assert result["fallback_reason"] is None
     assert result["prompt_token_count"] == len(prompt_tokens)
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
+    assert service.last_prefill_response is not None
+    assert service.last_prefill_response["status"] == "pass"
 
 
 
@@ -1047,52 +1169,94 @@ def test_main_blocks_r9700_native_without_hardware_evidence_and_writes_json_log_
     tmp_path, monkeypatch
 ):
     serving = _serving_module()
+    native_worker = importlib.import_module("native_r9700.native_worker")
+    model_dir = tmp_path / "consumer-model"
+    runner_path = tmp_path / "native_r9700_runner"
+    artifacts_dir = tmp_path / "service-artifacts"
     json_path = tmp_path / "result.json"
     log_path = tmp_path / "run.log"
     report_path = tmp_path / "path-a-validation-results.md"
     report_path.write_text("# Existing report\n", encoding="utf-8")
-    observed = {"load_model_calls": 0}
+    service = _LiveServiceDispatcher(
+        artifacts_dir,
+        prefill_error=_cache_rejection(
+            "native evidence missing",
+            "native_evidence_validation",
+        ),
+    )
+    events: list[object] = []
 
-    def fake_load_model(model_dir):
+    class Registry:
+        dispatch = service.dispatch
+
+        def close(self):
+            events.append("registry.close")
+
+    registry = Registry()
+    model_digest = _TASK4_MODEL_DIGEST
+    observed = {"load_model_calls": 0, "generate_calls": 0}
+
+    def fake_build_registry(*, runner_path, artifact_dir):
+        events.append(("build_registry", str(runner_path), str(artifact_dir)))
+        return registry
+
+    def fake_verify_model_identity(model_uri, supplied_digest=None):
+        events.append(("verify_model_identity", str(model_uri), supplied_digest))
+        assert supplied_digest is None
+        return SimpleNamespace(
+            canonical_uri=str(model_uri),
+            digest=model_digest,
+            fingerprint=dict(_TASK4_MODEL_FINGERPRINT),
+            resident_bytes=4096,
+        )
+
+    def fake_load_model(path):
         observed["load_model_calls"] += 1
-        return "resident-model", FakeTokenizer({})
+        return (
+            {"model_uri": str(path), "model_digest": model_digest},
+            FakeTokenizer({}),
+        )
 
-    def fake_generate_with_native_prefill(model, tokenizer, prompt, *, native, max_tokens, **kwargs):
-        assert native.producer_kind == _R9700_NATIVE_PRODUCER_KIND
-        return {
-            "schema_version": 1,
-            "status": "blocked",
-            "route": "native_mlx_fallback",
-            "fallback_reason": "native_evidence_missing",
-            "accepted_cache": False,
-            "prompt_token_count": len(prompt),
-            "S": len(prompt),
-            "n_prefix": len(prompt) - 1,
-            "decoded_tokens": [91],
-            "requested_producer_kind": _R9700_NATIVE_PRODUCER_KIND,
-            "producer_kind": None,
-            "native_prefill_acceptance": None,
-            "hardware_log_path": None,
-            "kernel_count": 0,
-            "transfer_bytes": 0,
-            "exit_status": 2,
-        }
+    def fake_generate_step(prompt_arg, model, **kwargs):
+        observed["generate_calls"] += 1
+        assert _as_int_list(prompt_arg) == [10, 11, 12, 13]
+        assert kwargs.get("prompt_cache") is None
+        yield np.int64(91)
 
-    monkeypatch.setattr(serving, "load_model", fake_load_model, raising=False)
-    monkeypatch.setattr(serving, "generate_with_native_prefill", fake_generate_with_native_prefill)
+    monkeypatch.setattr(native_worker, "build_registry", fake_build_registry, raising=False)
+    monkeypatch.setattr(serving, "native_worker", native_worker, raising=False)
+    monkeypatch.setattr(serving, "build_registry", fake_build_registry, raising=False)
+    monkeypatch.setattr(serving, "verify_model_identity", fake_verify_model_identity, raising=False)
+    monkeypatch.setattr(serving, "load_model", fake_load_model)
+    monkeypatch.setattr(serving, "generate_step", fake_generate_step)
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "r9700_native main must not call one-shot subprocess.run"
+        ),
+    )
 
     rc = serving.main(
         [
             "--model",
-            "consumer-model-dir",
+            str(model_dir),
+            "--producer-model",
+            str(model_dir),
+            "--native-runner",
+            str(runner_path),
             "--producer-kind",
             _R9700_NATIVE_PRODUCER_KIND,
             "--token-ids-json",
             "[10, 11, 12, 13]",
+            "--threshold-tokens",
+            "2",
+            "--max-new-tokens",
+            "1",
             "--json",
             str(json_path),
             "--artifacts-dir",
-            str(tmp_path / "artifacts"),
+            str(artifacts_dir),
             "--log",
             str(log_path),
             "--report",
@@ -1102,11 +1266,31 @@ def test_main_blocks_r9700_native_without_hardware_evidence_and_writes_json_log_
 
     assert rc == 2
     assert observed["load_model_calls"] == 1
+    assert observed["generate_calls"] == 1
+    assert events[:3] == [
+        ("verify_model_identity", str(model_dir), None),
+        ("verify_model_identity", str(model_dir), None),
+        ("build_registry", str(runner_path), str(artifacts_dir)),
+    ]
+    assert events[-1] == "registry.close"
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
+    assert service.last_prefill_response is not None
+    assert service.last_prefill_response["status"] == "blocked"
+    assert service.last_prefill_response["error"] == {
+        "domain": "cache_rejection",
+        "message": "native evidence missing",
+        "failure_stage": "native_evidence_validation",
+    }
     result_json = json.loads(json_path.read_text(encoding="utf-8"))
     assert result_json["status"] == "blocked"
     assert result_json["gate_result"] == "blocked"
     assert result_json["route"] == "native_mlx_fallback"
-    assert result_json["fallback_reason"] == "native_evidence_missing"
+    assert result_json["fallback_reason"] == "cache_validation_failed"
+    assert result_json["fallback_detail"] == "native evidence missing"
     assert result_json["requested_producer_kind"] == _R9700_NATIVE_PRODUCER_KIND
     assert result_json["producer_kind"] is None
     assert result_json["accepted_cache"] is False
@@ -1257,3 +1441,1380 @@ def test_main_fixture_suite_fails_when_decoded_tokens_do_not_match_committed_bas
     assert result["gate_result"] == "fail"
     assert [entry["comparison"]["exact_match"] for entry in result["prompt_results"]] == [False, False]
     assert "gate_result: fail" in log_path.read_text(encoding="utf-8")
+
+
+_TASK4_PRODUCER_FINGERPRINT = "sha256:" + "b" * 64
+_TASK4_MODEL_DIGEST = "sha256:" + "c" * 64
+_TASK4_MODEL_FINGERPRINT = {
+    "model_digest": _TASK4_MODEL_DIGEST,
+    "format": "safetensors",
+    "quantization": "fp16",
+    "model_family": "llama",
+    "model_type": "llama",
+    "architectures": ["LlamaForCausalLM"],
+    "geometry": {
+        "num_layers": 16,
+        "num_heads": 32,
+        "n_kv_heads": 8,
+        "head_dim": 64,
+        "hidden_size": 2048,
+        "intermediate_size": 8192,
+        "vocab_size": 128256,
+        "max_position_embeddings": 131072,
+    },
+    "rms_norm_eps": 0.00001,
+    "rope_theta": 500000.0,
+    "rope_scaling": {
+        "rope_type": "llama3",
+        "factor": 32.0,
+        "high_freq_factor": 4.0,
+        "low_freq_factor": 1.0,
+        "original_max_position_embeddings": 8192,
+    },
+}
+
+
+def _task4_metadata(
+    n_prefix: int, request_id: str, *, producer_fingerprint: str = _TASK4_PRODUCER_FINGERPRINT
+) -> dict[str, object]:
+    return {
+        "schema_version": "mlx_lm_prompt_cache_v1",
+        "producer_fingerprint": producer_fingerprint,
+        "producer_kind": _R9700_NATIVE_PRODUCER_KIND,
+        "model_digest": _TASK4_MODEL_DIGEST,
+        "num_layers": 16,
+        "batch": 1,
+        "n_kv_heads": 8,
+        "offset": n_prefix,
+        "sequence_length": n_prefix,
+        "head_dim": 64,
+        "physical_layout": "B,H,S,D",
+        "dtype": "float16",
+        "absolute_start_position": 0,
+        "absolute_end_position": n_prefix,
+        "rope_theta": 500000.0,
+        "rope_scaling": {
+            "rope_type": "llama3",
+            "factor": 32.0,
+            "high_freq_factor": 4.0,
+            "low_freq_factor": 1.0,
+            "original_max_position_embeddings": 8192,
+        },
+        "cache_class": "KVCache",
+        "cache_variant": "llama3.2_1b_fp16",
+        "request_id": request_id,
+        "meta_state": ["" for _ in range(_EXPECTED_NUM_LAYERS)],
+    }
+
+
+class _LiveServiceDispatcher:
+    """A live public-dispatch double; the real registry owns private state."""
+
+    def __init__(
+        self,
+        artifacts_dir: Path,
+        *,
+        metadata_override: dict[str, object] | None = None,
+        prefill_error: dict[str, object] | None = None,
+        evidence_override: dict[str, object] | None = None,
+    ) -> None:
+        self.artifacts_dir = artifacts_dir
+        self.calls: list[dict[str, object]] = []
+        self.responses: list[dict[str, object]] = []
+        self.last_prefill_response: dict[str, object] | None = None
+        self.last_prefill_result: dict[str, object] | None = None
+        self.child_pid = 73_002
+        self.launch_count = 1
+        self.generation = 19
+        self.handle = "mh_" + "d" * 32
+        self.metadata_override = metadata_override or {}
+        self.prefill_error = prefill_error
+        self.evidence_override = evidence_override or {}
+        self.last_metadata: dict[str, object] | None = None
+        self.model_uri: str | None = None
+
+
+    def _response(
+        self,
+        request: dict[str, object],
+        *,
+        status: str = "pass",
+        result: dict[str, object] | None = None,
+        error: dict[str, object] | None = None,
+        evidence: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        response = {
+            "protocol_version": "r9700_prefill_service_v1",
+            "request_id": request["request_id"],
+            "operation": request["operation"],
+            "status": status,
+            "result": {} if result is None else result,
+            "error": error,
+            "evidence": evidence,
+        }
+        self.responses.append(response)
+        if request["operation"] == "Prefill":
+            self.last_prefill_response = response
+            self.last_prefill_result = dict(response["result"])
+        return response
+
+    def __call__(self, request: dict[str, object]) -> dict[str, object]:
+        self.calls.append(request)
+        operation = request["operation"]
+        if operation == "LoadModel":
+            self.model_uri = str(request["body"]["model_uri"])
+            return self._response(
+                request,
+                result={
+                    "model_handle": self.handle,
+                    "model_state": "resident-ready",
+                    "model_fingerprint": _TASK4_MODEL_FINGERPRINT,
+                    "kernel_pack_digests": ["sha256:" + "e" * 64],
+                },
+            )
+        if operation == "Prefill":
+            body = request["body"]
+            token_ids = list(body["token_ids"])
+            request_id = str(request["request_id"])
+            n_prefix = len(token_ids) - 1
+            if self.prefill_error is not None:
+                return self._response(
+                    request,
+                    status=str(self.prefill_error.get("status", "error")),
+                    error=dict(self.prefill_error["error"]),
+                )
+            self.artifacts_dir.mkdir(parents=True, exist_ok=True)
+            npz_path = self.artifacts_dir / f"{request_id}.prefill.npz"
+            prefill_log_path = self.artifacts_dir / f"{request_id}.prefill.log"
+            cache_path = self.artifacts_dir / f"{request_id}.prompt-cache.safetensors"
+            cache_log_path = self.artifacts_dir / f"{request_id}.kv-cache.log"
+            arrays: dict[str, object] = {
+                "model": np.array(self.model_uri),
+                "n_prefix": np.array(n_prefix, dtype=np.int64),
+                "num_layers": np.array(16, dtype=np.int64),
+                "producer_kind": np.array("r9700_native"),
+            }
+            shape = (1, 8, n_prefix, 64)
+            for layer_index in range(16):
+                arrays[f"layer{layer_index}_K"] = np.zeros(shape, dtype=np.float16)
+                arrays[f"layer{layer_index}_V"] = np.zeros(shape, dtype=np.float16)
+            np.savez(npz_path, **arrays)
+            prefill_log_path.write_text("native evidence\n", encoding="utf-8")
+            cache_path.write_bytes(b"persistent-cache")
+            cache_log_path.write_text("cache emitted\n", encoding="utf-8")
+            metadata = _task4_metadata(n_prefix, request_id)
+            metadata.update(self.metadata_override)
+            self.last_metadata = metadata
+            cache = {
+                "prompt_cache_path": str(cache_path),
+                "metadata": metadata,
+                "prefill_npz_path": str(npz_path),
+                "prefill_log_path": str(prefill_log_path),
+                "kv_cache_log_path": str(cache_log_path),
+                "payload_digest": "sha256:" + "f" * 64,
+                "payload_length_bytes": npz_path.stat().st_size,
+            }
+            evidence = {
+                "producer_kind": _R9700_NATIVE_PRODUCER_KIND,
+                "producer_fingerprint": _TASK4_PRODUCER_FINGERPRINT,
+                "native_prefill_acceptance": "pass",
+                "native_prefill_full_layer_loop_status": "pass",
+                "runtime_substrate": "TinyGPU.app/APLRemotePCIDevice/PCIIface",
+                "hardware_log_path": str(prefill_log_path),
+                "compute_completion_policy": "terminal",
+                "compute_barrier_policy": "full",
+                "prefill_npz_path": str(npz_path),
+                "kernel_count": 1,
+                "transfer_bytes": 4096,
+                "block_tokens": n_prefix,
+                "block_count": 1,
+                "failure_stage": "none",
+                "exit_status": 0,
+                "failure_text": "none",
+            }
+            evidence.update(self.evidence_override)
+            return self._response(
+                request,
+                result={
+                    "model_handle": self.handle,
+                    "request_state": "produced",
+                    "prompt_token_count": len(token_ids),
+                    "prefix_token_count": n_prefix,
+                    "cache": cache,
+                    "metrics": {
+                        "prefill_elapsed_sec": 0.0125,
+                        "kernel_elapsed_usec": 8000,
+                        "transfer_elapsed_sec": 0.0025,
+                        "cache_emit_elapsed_sec": 0.001,
+                        "total_elapsed_sec": 0.014,
+                        "tokens_per_sec_prefill": (len(token_ids) - 1) / 0.0125,
+                        "transfer_h2d_bytes": 3072,
+                        "transfer_d2h_bytes": 1024,
+                    },
+                },
+                evidence=evidence,
+            )
+        if operation == "UnloadModel":
+            return self._response(
+                request,
+                result={"model_handle": self.handle, "model_state": "unloaded"},
+            )
+        raise AssertionError(f"unexpected public operation: {operation}")
+
+    def dispatch(self, request: dict[str, object]) -> dict[str, object]:
+        return self(request)
+
+
+def test_persistent_dispatch_routes_load_prefill_unload_and_injects_s_minus_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A live dispatcher replaces one-shot producer commands and preserves S-1 decode."""
+    serving = _serving_module()
+    service = _LiveServiceDispatcher(tmp_path / "service-artifacts")
+    prompt_tokens = [101, 102, 103, 104]
+    native = _native_config(
+        serving,
+        tmp_path,
+        threshold_tokens=2,
+        request_id="persistent-request",
+        producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    decoded_inputs: list[tuple[list[int], object]] = []
+
+    def no_one_shot(*args, **kwargs):
+        pytest.fail("RED: persistent warm Prefill must not call subprocess.run")
+
+    def fake_load_prompt_cache(path, *, return_metadata=False):
+        assert Path(path).name == "persistent-request.prompt-cache.safetensors"
+        cache = _valid_cache(len(prompt_tokens) - 1)
+        metadata = _task4_metadata(len(prompt_tokens) - 1, "persistent-request")
+        return (cache, metadata) if return_metadata else cache
+
+    def fake_generate(prompt_arg, model, **kwargs):
+        decoded_inputs.append((_as_int_list(prompt_arg), kwargs.get("prompt_cache")))
+        yield np.int64(900)
+
+    monkeypatch.setattr(serving.subprocess, "run", no_one_shot)
+    with session:
+        result = serving.generate_with_native_prefill(
+            "resident-model",
+            FakeTokenizer({}),
+            prompt_tokens,
+            native=native,
+            max_tokens=2,
+            generate_step_fn=fake_generate,
+            load_prompt_cache_fn=fake_load_prompt_cache,
+            service_session=session,
+        )
+
+    operations = [call["operation"] for call in service.calls]
+    assert operations == ["LoadModel", "Prefill", "UnloadModel"]
+    prefill = service.calls[1]
+    assert prefill["body"]["token_ids"] == prompt_tokens
+    assert prefill["body"]["token_ids"][:-1] == prompt_tokens[:-1]
+    assert result["route"] == "native_producer"
+    assert result["accepted_cache"] is True
+    assert result["producer_kind"] == _R9700_NATIVE_PRODUCER_KIND
+    assert result["metadata"]["producer_fingerprint"] == _TASK4_PRODUCER_FINGERPRINT
+    assert result["producer_fingerprint"] == _TASK4_PRODUCER_FINGERPRINT
+    assert result["prefill_npz_path"].endswith("persistent-request.prefill.npz")
+    assert result["prefill_log_path"].endswith("persistent-request.prefill.log")
+    assert result["prompt_cache_path"].endswith(
+        "persistent-request.prompt-cache.safetensors"
+    )
+    assert Path(result["prefill_npz_path"]).parent == tmp_path / "service-artifacts"
+    assert decoded_inputs and decoded_inputs[0][0] == [prompt_tokens[-1]]
+    assert decoded_inputs[0][1] is not None
+    assert service.launch_count == 1
+
+
+def test_persistent_dispatch_rejects_fingerprint_mismatch_before_acceptance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unknown/mismatched producer identity may fall back only before cache acceptance."""
+    serving = _serving_module()
+    service = _LiveServiceDispatcher(
+        tmp_path / "service-artifacts",
+        metadata_override={"producer_fingerprint": "sha256:" + "9" * 64},
+    )
+    prompt_tokens = [201, 202, 203]
+    native = _native_config(
+        serving,
+        tmp_path,
+        threshold_tokens=2,
+        request_id="identity-mismatch",
+        producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    generate_inputs: list[list[int]] = []
+
+    def fake_generate(prompt_arg, model, **kwargs):
+        generate_inputs.append(_as_int_list(prompt_arg))
+        yield np.int64(901)
+
+    def fake_load_prompt_cache(path, *, return_metadata=False):
+        cache = _valid_cache(len(prompt_tokens) - 1)
+        metadata = _task4_metadata(len(prompt_tokens) - 1, "identity-mismatch")
+        metadata["producer_fingerprint"] = "sha256:" + "9" * 64
+        return (cache, metadata) if return_metadata else cache
+
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("RED: persistent path used one-shot subprocess"),
+    )
+    with session:
+        result = serving.generate_with_native_prefill(
+            "resident-model",
+            FakeTokenizer({}),
+            prompt_tokens,
+            native=native,
+            max_tokens=1,
+            generate_step_fn=fake_generate,
+            load_prompt_cache_fn=fake_load_prompt_cache,
+            service_session=session,
+        )
+
+    assert result["accepted_cache"] is False
+    assert result["route"] == "native_mlx_fallback"
+    assert generate_inputs == [prompt_tokens]
+    assert len([call for call in service.calls if call["operation"] == "Prefill"]) == 1
+
+
+def test_persistent_dispatch_child_fault_is_terminal_without_prefix_repair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A private child/device fault cannot silently recompute an accepted prefix."""
+    serving = _serving_module()
+    service = _LiveServiceDispatcher(
+        tmp_path / "service-artifacts",
+        prefill_error={
+            "status": "error",
+            "error": {
+                "domain": "device_lost_or_faulted",
+                "message": "native resource child became unavailable",
+                "failure_stage": "child_eof",
+            },
+        },
+    )
+    native = _native_config(
+        serving,
+        tmp_path,
+        threshold_tokens=2,
+        request_id="child-fault",
+        producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    generate_inputs: list[list[int]] = []
+
+    def fake_generate(prompt_arg, model, **kwargs):
+        generate_inputs.append(_as_int_list(prompt_arg))
+        yield np.int64(902)
+
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("RED: persistent path used one-shot subprocess"),
+    )
+    with session:
+        with pytest.raises(serving.NativePrefillError):
+            serving.generate_with_native_prefill(
+                "resident-model",
+                FakeTokenizer({}),
+                [301, 302, 303],
+                native=native,
+                max_tokens=1,
+                generate_step_fn=fake_generate,
+                service_session=session,
+            )
+
+    assert generate_inputs == []
+    assert len([call for call in service.calls if call["operation"] == "Prefill"]) == 1
+
+
+@pytest.mark.parametrize(
+    ("field", "bad_value"),
+    [
+        pytest.param("model_digest", "sha256:" + "8" * 64, id="model-digest"),
+        pytest.param("rope_theta", 500001.0, id="rope-theta"),
+        pytest.param("absolute_end_position", 1, id="absolute-end-position"),
+        pytest.param("sequence_length", 1, id="sequence-length"),
+        pytest.param("meta_state", [""] * 15, id="meta-state-cardinality"),
+    ],
+)
+def test_persistent_dispatch_rejects_cache_identity_before_acceptance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    bad_value: object,
+) -> None:
+    """Model/RoPE/position/meta-state mismatches are adapter rejection, not acceptance."""
+    serving = _serving_module()
+    service = _LiveServiceDispatcher(
+        tmp_path / "service-artifacts",
+        metadata_override={field: bad_value},
+    )
+    prompt_tokens = [401, 402, 403]
+    native = _native_config(
+        serving,
+        tmp_path,
+        threshold_tokens=2,
+        request_id=f"identity-{field.replace('_', '-')}",
+        producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    generate_inputs: list[list[int]] = []
+
+    def fake_generate(prompt_arg, model, **kwargs):
+        generate_inputs.append(_as_int_list(prompt_arg))
+        yield np.int64(903)
+
+    def fake_load_prompt_cache(path, *, return_metadata=False):
+        cache = _valid_cache(len(prompt_tokens) - 1)
+        assert service.last_metadata is not None
+        metadata = dict(service.last_metadata)
+        return (cache, metadata) if return_metadata else cache
+
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("RED: persistent path used one-shot subprocess"),
+    )
+    with session:
+        result = serving.generate_with_native_prefill(
+            "resident-model",
+            FakeTokenizer({}),
+            prompt_tokens,
+            native=native,
+            max_tokens=1,
+            generate_step_fn=fake_generate,
+            load_prompt_cache_fn=fake_load_prompt_cache,
+            service_session=session,
+        )
+
+    assert result["accepted_cache"] is False
+    assert result["route"] == "native_mlx_fallback"
+    assert generate_inputs == [prompt_tokens]
+    assert result["fallback_reason"] == "cache_validation_failed"
+    assert field in result["fallback_detail"]
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
+
+
+def test_persistent_dispatch_decode_failure_is_terminal_after_cache_acceptance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Once imported cache is accepted, decode failure cannot trigger prefix repair."""
+    serving = _serving_module()
+    service = _LiveServiceDispatcher(tmp_path / "service-artifacts")
+    prompt_tokens = [501, 502, 503]
+    native = _native_config(
+        serving,
+        tmp_path,
+        threshold_tokens=2,
+        request_id="accepted-decode-failure",
+        producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri="producer-model-dir",
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    generate_inputs: list[list[int]] = []
+
+    def fake_load_prompt_cache(path, *, return_metadata=False):
+        cache = _valid_cache(len(prompt_tokens) - 1)
+        assert service.last_metadata is not None
+        return (
+            (cache, dict(service.last_metadata))
+            if return_metadata
+            else cache
+        )
+
+    def failing_generate(prompt_arg, model, **kwargs):
+        generate_inputs.append(_as_int_list(prompt_arg))
+        assert kwargs.get("prompt_cache") is not None
+        raise RuntimeError("decode failed after acceptance")
+        yield np.int64(904)
+
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("RED: persistent path used one-shot subprocess"),
+    )
+    with session:
+        with pytest.raises(serving.NativePrefillError) as caught:
+            serving.generate_with_native_prefill(
+                "resident-model",
+                FakeTokenizer({}),
+                prompt_tokens,
+                native=native,
+                max_tokens=1,
+                generate_step_fn=failing_generate,
+                load_prompt_cache_fn=fake_load_prompt_cache,
+                service_session=session,
+            )
+
+    assert "decode failed after acceptance" in str(caught.value)
+    assert generate_inputs == [[prompt_tokens[-1]]]
+    assert len([call for call in service.calls if call["operation"] == "Prefill"]) == 1
+
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
+
+class _EmittingServiceDispatcher(_LiveServiceDispatcher):
+    """Public dispatcher double that writes an actual mlx-lm cache artifact."""
+
+    def __call__(self, request: dict[str, object]) -> dict[str, object]:
+        response = super().__call__(request)
+        if request["operation"] != "Prefill" or response["status"] != "pass":
+            return response
+
+        from native_r9700 import kv_cache
+
+        body = request["body"]
+        n_prefix = len(body["token_ids"]) - 1
+        projection = response["result"]["cache"]
+        metadata = dict(projection["metadata"])
+        shape = (1, _EXPECTED_N_KV_HEADS, n_prefix, _EXPECTED_HEAD_DIM)
+        layers = [
+            {
+                "layer": layer_index,
+                "K": np.full(shape, layer_index, dtype=np.float16),
+                "V": np.full(shape, layer_index + 1, dtype=np.float16),
+            }
+            for layer_index in range(_EXPECTED_NUM_LAYERS)
+        ]
+        kv_cache.emit_prompt_cache(
+            {
+                "model": "verified-llama",
+                "n_prefix": n_prefix,
+                "layers": layers,
+                "metadata": metadata,
+            },
+            projection["prompt_cache_path"],
+        )
+        return response
+
+
+def _load_emitted_prompt_cache(path: Path, *, return_metadata: bool = False):
+    """Use mlx-lm's loader when available, with a byte-level equivalent fallback."""
+
+    try:
+        from mlx_lm.models.cache import load_prompt_cache as mlx_load_prompt_cache
+    except ImportError:
+        mlx_load_prompt_cache = None
+    if mlx_load_prompt_cache is not None:
+        return mlx_load_prompt_cache(str(path), return_metadata=return_metadata)
+
+    from safetensors import safe_open
+
+    with safe_open(str(path), framework="np") as handle:
+        raw_metadata = dict(handle.metadata())
+        tensors = {
+            key: handle.get_tensor(key)
+            for key in handle.keys()
+        }
+
+    offset = int(raw_metadata["1.offset"])
+    cache = []
+    for layer_index in range(_EXPECTED_NUM_LAYERS):
+        layer = KVCache(offset, layer_index=layer_index)
+        layer.keys = tensors[f"{layer_index}.0"]
+        layer.values = tensors[f"{layer_index}.1"]
+        layer.state = (layer.keys, layer.values)
+        layer.offset = offset
+        layer.size = offset
+        layer.meta_state = raw_metadata[f"0.{layer_index}"]
+        cache.append(layer)
+
+    metadata = {
+        key[2:]: value
+        for key, value in raw_metadata.items()
+        if key.startswith("1.")
+    }
+    return (cache, metadata) if return_metadata else cache
+
+
+def test_persistent_prefill_session_reuses_one_loaded_model_for_two_generations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two warm generations share one explicit LoadModel/UnloadModel lifetime."""
+
+    serving = _serving_module()
+    service = _LiveServiceDispatcher(tmp_path / "service-artifacts")
+    model_uri = str(tmp_path / "verified-model")
+    model = {"model_uri": model_uri, "model_digest": _TASK4_MODEL_DIGEST}
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri=model_uri,
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    decode_inputs: list[tuple[list[int], object]] = []
+
+    def fake_load_prompt_cache(path, *, return_metadata=False):
+        assert return_metadata is True
+        assert Path(path).is_file()
+        assert service.last_metadata is not None
+        n_prefix = int(service.last_metadata["offset"])
+        cache = _valid_cache(n_prefix)
+        metadata = dict(service.last_metadata)
+        return (cache, metadata) if return_metadata else cache
+
+    def fake_generate(prompt_arg, model_arg, **kwargs):
+        decode_inputs.append((_as_int_list(prompt_arg), kwargs.get("prompt_cache")))
+        yield np.int64(900 + len(decode_inputs) - 1)
+
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "RED: a loaded PersistentPrefillSession must not use one-shot subprocess.run"
+        ),
+    )
+
+    prompts = ([101, 102, 103], [201, 202])
+    results = []
+    with session as loaded_session:
+        assert loaded_session is session
+        for index, prompt_tokens in enumerate(prompts):
+            native = _native_config(
+                serving,
+                tmp_path,
+                threshold_tokens=2,
+                request_id=f"warm-session-{index}",
+                producer_model_dir=model_uri,
+                producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+            )
+            results.append(
+                serving.generate_with_native_prefill(
+                    model,
+                    FakeTokenizer({}),
+                    prompt_tokens,
+                    native=native,
+                    max_tokens=1,
+                    generate_step_fn=fake_generate,
+                    load_prompt_cache_fn=fake_load_prompt_cache,
+                    service_session=session,
+                )
+            )
+
+    # __exit__ performs the only unload; an explicit repeated close is idempotent.
+    session.close()
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "Prefill",
+        "UnloadModel",
+    ]
+    assert [call["operation"] for call in service.calls].count("LoadModel") == 1
+    assert [call["operation"] for call in service.calls].count("Prefill") == 2
+    assert service.calls[0]["body"] == {
+        "model_uri": model_uri,
+        "model_digest": _TASK4_MODEL_DIGEST,
+        "format": "safetensors",
+        "quantization": "fp16",
+    }
+    prefill_calls = service.calls[1:3]
+    assert [call["body"]["token_ids"] for call in prefill_calls] == [
+        list(prompts[0]),
+        list(prompts[1]),
+    ]
+    assert all(
+        call["body"]["model_handle"] == service.handle
+        for call in prefill_calls
+    )
+    assert [result["route"] for result in results] == [
+        "native_producer",
+        "native_producer",
+    ]
+    assert [result["decoded_tokens"] for result in results] == [[900], [901]]
+    assert all(result["prefill_elapsed_sec"] == 0.0125 for result in results)
+    assert all(result["kernel_elapsed_usec"] == 8000 for result in results)
+    assert all(result["transfer_elapsed_sec"] == 0.0025 for result in results)
+    assert all(result["cache_emit_elapsed_sec"] == 0.001 for result in results)
+    assert all(result["cache_import_elapsed_sec"] >= 0.0 for result in results)
+    assert all(result["decode_elapsed_sec"] >= 0.0 for result in results)
+    assert all(result["total_elapsed_sec"] > 0.0 for result in results)
+    assert all(result["transfer_h2d_bytes"] == 3072 for result in results)
+    assert all(result["transfer_d2h_bytes"] == 1024 for result in results)
+    assert [entry[0] for entry in decode_inputs] == [[103], [202]]
+    assert all(entry[1] is not None for entry in decode_inputs)
+    assert service.launch_count == 1
+
+
+def test_r9700_native_main_wires_verified_registry_and_session_without_one_shot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The production r9700_native main owns one registry/session lifecycle."""
+
+    serving = _serving_module()
+    native_worker = importlib.import_module("native_r9700.native_worker")
+    model_dir = tmp_path / "consumer-model"
+    runner_path = tmp_path / "native_r9700_runner"
+    artifacts_dir = tmp_path / "service-artifacts"
+    model_digest = _TASK4_MODEL_DIGEST
+    service = _EmittingServiceDispatcher(artifacts_dir)
+    events: list[object] = []
+
+    class Registry:
+        dispatch = service.dispatch
+
+        def close(self):
+            events.append("registry.close")
+
+    registry = Registry()
+
+    def fake_build_registry(*, runner_path, artifact_dir):
+        events.append(
+            ("build_registry", str(runner_path), str(artifact_dir))
+        )
+        return registry
+
+    def fake_verify_model_identity(model_uri, supplied_digest=None):
+        events.append(("verify_model_identity", str(model_uri), supplied_digest))
+        assert supplied_digest is None
+        return SimpleNamespace(
+            canonical_uri=str(model_uri),
+            digest=model_digest,
+            fingerprint=dict(_TASK4_MODEL_FINGERPRINT),
+            resident_bytes=4096,
+        )
+
+    def fake_load_model(path):
+        events.append(("load_model", str(path)))
+        return (
+            {"model_uri": str(path), "model_digest": model_digest},
+            FakeTokenizer({}),
+        )
+
+
+    monkeypatch.setattr(
+        native_worker,
+        "build_registry",
+        fake_build_registry,
+        raising=False,
+    )
+    monkeypatch.setattr(serving, "native_worker", native_worker, raising=False)
+    monkeypatch.setattr(
+        serving,
+        "build_registry",
+        fake_build_registry,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        serving,
+        "verify_model_identity",
+        fake_verify_model_identity,
+        raising=False,
+    )
+    monkeypatch.setattr(serving, "load_model", fake_load_model)
+    monkeypatch.setattr(serving, "load_prompt_cache", _load_emitted_prompt_cache)
+    monkeypatch.setattr(
+        serving,
+        "generate_step",
+        lambda prompt, model, **kwargs: iter([np.int64(907)]),
+    )
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "RED: r9700_native production main must not use one-shot subprocess.run"
+        ),
+    )
+
+    rc = serving.main(
+        [
+            "--model",
+            str(model_dir),
+            "--producer-model",
+            str(model_dir),
+            "--native-runner",
+            str(runner_path),
+            "--token-ids-json",
+            "[11, 12, 13]",
+            "--producer-kind",
+            _R9700_NATIVE_PRODUCER_KIND,
+            "--threshold-tokens",
+            "2",
+            "--max-new-tokens",
+            "1",
+            "--artifacts-dir",
+            str(artifacts_dir),
+            "--json",
+            str(tmp_path / "result.json"),
+            "--log",
+            str(tmp_path / "run.log"),
+        ]
+    )
+
+    assert rc == 0
+    build_events = [event for event in events if isinstance(event, tuple) and event[0] == "build_registry"]
+    assert build_events == [
+        ("build_registry", str(runner_path), str(artifacts_dir))
+    ]
+    verify_events = [
+        event
+        for event in events
+        if isinstance(event, tuple) and event[0] == "verify_model_identity"
+    ]
+    assert verify_events == [
+        ("verify_model_identity", str(model_dir), None),
+        ("verify_model_identity", str(model_dir), None),
+    ]
+    load_call = next(call for call in service.calls if call["operation"] == "LoadModel")
+    assert load_call["body"]["model_digest"] == model_digest
+    assert load_call["body"]["model_digest"] != ""
+    assert load_call["body"]["model_digest"].startswith("sha256:")
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
+    assert events[-1] == "registry.close"
+
+
+def test_persistent_serving_consumes_emitted_cache_state_and_validates_reconstructed_layers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An emitted file reconstructs 16 KVCache layers; returned metadata is 1.* only."""
+
+    serving = _serving_module()
+    service = _EmittingServiceDispatcher(tmp_path / "service-artifacts")
+    model_uri = str(tmp_path / "verified-model")
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri=model_uri,
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    prompt_tokens = [301, 302, 303]
+    decode_inputs: list[tuple[list[int], object]] = []
+
+    def fake_generate(prompt_arg, model, **kwargs):
+        decode_inputs.append((_as_int_list(prompt_arg), kwargs.get("prompt_cache")))
+        yield np.int64(905)
+
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "RED: emitted-cache session must not use one-shot subprocess.run"
+        ),
+    )
+
+    with session:
+        result = serving.generate_with_native_prefill(
+            {"model_uri": model_uri, "model_digest": _TASK4_MODEL_DIGEST},
+            FakeTokenizer({}),
+            prompt_tokens,
+            native=_native_config(
+                serving,
+                tmp_path,
+                threshold_tokens=2,
+                request_id="emitted-cache",
+                producer_model_dir=model_uri,
+                producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+            ),
+            max_tokens=1,
+            generate_step_fn=fake_generate,
+            load_prompt_cache_fn=_load_emitted_prompt_cache,
+            service_session=session,
+        )
+
+    assert result["accepted_cache"] is True
+    assert result["route"] == "native_producer"
+    from safetensors import safe_open
+
+    with safe_open(str(result["prompt_cache_path"]), framework="np") as handle:
+        emitted_metadata = dict(handle.metadata())
+    assert {f"0.{index}" for index in range(_EXPECTED_NUM_LAYERS)} <= set(
+        emitted_metadata
+    )
+    assert all(
+        emitted_metadata[f"0.{index}"] == ""
+        for index in range(_EXPECTED_NUM_LAYERS)
+    )
+    assert emitted_metadata["1.offset"] == "2"
+    assert emitted_metadata["1.num_layers"] == "16"
+    returned_metadata = result["metadata"]
+    assert "meta_state" not in returned_metadata
+    assert not any(
+        str(key).startswith(("0.", "2."))
+        for key in returned_metadata
+    )
+    assert returned_metadata.get("offset", returned_metadata.get("1.offset")) == "2"
+    assert returned_metadata.get(
+        "num_layers", returned_metadata.get("1.num_layers")
+    ) == "16"
+    assert len(decode_inputs) == 1
+    assert decode_inputs[0][0] == [prompt_tokens[-1]]
+    reconstructed_cache = decode_inputs[0][1]
+    assert reconstructed_cache is not None
+    assert len(reconstructed_cache) == _EXPECTED_NUM_LAYERS
+    for layer in reconstructed_cache:
+        assert type(layer).__name__ == "KVCache"
+        assert tuple(np.asarray(layer.keys).shape) == (
+            1,
+            _EXPECTED_N_KV_HEADS,
+            len(prompt_tokens) - 1,
+            _EXPECTED_HEAD_DIM,
+        )
+        assert tuple(np.asarray(layer.values).shape) == tuple(
+            np.asarray(layer.keys).shape
+        )
+        assert int(layer.offset) == len(prompt_tokens) - 1
+        size = layer.size() if callable(getattr(layer, "size", None)) else layer.size
+        assert int(size) == len(prompt_tokens) - 1
+        assert getattr(layer, "meta_state", "") == ""
+
+
+def test_persistent_serving_accepts_single_token_zero_prefix_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """S=1 is a valid native request with an empty N=0 prefix cache."""
+
+    serving = _serving_module()
+    service = _LiveServiceDispatcher(
+        tmp_path / "service-artifacts",
+        evidence_override={
+            "kernel_count": 0,
+            "transfer_bytes": 0,
+            "block_tokens": 0,
+            "block_count": 0,
+        },
+    )
+    model_uri = str(tmp_path / "verified-model")
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri=model_uri,
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    decode_inputs: list[list[int]] = []
+
+    def fake_load_prompt_cache(path, *, return_metadata=False):
+        assert return_metadata is True
+        assert service.last_metadata is not None
+        cache = _valid_cache(0)
+        metadata = dict(service.last_metadata)
+        return (cache, metadata) if return_metadata else cache
+
+    def fake_generate(prompt_arg, model, **kwargs):
+        decode_inputs.append(_as_int_list(prompt_arg))
+        assert kwargs.get("prompt_cache") is not None
+        yield np.int64(906)
+
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "RED: S=1 native serving must not use one-shot subprocess.run"
+        ),
+    )
+
+    with session:
+        result = serving.generate_with_native_prefill(
+            {"model_uri": model_uri, "model_digest": _TASK4_MODEL_DIGEST},
+            FakeTokenizer({}),
+            [777],
+            native=_native_config(
+                serving,
+                tmp_path,
+                threshold_tokens=1,
+                request_id="zero-prefix",
+                producer_model_dir=model_uri,
+                producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+            ),
+            max_tokens=1,
+            generate_step_fn=fake_generate,
+            load_prompt_cache_fn=fake_load_prompt_cache,
+            service_session=session,
+        )
+
+    assert result["accepted_cache"] is True
+    assert result["route"] == "native_producer"
+    assert result["n_prefix"] == 0
+    assert result["decoded_tokens"] == [906]
+    assert decode_inputs == [[777]]
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
+    assert service.calls[1]["body"]["token_ids"] == [777]
+    assert service.last_prefill_result is not None
+    assert service.last_prefill_result["prefix_token_count"] == 0
+    for layer in _valid_cache(0):
+        assert tuple(layer.keys.shape) == (1, _EXPECTED_N_KV_HEADS, 0, _EXPECTED_HEAD_DIM)
+ 
+ 
+def test_r9700_native_main_rejects_consumer_producer_model_digest_mismatch_before_load_or_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Native main verifies both model identities before loading either model."""
+
+    serving = _serving_module()
+    native_worker = importlib.import_module("native_r9700.native_worker")
+    model_dir = tmp_path / "consumer-model"
+    producer_model_dir = tmp_path / "producer-model"
+    consumer_digest = "sha256:" + "a" * 64
+    producer_digest = "sha256:" + "b" * 64
+    events: list[tuple[object, ...]] = []
+
+    def fake_verify_model_identity(model_uri, supplied_digest=None):
+        path = str(model_uri)
+        events.append(("verify_model_identity", path, supplied_digest))
+        digest = consumer_digest if path == str(model_dir) else producer_digest
+        fingerprint = dict(_TASK4_MODEL_FINGERPRINT)
+        fingerprint["model_digest"] = digest
+        return SimpleNamespace(
+            canonical_uri=path,
+            digest=digest,
+            fingerprint=fingerprint,
+            resident_bytes=4096,
+        )
+
+    def fail_load_model(path):
+        events.append(("load_model", str(path)))
+        pytest.fail("digest mismatch must be rejected before loading the consumer model")
+
+    def fail_build_registry(*, runner_path, artifact_dir):
+        events.append(("build_registry", str(runner_path), str(artifact_dir)))
+        pytest.fail("digest mismatch must be rejected before constructing a session/registry")
+
+    monkeypatch.setattr(serving, "verify_model_identity", fake_verify_model_identity)
+    monkeypatch.setattr(native_worker, "verify_model_identity", fake_verify_model_identity, raising=False)
+    monkeypatch.setattr(serving, "load_model", fail_load_model)
+    monkeypatch.setattr(serving, "build_registry", fail_build_registry, raising=False)
+    monkeypatch.setattr(native_worker, "build_registry", fail_build_registry, raising=False)
+
+    json_path = tmp_path / "digest-mismatch.json"
+    log_path = tmp_path / "digest-mismatch.log"
+    rc = serving.main(
+        [
+            "--model",
+            str(model_dir),
+            "--producer-model",
+            str(producer_model_dir),
+            "--native-runner",
+            str(tmp_path / "native_r9700_runner"),
+            "--token-ids-json",
+            "[11, 12, 13]",
+            "--producer-kind",
+            _R9700_NATIVE_PRODUCER_KIND,
+            "--threshold-tokens",
+            "2",
+            "--max-new-tokens",
+            "1",
+            "--artifacts-dir",
+            str(tmp_path / "service-artifacts"),
+            "--json",
+            str(json_path),
+            "--log",
+            str(log_path),
+        ]
+    )
+
+    assert rc == 2
+    assert [event[0] for event in events] == [
+        "verify_model_identity",
+        "verify_model_identity",
+    ]
+    assert {event[1] for event in events} == {
+        str(model_dir),
+        str(producer_model_dir),
+    }
+    assert not any(event[0] in {"load_model", "build_registry"} for event in events)
+    result = json.loads(json_path.read_text(encoding="utf-8"))
+    assert result["status"] == "blocked"
+    assert result["exit_status"] == 2
+    assert "digest" in json.dumps(result["error"]).lower()
+
+
+class _PersistentEvidenceMutationDispatcher(_LiveServiceDispatcher):
+    """Persistent service double with one isolated native-evidence mutation."""
+
+    def __init__(
+        self,
+        artifacts_dir: Path,
+        *,
+        model_uri: str,
+        mutation: str,
+    ) -> None:
+        super().__init__(artifacts_dir)
+        self.model_uri = model_uri
+        self.mutation = mutation
+
+    def _write_valid_npz(self, path: Path, n_prefix: int) -> None:
+        shape = (1, _EXPECTED_N_KV_HEADS, n_prefix, _EXPECTED_HEAD_DIM)
+        arrays: dict[str, np.ndarray] = {
+            "model": np.asarray(self.model_uri),
+            "producer_kind": np.asarray(_R9700_NATIVE_PRODUCER_KIND),
+            "num_layers": np.asarray(_EXPECTED_NUM_LAYERS, dtype=np.int64),
+            "n_prefix": np.asarray(n_prefix, dtype=np.int64),
+        }
+        for layer_index in range(_EXPECTED_NUM_LAYERS):
+            arrays[f"layer{layer_index}_K"] = np.zeros(shape, dtype=np.float16)
+            arrays[f"layer{layer_index}_V"] = np.ones(shape, dtype=np.float16)
+        np.savez(path, **arrays)
+
+    def __call__(self, request: dict[str, object]) -> dict[str, object]:
+        response = super().__call__(request)
+        if request["operation"] != "Prefill" or response["status"] != "pass":
+            return response
+
+        result = response["result"]
+        evidence = response["evidence"]
+        assert isinstance(result, dict)
+        assert isinstance(evidence, dict)
+        cache = result["cache"]
+        assert isinstance(cache, dict)
+        npz_path = Path(cache["prefill_npz_path"])
+        prefill_log_path = Path(cache["prefill_log_path"])
+        n_prefix = len(request["body"]["token_ids"]) - 1
+        self._write_valid_npz(npz_path, n_prefix)
+
+        if self.mutation == "blocked-acceptance":
+            evidence["native_prefill_acceptance"] = "blocked"
+        elif self.mutation == "failed-full-layer":
+            evidence["native_prefill_full_layer_loop_status"] = "blocked"
+        elif self.mutation == "wrong-substrate":
+            evidence["runtime_substrate"] = "Linux/ROCm/HIP"
+        elif self.mutation == "wrong-completion-policy":
+            evidence["compute_completion_policy"] = "best-effort"
+        elif self.mutation == "wrong-barrier-policy":
+            evidence["compute_barrier_policy"] = "none"
+        elif self.mutation == "failure-stage":
+            evidence["failure_stage"] = "native_prefill_failed"
+        elif self.mutation == "failure-text":
+            evidence["failure_text"] = "native prefill failed"
+        elif self.mutation == "nonzero-exit":
+            evidence["exit_status"] = 1
+        elif self.mutation == "missing-hardware-log":
+            evidence.pop("hardware_log_path", None)
+        elif self.mutation == "unreadable-hardware-log":
+            prefill_log_path.write_bytes(b"\xff\xfe\xfd")
+        elif self.mutation == "unbound-hardware-log":
+            other_log = self.artifacts_dir / "other-request.prefill.log"
+            other_log.write_text("other request\n", encoding="utf-8")
+            evidence["hardware_log_path"] = str(other_log)
+        elif self.mutation == "missing-npz":
+            evidence.pop("prefill_npz_path", None)
+        elif self.mutation == "invalid-npz":
+            npz_path.write_bytes(b"not-a-valid-native-prefill-npz")
+        elif self.mutation == "zero-kernel":
+            evidence["kernel_count"] = 0
+        elif self.mutation == "zero-transfer":
+            evidence["transfer_bytes"] = 0
+        elif self.mutation == "zero-prefix":
+            evidence["kernel_count"] = 0
+            evidence["transfer_bytes"] = 0
+            evidence["block_tokens"] = 0
+            evidence["block_count"] = 0
+        else:
+            raise AssertionError(f"unknown evidence mutation: {self.mutation}")
+        return response
+
+
+_PERSISTENT_EVIDENCE_MUTATIONS = (
+    pytest.param("blocked-acceptance", id="blocked-acceptance"),
+    pytest.param("failed-full-layer", id="failed-full-layer"),
+    pytest.param("wrong-substrate", id="wrong-substrate"),
+    pytest.param("wrong-completion-policy", id="wrong-completion-policy"),
+    pytest.param("wrong-barrier-policy", id="wrong-barrier-policy"),
+    pytest.param("failure-stage", id="nonempty-failure-stage"),
+    pytest.param("failure-text", id="nonempty-failure-text"),
+    pytest.param("nonzero-exit", id="nonzero-exit"),
+    pytest.param("missing-hardware-log", id="missing-hardware-log"),
+    pytest.param("unreadable-hardware-log", id="unreadable-hardware-log"),
+    pytest.param("unbound-hardware-log", id="unbound-hardware-log"),
+    pytest.param("missing-npz", id="missing-npz"),
+    pytest.param("invalid-npz", id="invalid-npz"),
+    pytest.param("zero-kernel", id="zero-kernel-on-positive-prefix"),
+    pytest.param("zero-transfer", id="zero-transfer-on-positive-prefix"),
+)
+
+
+@pytest.mark.parametrize("mutation", _PERSISTENT_EVIDENCE_MUTATIONS)
+def test_persistent_prefill_rejects_semantically_invalid_evidence_before_cache_acceptance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    """Every failed native-evidence gate stays on the pre-acceptance boundary."""
+
+    serving = _serving_module()
+    model_uri = str(tmp_path / "verified-model")
+    service = _PersistentEvidenceMutationDispatcher(
+        tmp_path / "service-artifacts",
+        model_uri=model_uri,
+        mutation=mutation,
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri=model_uri,
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    prompt_tokens = [601, 602, 603]
+    native = _native_config(
+        serving,
+        tmp_path,
+        threshold_tokens=2,
+        request_id=f"evidence-{mutation}",
+        producer_model_dir=model_uri,
+        producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+    )
+    generated: list[tuple[list[int], object]] = []
+
+    def fake_load_prompt_cache(path, *, return_metadata=False):
+        assert return_metadata is True
+        assert service.last_metadata is not None
+        cache = _valid_cache(len(prompt_tokens) - 1)
+        metadata = dict(service.last_metadata)
+        return (cache, metadata) if return_metadata else cache
+
+    def fake_generate(prompt_arg, model, **kwargs):
+        generated.append((_as_int_list(prompt_arg), kwargs.get("prompt_cache")))
+        yield np.int64(910)
+
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "persistent evidence rejection must not use one-shot subprocess"
+        ),
+    )
+    with session:
+        try:
+            result = serving.generate_with_native_prefill(
+                "resident-model",
+                FakeTokenizer({}),
+                prompt_tokens,
+                native=native,
+                max_tokens=1,
+                generate_step_fn=fake_generate,
+                load_prompt_cache_fn=fake_load_prompt_cache,
+                service_session=session,
+            )
+        except serving.NativePrefillError as exc:
+            assert exc.result is not None, "pre-acceptance errors must retain a result"
+            result = exc.result
+
+    assert result["accepted_cache"] is False
+    assert result.get("prompt_cache_path") in {None, ""}
+    assert result["route"] in {"native_mlx_fallback", "native_producer"}
+    assert result["status"] in {"blocked", "error"}
+    if result["route"] == "native_mlx_fallback":
+        assert result["status"] == "blocked"
+        assert result["exit_status"] == 2
+        assert result["fallback_reason"] == "cache_validation_failed"
+        assert generated == [(prompt_tokens, None)]
+    else:
+        assert result["status"] == "error"
+        assert result["exit_status"] == 1
+        assert generated == []
+
+
+def test_persistent_prefill_accepts_declared_zero_prefix_without_positive_work_counters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """N=0 may report no work while retaining complete accepted evidence."""
+
+    serving = _serving_module()
+    model_uri = str(tmp_path / "verified-model")
+    service = _PersistentEvidenceMutationDispatcher(
+        tmp_path / "service-artifacts",
+        model_uri=model_uri,
+        mutation="zero-prefix",
+    )
+    session = serving.PersistentPrefillSession(
+        service.dispatch,
+        model_uri=model_uri,
+        model_digest=_TASK4_MODEL_DIGEST,
+    )
+    generated: list[tuple[list[int], object]] = []
+
+    def fake_load_prompt_cache(path, *, return_metadata=False):
+        assert return_metadata is True
+        assert service.last_metadata is not None
+        cache = _valid_cache(0)
+        metadata = dict(service.last_metadata)
+        return (cache, metadata) if return_metadata else cache
+
+    def fake_generate(prompt_arg, model, **kwargs):
+        generated.append((_as_int_list(prompt_arg), kwargs.get("prompt_cache")))
+        yield np.int64(911)
+
+    monkeypatch.setattr(
+        serving.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "zero-prefix persistent serving must not use one-shot subprocess"
+        ),
+    )
+    with session:
+        result = serving.generate_with_native_prefill(
+            "resident-model",
+            FakeTokenizer({}),
+            [777],
+            native=_native_config(
+                serving,
+                tmp_path,
+                threshold_tokens=1,
+                request_id="zero-prefix-evidence",
+                producer_model_dir=model_uri,
+                producer_kind=_R9700_NATIVE_PRODUCER_KIND,
+            ),
+            max_tokens=1,
+            generate_step_fn=fake_generate,
+            load_prompt_cache_fn=fake_load_prompt_cache,
+            service_session=session,
+        )
+
+    assert result["accepted_cache"] is True
+    assert result["route"] == "native_producer"
+    assert result["status"] == "pass"
+    assert result["n_prefix"] == 0
+    assert result["kernel_count"] == 0
+    assert result["transfer_bytes"] == 0
+    assert service.last_prefill_response is not None
+    evidence = service.last_prefill_response["evidence"]
+    assert evidence["native_prefill_acceptance"] == "pass"
+    assert evidence["native_prefill_full_layer_loop_status"] == "pass"
+    assert evidence["runtime_substrate"] == "TinyGPU.app/APLRemotePCIDevice/PCIIface"
+    assert evidence["compute_completion_policy"] == "terminal"
+    assert evidence["compute_barrier_policy"] == "full"
+    assert evidence["block_tokens"] == 0
+    assert evidence["block_count"] == 0
+    assert evidence["failure_stage"] == "none"
+    assert evidence["failure_text"] == "none"
+    assert generated and generated[0][0] == [777]
+    assert generated[0][1] is not None
+    assert [call["operation"] for call in service.calls] == [
+        "LoadModel",
+        "Prefill",
+        "UnloadModel",
+    ]
