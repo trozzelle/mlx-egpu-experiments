@@ -12,7 +12,7 @@
 ## Expected supervisor RED command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ## Expected RED failure reason
@@ -74,7 +74,7 @@ If an earlier substrate prerequisite fails on the supervisor machine, the log sh
 - Focused no-hardware contract command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Observed result: `12 passed in 11.00s`.

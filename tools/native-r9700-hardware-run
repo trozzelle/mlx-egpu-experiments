@@ -15,9 +15,10 @@
 
 set -eu
 
-DEFAULT_SOCKET="${TMPDIR}/tinygpu.sock"
+TMP_ROOT="${TMPDIR:-/tmp}"
+DEFAULT_SOCKET="${TMP_ROOT%/}/tinygpu.sock"
 SERVER_BIN="/Applications/TinyGPU.app/Contents/MacOS/TinyGPU"
-PYTHON="${HOME}/.pyenv/versions/3.12.8/bin/python3"
+PYTHON="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 LOCK_DIR="${HOME:?HOME is required}/.cache/native-r9700"
 LOCK_FILE="$LOCK_DIR/hardware.lock"
 

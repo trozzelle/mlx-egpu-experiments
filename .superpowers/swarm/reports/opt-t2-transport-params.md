@@ -31,7 +31,7 @@
 # Full runner build (see plan Global Constraints)
 # Expected: exit 0, no warnings-as-errors.
 
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 $PY -m pytest tests/native_r9700/test_native_amdev_transfer_contract.py -q
 # Expected: PASS (probe self-test streams unchanged).
 ```

@@ -20,7 +20,7 @@ Needs review. C++ deterministic SDMA helpers/self-tests added.
 ## Supervisor command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected GREEN: all no-hardware tests pass.

@@ -27,9 +27,9 @@ Runtime/bridge contract:
 - Hardware tolerance markers: `tolerance: fp32_ulp<=64`, `max_abs_diff: 1.621246337890625e-05`, `max_ulp_diff: 35`, `mismatch_count: 0`, `byte_mismatch_count: 88`.
 
 Validation commands observed:
-- RED regression: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_k_cols0_16_second_weight_tile_uses_dot2_pair_packing -q` exited 1 before the fix because the embedded second tile equaled raw fixture bytes instead of packed bytes.
+- RED regression: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_k_cols0_16_second_weight_tile_uses_dot2_pair_packing -q` exited 1 before the fix because the embedded second tile equaled raw fixture bytes instead of packed bytes.
 - `python3 -m py_compile native_r9700/ref_fixtures.py tests/native_r9700/test_ref_fixtures.py tests/native_r9700/test_runtime_contract.py` exited 0.
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_k_projection_full_inner_cols0_16_fixture_matches_fp32_matmul_oracle tests/native_r9700/test_runtime_contract.py::test_layer0_k_cols0_16_second_weight_tile_uses_dot2_pair_packing tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_proj_full_inner_cols0_16_tiled_accum_chain -q` exited 0 with `3 passed`.
+- `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_k_projection_full_inner_cols0_16_fixture_matches_fp32_matmul_oracle tests/native_r9700/test_runtime_contract.py::test_layer0_k_cols0_16_second_weight_tile_uses_dot2_pair_packing tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_proj_full_inner_cols0_16_tiled_accum_chain -q` exited 0 with `3 passed`.
 - `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -o /tmp/native_r9700_primitive_bridge_c1r6s` exited 0.
 - `mkdir -p build/native-r9700-runtime && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -o build/native-r9700-runtime/native_r9700_primitive_bridge && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner` exited 0.
 - `build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_k_proj_full_inner_cols0_16_tiled_accum_chain` exited 0 and wrote `logs/c1-runner-primitive-chain-proof-layer0_k_proj_full_inner_cols0_16_tiled_accum_chain-2026-08-19T20:02:00Z.log`.
@@ -53,5 +53,5 @@ Review gate:
 - `C1R6sReview` approved with no Critical/Important findings. Reviewer confirmed second K tile dot2-pair packing, wrapper tolerated marker validation, and hardware-primitive-only scope.
 
 Full native regression after review dispatch:
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` exited 0 with `177 passed, 2 warnings in 77.86s`.
+- `${PY} -m pytest tests/native_r9700 -q` exited 0 with `177 passed, 2 warnings in 77.86s`.
 

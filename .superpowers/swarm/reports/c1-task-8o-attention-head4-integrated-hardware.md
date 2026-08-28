@@ -59,7 +59,7 @@ Validation commands were not executed by this agent per the wave constraint. The
   - Result: exit 0, no compiler output.
 - `build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_attention_scores_softmax_context_head4_tokens0_5_cols256_320_chain`
   - Result: hardware wrapper exited 0 with `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `mismatch_count: 0`, `max_abs_diff=4.6566128730773926e-10`, `max_ulp_diff=2`, `byte_mismatch_count=5`, and log `logs/c1-runner-primitive-chain-proof-layer0_attention_scores_softmax_context_head4_tokens0_5_cols256_320_chain-2026-08-20T16:58:53Z.log`.
-- Full native regression after review: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` exited 0 with `274 passed, 2 warnings in 393.96s`; raw output `artifact://2749`.
+- Full native regression after review: `${PY} -m pytest tests/native_r9700 -q` exited 0 with `274 passed, 2 warnings in 393.96s`; raw output `artifact://2749`.
 
 ## Remaining blockers
 - Native prefill acceptance remains open.

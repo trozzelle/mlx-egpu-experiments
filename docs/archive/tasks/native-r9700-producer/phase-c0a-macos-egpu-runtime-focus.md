@@ -52,7 +52,7 @@ Agents update only their row and append evidence/notes as work completes.
 ### Source refs
 
 - C0 task set 2 row and report: stale libusb-only probe compiled but logged `tinygpu_device_count: 0`; this no longer represents the working local path.
-- Corrected TinyGPU discovery evidence: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/system.py` `APLRemotePCIDevice`, `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/ops_amd.py` `PCIIface`, and the C0A TinyGPU.app/IOKit PCI discovery command in `validation-commands.md`.
+- Corrected TinyGPU discovery evidence: `<tinygrad-checkout>/tinygrad/runtime/support/system.py` `APLRemotePCIDevice`, `<tinygrad-checkout>/tinygrad/runtime/ops_amd.py` `PCIIface`, and the C0A TinyGPU.app/IOKit PCI discovery command in `validation-commands.md`.
 
 ### Target
 
@@ -78,8 +78,8 @@ Non-goals: no DMA implementation, no kernel launch implementation, no model pref
 ### Validation
 
 ```sh
-JITBEAM=2 DEV=AMD PYTHONPATH=${HOME}/Development/ml/tools/tinygrad \
-  ${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "from tinygrad.runtime.support.system import System; from tinygrad import Device; devs=System.list_devices(0x1002, ((0xffff,(0x74a1,0x744c,0x7480,0x7550,0x7551,0x7590,0x75a0)),), None); print('amd_pci_devices', devs); d=Device['AMD']; print('iface', type(d.iface).__name__); print('arch', d.arch); print('pcibus', getattr(d.iface.pci_dev, 'pcibus', None)); print('pci_dev_class', type(d.iface.pci_dev).__name__)"
+JITBEAM=2 DEV=AMD PYTHONPATH=<tinygrad-checkout> \
+  ${PY} -c "from tinygrad.runtime.support.system import System; from tinygrad import Device; devs=System.list_devices(0x1002, ((0xffff,(0x74a1,0x744c,0x7480,0x7550,0x7551,0x7590,0x75a0)),), None); print('amd_pci_devices', devs); d=Device['AMD']; print('iface', type(d.iface).__name__); print('arch', d.arch); print('pcibus', getattr(d.iface.pci_dev, 'pcibus', None)); print('pci_dev_class', type(d.iface.pci_dev).__name__)"
 ```
 
 ## Task set 2: TinyGPU ABI pinning note

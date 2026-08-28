@@ -19,8 +19,8 @@ Acceptance remains `hardware_primitive_chain_only_partial`; `native_prefill_acce
 ## Verification
 
 - Focused post-repair contracts passed:
-  - `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k 'future_mlp_down or future_attention or future_heads_embedded or future_cols_embedded or help_lists' -q` -> `29 passed, 131 deselected in 175.84s`.
-  - `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -k 'schema_json_matches_disk_digests or mlp_down_proj_full_inner or future_head' -q` -> `47 passed, 55 deselected in 0.24s`.
+  - `${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k 'future_mlp_down or future_attention or future_heads_embedded or future_cols_embedded or help_lists' -q` -> `29 passed, 131 deselected in 175.84s`.
+  - `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -k 'schema_json_matches_disk_digests or mlp_down_proj_full_inner or future_head' -q` -> `47 passed, 55 deselected in 0.24s`.
   - `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_primitive_bridge` -> exit `0`, no compiler output after missing MLP bridge wiring was repaired.
   - `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner` -> exit `0`, no compiler output.
 - Real hardware proof passed for all eight batch1088 chains with `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, and `failure_stage: none`:
@@ -33,7 +33,7 @@ Acceptance remains `hardware_primitive_chain_only_partial`; `native_prefill_acce
   - `layer0_attention_scores_softmax_context_head19_tokens0_5_cols1216_1280_chain`: max_abs_diff `9.3132257461547852e-10`, max_ulp_diff `4`, byte_mismatch_count `8`, log `logs/c1-runner-primitive-chain-proof-layer0_attention_scores_softmax_context_head19_tokens0_5_cols1216_1280_chain-2026-08-18-batch1088-repair7.log`.
   - `layer0_attention_scores_softmax_context_head20_tokens0_5_cols1280_1344_chain`: tolerance `fp32_abs<=1e-8_or_ulp<=64`, max_abs_diff `7.4505805969238281e-09`, max_ulp_diff `256`, byte_mismatch_count `11`, log `logs/c1-runner-primitive-chain-proof-layer0_attention_scores_softmax_context_head20_tokens0_5_cols1280_1344_chain-2026-08-18-batch1088-repair9.log`.
 - Review gate passed: `C1Batch1088Review` found no Critical/Important/Minor issues and recommended accepting the checkpoint.
-- Full native regression passed: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> `371 passed, 2 warnings in 999.53s` (`artifact://3946`).
+- Full native regression passed: `${PY} -m pytest tests/native_r9700 -q` -> `371 passed, 2 warnings in 999.53s` (`artifact://3946`).
 
 ## Decisions
 

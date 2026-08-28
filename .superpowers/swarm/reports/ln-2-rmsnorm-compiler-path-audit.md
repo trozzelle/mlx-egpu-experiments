@@ -42,7 +42,7 @@ The current source digest is
    arithmetic.
 3. `generate` calls Tinygrad's `compile_hip(source_text, "gfx1201", asm=False)`
    (`:1189-1219`). The active Tinygrad implementation is
-   `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/compiler_amd.py`.
+   `<tinygrad-checkout>/tinygrad/runtime/support/compiler_amd.py`.
    It sets ISA `amdgcn-amd-amdhsa--gfx1201` and HIP language (`:48-52`), compiles
    source to bitcode with `-O3 -mcumode --hip-version=6.0.32830`,
    `-D__HIPCC_RTC__`, C++14, `-nogpuinc`, `--offload-arch=gfx1201`, and

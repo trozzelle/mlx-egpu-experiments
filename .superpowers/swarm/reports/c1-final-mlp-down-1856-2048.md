@@ -13,6 +13,6 @@
 - Added focused fixture/runtime tests for schema, packed layout, expected fp32 bytes, and fake wrapper markers.
 
 ## Verification
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -k 'mlp_down_proj_full_inner' -q` -> `64 passed, 60 deselected`.
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_future_cols_embedded_operands_use_kernel_layouts or final_mlp_down_bands' -q` -> `12 passed, 166 deselected`.
+- `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -k 'mlp_down_proj_full_inner' -q` -> `64 passed, 60 deselected`.
+- `${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_future_cols_embedded_operands_use_kernel_layouts or final_mlp_down_bands' -q` -> `12 passed, 166 deselected`.
 - `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -o /tmp/native_r9700_c1_bridge_final_mlp_check` -> exit 0, no output.

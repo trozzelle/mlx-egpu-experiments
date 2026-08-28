@@ -14,7 +14,7 @@
 Supervisor RED command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
 ```
 
 Expected RED result: fail until `--self-test compute-doorbell-consumption` is implemented in the native probe.
@@ -24,7 +24,7 @@ Expected RED result: fail until `--self-test compute-doorbell-consumption` is im
 Command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
 ```
 
 Result: exited `1` as expected for RED.

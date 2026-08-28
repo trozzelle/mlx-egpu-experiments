@@ -15,13 +15,13 @@ The existing `failure_stage: output_path_conflict` response, direct and `./` ali
 Focused RED-contract selectors:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'native_prefill_proof_redacts_token_ids_from_stdout_and_hardware_log or native_prefill_proof_rejects_relative_output_and_absolute_log_aliases'
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'native_prefill_proof_redacts_token_ids_from_stdout_and_hardware_log or native_prefill_proof_rejects_relative_output_and_absolute_log_aliases'
 ```
 
 Full runtime-contract validation:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q
 ```
 
 C++ compile validation:

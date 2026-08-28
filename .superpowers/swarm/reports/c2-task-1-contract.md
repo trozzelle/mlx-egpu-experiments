@@ -62,11 +62,11 @@ C2 wrapper logs must include: command line; timestamp; model/config path; produc
 
 ## Commands recorded for downstream task sets
 
-- Focused wrapper/behavior tests: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -v`.
-- Full native suite after wrapper/test changes: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v`.
-- Full Python suite after Python changes: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v`.
-- C2 full prompt-suite integration CLI shape: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --max-new-tokens 4 --threshold-tokens 128 --producer-timeout-s 300 --artifacts-dir logs/c2-serving --json logs/c2-serving/result.json --log logs/c2-serving/run.log --report docs/path-a-validation-results.md`.
-- C2 producer-unavailable fallback CLI shape: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --producer-model /tmp/native-r9700-missing-producer-model --fixtures-dir tests/native_r9700/fixtures --prompt-name prompt-1 --max-new-tokens 4 --threshold-tokens 128 --producer-timeout-s 5 --artifacts-dir logs/c2-serving-unavailable --json logs/c2-serving-unavailable/result.json --log logs/c2-serving-unavailable/run.log`.
+- Focused wrapper/behavior tests: `${PY} -m pytest tests/native_r9700/test_serving.py -v`.
+- Full native suite after wrapper/test changes: `${PY} -m pytest tests/native_r9700 -v`.
+- Full Python suite after Python changes: `${PY} -m pytest tests -v`.
+- C2 full prompt-suite integration CLI shape: `${PY} -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --max-new-tokens 4 --threshold-tokens 128 --producer-timeout-s 300 --artifacts-dir logs/c2-serving --json logs/c2-serving/result.json --log logs/c2-serving/run.log --report docs/path-a-validation-results.md`.
+- C2 producer-unavailable fallback CLI shape: `${PY} -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --producer-model /tmp/native-r9700-missing-producer-model --fixtures-dir tests/native_r9700/fixtures --prompt-name prompt-1 --max-new-tokens 4 --threshold-tokens 128 --producer-timeout-s 5 --artifacts-dir logs/c2-serving-unavailable --json logs/c2-serving-unavailable/result.json --log logs/c2-serving-unavailable/run.log`.
 
 ## Decisions recorded
 

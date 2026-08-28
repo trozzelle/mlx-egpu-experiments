@@ -45,7 +45,7 @@ No fixture generation, `qwen_parity.py` edits, native hardware, or Llama cache b
 From the worktree root, run exactly:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_hybrid_state_spill.py \
   tests/native_r9700/test_qwen_layer_executor.py \
   tests/native_r9700/test_qwen_layer_executor_contract.py -v
@@ -126,7 +126,7 @@ The final residual review adds four more focused contracts:
 From `.worktrees/r9700-products-wave-a`, the exact supervisor command is:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_hybrid_state_spill.py \
   tests/native_r9700/test_qwen_layer_executor.py \
   tests/native_r9700/test_qwen_layer_executor_contract.py -v

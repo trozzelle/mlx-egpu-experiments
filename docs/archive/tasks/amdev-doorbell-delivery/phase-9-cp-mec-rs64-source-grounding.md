@@ -3,7 +3,7 @@
 ## Source grounding
 - Parent plan: `docs/archive/superpowers/plans/2026-08-17-cp-mec-rs64-exception-grounding.md`.
 - Current reviewed blocker: `cp_mec_rs64_exception_status_needs_source_grounding` from `.superpowers/swarm/reports/c0a-compute-task-10-cp-mec-visibility-review.md`.
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 
 ## Selected lane
 - `selected_lane: rs64_exception_context_diagnostic`

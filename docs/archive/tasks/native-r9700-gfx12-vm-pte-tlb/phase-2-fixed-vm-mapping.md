@@ -16,7 +16,7 @@ Implement the minimum hardware VM/PTE/TLB work needed for the existing `--transf
 
 - Phase 1 must be reviewed and GREEN.
 - Existing C0B discovery path must still map BAR0/BAR2/BAR5 and parse `MAP_SYSMEM_FD` page lists.
-- Work boundary remains `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Work boundary remains `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 
 ## Orchestration map
 
@@ -122,7 +122,7 @@ Non-goals: no GFX compute queue, no kernel dispatch, no broad generated register
 Supervisor runs:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Supervisor then runs the C0B transfer command from `validation-commands.md` and inspects `logs/c0b-native-amdev-sdma-transfer.log`.
@@ -159,7 +159,7 @@ No validation commands run by the reviewer. Supervisor verification evidence is 
 
 ## Phase validation
 
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` passes.
+- `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` passes.
 - Hardware transfer command writes `logs/c0b-native-amdev-sdma-transfer.log`.
 - Log contains VM page-table and TLB evidence fields.
 - Reviewer accepts correctness, maintainability, architectural fit, and simplicity.

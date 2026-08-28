@@ -35,7 +35,7 @@ This pins the final-review requirement that the package contain the exact six af
 Run exactly:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_parity.py -v
 ```
 

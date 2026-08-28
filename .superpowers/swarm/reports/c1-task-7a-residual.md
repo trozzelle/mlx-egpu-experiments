@@ -24,7 +24,7 @@ This is a hardware primitive-chain proof only. `native_prefill_acceptance` remai
 Focused host tests:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_ref_fixtures.py::test_layer_trace_attention_residual_cols0_64_fixtures_schema_shape_dtype \
   tests/native_r9700/test_ref_fixtures.py::test_layer0_attention_residual_cols0_64_fixture_matches_fp16_add_oracle \
   tests/native_r9700/test_runtime_contract.py::test_layer0_attention_residual_cols0_64_operands_are_sliced_rows8x64 \

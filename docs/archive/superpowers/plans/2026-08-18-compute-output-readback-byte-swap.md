@@ -13,7 +13,7 @@
 
 ## Global Constraints
 
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Current checkpoint: `3aaa6bb` (C0A22 docs), atop `353b17b` (C0A22 hw result), `c263e11` (C0A22 impl), `d603f7b` (C0A21).
 - **NO kernel-behavior change in this plan.** `kKernelText`, `kDispatchGlobalSizeX/Y/Z`, `kDispatchLocalSizeX/Y/Z`, kernarg layout, BAR2 index/value, GDC/S2A routes, CP MEC doorbell ranges, PM4 packet sequence, scheduler, retry loops, AQL, Linux HIP fallback, allocator/runtime framework, and C1/C2/C3 are all OUT OF SCOPE until a reviewed cause selects the single fix lane (follow-on plan).
 - Do NOT write `regCP_MEC_RS64_PRGRM_CNTR_START`/`_HI`, `regCP_ME_PRGRM_CNTR_START`/`_HI`, `regCP_PFP_PRGRM_CNTR_START`/`_HI`, or any other program-counter register (firmware `ucode_start` values unavailable).
@@ -72,8 +72,8 @@ Add a pytest contract test that compiles and runs `--self-test compute-readback-
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest 'tests/test_native_amdev_transfer_contract.py::test_compute_readback_classifier_self_test_reports_anomaly' -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest 'tests/test_native_amdev_transfer_contract.py::test_compute_readback_classifier_self_test_reports_anomaly' -v
 ```
 
 Expected: FAIL with "self_test: compute-readback-classifier" line absent.
@@ -145,8 +145,8 @@ Add the `--self-test compute-readback-classifier` path: feed the byte strings `k
 - [ ] **Step 4: Run it to verify it passes**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest 'tests/test_native_amdev_transfer_contract.py::test_compute_readback_classifier_self_test_reports_anomaly' -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest 'tests/test_native_amdev_transfer_contract.py::test_compute_readback_classifier_self_test_reports_anomaly' -v
 ```
 
 Expected: PASS.
@@ -205,8 +205,8 @@ These are the values the C0A23 T2 executor derived from the authoritative RDNA4 
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest 'tests/test_native_amdev_transfer_contract.py::test_kernel_text_decode_self_test_reports_store_ops' -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest 'tests/test_native_amdev_transfer_contract.py::test_kernel_text_decode_self_test_reports_store_ops' -v
 ```
 
 Expected: FAIL with "self_test: kernel-text-decode" line absent.
@@ -220,8 +220,8 @@ The decode constants (family-opcode decode table, `store_instruction_count=1`, a
 - [ ] **Step 4: Run it to verify it passes**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest 'tests/test_native_amdev_transfer_contract.py::test_kernel_text_decode_self_test_reports_store_ops' -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest 'tests/test_native_amdev_transfer_contract.py::test_kernel_text_decode_self_test_reports_store_ops' -v
 ```
 
 Expected: PASS.
@@ -243,7 +243,7 @@ git commit -m "feat: add kernel text store-format decode self-test (C0A23 T2)"
 - [ ] **Step 1: Run the hardware kernel proof with the classifier intact**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 log=logs/c0m-native-amdev-readback-byte-swap.log
 build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof > "$log" 2>&1
 status=$?
@@ -273,8 +273,8 @@ Dispatch `reviewer` to confirm: the report cites source lines (rdna3 enum values
 - [ ] **Step 5: Final verification and checkpoint**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 git diff --check
 ```
 

@@ -35,12 +35,12 @@ The existing no-hardware C++ probe in `test_kernel_pack_contract.py` now has sev
 Run after the production fixes, from the worktree root:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py -k current_review -v
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_hsa_code_image_loader.py -v
 ```

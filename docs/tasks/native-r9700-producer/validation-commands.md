@@ -4,20 +4,30 @@ This is the active shared command ledger for current F1–F6, P1–P5, and Q1 ta
 
 ## Fixed environment
 
-Use this Python for Python-side validation in this repo:
+Set `PY` to the pinned Python 3.12.8 interpreter and `REPO_ROOT` to this checkout:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
+REPO_ROOT="${REPO_ROOT:-$(pwd)}"
+export PY REPO_ROOT
 ```
 
-Do not rely on `python3` from `PATH`.
+Acceptance logs must record the resolved interpreter/version. Commands use these variables rather than machine-specific home paths.
 
-For AMD eGPU/tinygrad comparison runs that intentionally use tinygrad:
+For commands that consume local models, set the model cache separately:
+
+```sh
+MODEL_ROOT="${MODEL_ROOT:?set MODEL_ROOT to the local model cache root}"
+MODEL_HUB="${MODEL_HUB:-$MODEL_ROOT/hub}"
+export MODEL_ROOT MODEL_HUB
+```
+
+For AMD eGPU/tinygrad comparison runs:
 
 ```sh
 DEV=AMD
 JITBEAM=2
-HF_HOME=${HOME}/Development/ml/models
+HF_HOME="$MODEL_ROOT"
 ```
 
 Native R9700 producer commands must not import or call tinygrad unless explicitly running a labeled comparison/control command outside the producer path.
@@ -27,7 +37,7 @@ Native R9700 producer commands must not import or call tinygrad unless explicitl
 ### Existing Python regression suite
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
+"$PY" -m pytest tests -v
 ```
 
 ### Current native runner build and no-model smokes
@@ -58,7 +68,7 @@ build/native-r9700-runtime/native_r9700_runner --vram-smoke
 ### Existing harness syntax check
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m py_compile tinygrad_kv_worker/harness.py
+"$PY" -m py_compile tinygrad_kv_worker/harness.py
 ```
 
 ### Existing Phase 0 GPU parity command
@@ -66,8 +76,8 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m py_compile tinygrad_kv_worker/harn
 This is a regression/control command for the validated tinygrad producer path, not a Native R9700 producer command:
 
 ```sh
-DEV=AMD JITBEAM=2 HF_HOME=${HOME}/Development/ml/models \
-  ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m tinygrad_kv_worker.harness \
+DEV=AMD JITBEAM=2 HF_HOME="$MODEL_ROOT" \
+  "$PY" -m tinygrad_kv_worker.harness \
   --gguf mlx_models/meta-Llama-3.2-1B-Instruct.F16.gguf \
   --mlx mlx_models/meta-Llama-3.2-1B-Instruct \
   --out docs/path-a-validation-results.md \
@@ -116,7 +126,7 @@ Logs and model files must not be committed.
 
 ```sh
 mkdir -p logs/f1-persistent-worker/process-smoke
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.native_worker \
+"$PY" -m native_r9700.native_worker \
   --smoke-load-unload-reload \
   --model mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
@@ -136,7 +146,7 @@ Expected evidence: one public Python service process launches exactly one `nativ
 
 ```sh
 mkdir -p logs/f1-persistent-worker/warm
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.native_worker \
+"$PY" -m native_r9700.native_worker \
   --warm-prefill-samples \
   --model mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
@@ -148,7 +158,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.native_worker \
   --json logs/f1-persistent-worker/warm/serving.json \
   --log logs/f1-persistent-worker/warm/worker.log \
   --trace logs/f1-persistent-worker/warm/trace.json
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.benchmark \
+"$PY" -m native_r9700.benchmark \
   --model mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --artifacts-dir logs/f1-persistent-worker/warm/artifacts \
@@ -174,12 +184,13 @@ Rollback and Release pass only with `{resource_generation:uint64,state:"released
   set -u
   : "${ROCWMMA_CHECKOUT:?set ROCWMMA_CHECKOUT to the exact f7f2aee8e764e612f49f2dc030b7e1639fb30d34 checkout}"
   : "${AITER_CHECKOUT:?set AITER_CHECKOUT to the exact 35c652ed3bd34e5d5828954e1545babc9255a69a checkout}"
+  : "${CALCULATOR_SOURCE:?set CALCULATOR_SOURCE to the pinned matrix_calculator.py}"
   mkdir -p build/f2-wmma logs/f2
   layout_spec=build/f2-wmma/f2-wmma-physical-layout-spec.json
   inverse_fixture=build/f2-wmma/f2-wmma-physical-layout-inverse.npz
   log=logs/f2/wmma-physical-layout-proof.log
   {
-    printf "%s\n" "command: tools/f2-wmma-layout-proof --source-layout-version f16-row-major-nk-source-v1 --physical-layout-version f2-wmma-physical-tile-v1 --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/samples/simple_hgemm.cpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/rocwmma.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/io_config.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/io_layout.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/mapping_util.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/accessors_impl.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/layout/matrix_layout_traits_impl.hpp --rocwmma-symbols matrix_b,col_major,fragment,load_matrix_sync,IOConfig,GetMappingUtil --aiter-source \$AITER_CHECKOUT/aiter/ops/flydsl/kernels/flash_attn_func_gfx1201.py --calculator-source ${HOME}/Development/ml/tools/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py --local-source native_r9700/kernels/llama_gate_up_projection_f16.cpp --layout-spec build/f2-wmma/f2-wmma-physical-layout-spec.json --inverse-fixture build/f2-wmma/f2-wmma-physical-layout-inverse.npz --output logs/f2/wmma-physical-layout-proof.json"
+    printf "%s\n" "command: tools/f2-wmma-layout-proof --source-layout-version f16-row-major-nk-source-v1 --physical-layout-version f2-wmma-physical-tile-v1 --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/samples/simple_hgemm.cpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/rocwmma.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/io_config.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/io_layout.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/mapping_util.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/accessors_impl.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/layout/matrix_layout_traits_impl.hpp --rocwmma-symbols matrix_b,col_major,fragment,load_matrix_sync,IOConfig,GetMappingUtil --aiter-source \$AITER_CHECKOUT/aiter/ops/flydsl/kernels/flash_attn_func_gfx1201.py --calculator-source ${CALCULATOR_SOURCE} --local-source native_r9700/kernels/llama_gate_up_projection_f16.cpp --layout-spec build/f2-wmma/f2-wmma-physical-layout-spec.json --inverse-fixture build/f2-wmma/f2-wmma-physical-layout-inverse.npz --output logs/f2/wmma-physical-layout-proof.json"
     date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"
     tools/f2-wmma-layout-proof \
       --source-layout-version f16-row-major-nk-source-v1 \
@@ -193,7 +204,7 @@ Rollback and Release pass only with `{resource_generation:uint64,state:"released
       --rocwmma-source "$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/layout/matrix_layout_traits_impl.hpp" \
       --rocwmma-symbols matrix_b,col_major,fragment,load_matrix_sync,IOConfig,GetMappingUtil \
       --aiter-source "$AITER_CHECKOUT/aiter/ops/flydsl/kernels/flash_attn_func_gfx1201.py" \
-      --calculator-source ${HOME}/Development/ml/tools/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py \
+      --calculator-source "$CALCULATOR_SOURCE" \
       --local-source native_r9700/kernels/llama_gate_up_projection_f16.cpp \
       --layout-spec "$layout_spec" \
       --inverse-fixture "$inverse_fixture" \
@@ -214,7 +225,7 @@ The required output is a concrete `EvidenceRef` with `record_kind: offline_revie
   set -u
   mkdir -p build/f2-wmma logs/f2 \
     build/upstream/amd-matrix-instruction-calculator build/upstream/python
-  PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+  PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
   CALC=build/upstream/amd-matrix-instruction-calculator/matrix_calculator.py
   CALC_URL=https://raw.githubusercontent.com/ROCm/amd_matrix_instruction_calculator/2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py
   CALC_SHA=53b027855ca44120401eeff69f41961821d1a393b163e112f7aa4d2a313e185d
@@ -358,7 +369,7 @@ P3's G0 migration MUST copy the complete hardware invocation in the block below,
       test -s .superpowers/swarm/reports/g0-wmma-conformance.md || status=$?
     fi
     if [ "$status" -eq 0 ]; then
-      ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+      "$PY" -m pytest \
         tests/native_r9700/test_wmma_lane_map_asset.py \
         tests/native_r9700/test_linear_wmma_f16_asset.py \
         tests/native_r9700/test_hsa_code_image_generator.py \
@@ -398,10 +409,10 @@ The fixed downstream `TGPUConformanceClient` binary and subcommands below are th
 ```sh
 xcode-select -p
 xcrun --sdk driverkit --show-sdk-version
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd "$REPO_ROOT/tinygpu"
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TGPUConformanceClient -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
+  "CONFIGURATION_BUILD_DIR=$REPO_ROOT/tinygpu/build/Debug"
 ./install_nosip.sh
 ```
 
@@ -410,10 +421,10 @@ Verified preflight on 2026-08-26: active developer directory `/Applications/Xcod
 ### P1 cold lifecycle
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+"$REPO_ROOT/tinygpu/build/Debug/tgpu-conformance-client" \
   cold-lifecycle --service org.tinygrad.tinygpu.driver2 \
   --pci-id 1002:7551 --architecture gfx1201 \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/cold-lifecycle.log
+  --log "$REPO_ROOT/logs/p1-tinygpu-owner/cold-lifecycle.log"
 ```
 
 Required observations are a fresh DEXT cold attach, ordered lifecycle stages, `TGPU_QUERY_CAPABILITIES` with `abi_major: 1`, `abi_minor: 0`, exact PCI/architecture identity, and a ready health record. The command uses the DriverKit user client directly and never the legacy proxy. A missing DriverKit SDK or DEXT is a blocked prerequisite, not a pass or a reason to fall back to a raw socket.
@@ -421,30 +432,30 @@ Required observations are a fresh DEXT cold attach, ordered lifecycle stages, `T
 ### P1 malformed submission, stale/client-death, queue reset, and bounded fault query
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+"$REPO_ROOT/tinygpu/build/Debug/tgpu-conformance-client" \
   malformed-submit --service org.tinygrad.tinygpu.driver2 \
   --cases wrong-record-size,absolute-address,unbound-binding,stale-handle \
   --expect-status TGPU_STATUS_SUBMISSION_REJECTED \
   --expect-no-queue-mutation \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/malformed-submit.log
+  --log "$REPO_ROOT/logs/p1-tinygpu-owner/malformed-submit.log"
 
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+"$REPO_ROOT/tinygpu/build/Debug/tgpu-conformance-client" \
   client-death --service org.tinygrad.tinygpu.driver2 \
   --close-with-live-resources --reopen --replay-handles \
   --expect-status TGPU_STATUS_INVALID_HANDLE \
   --expect-empty-new-namespace \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/client-death.log
+  --log "$REPO_ROOT/logs/p1-tinygpu-owner/client-death.log"
 
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+"$REPO_ROOT/tinygpu/build/Debug/tgpu-conformance-client" \
   queue-reset --service org.tinygrad.tinygpu.driver2 \
   --owner-only --expect-pending-fence-status TGPU_STATUS_CANCELED \
   --expect-no-replay \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/queue-reset.log
+  --log "$REPO_ROOT/logs/p1-tinygpu-owner/queue-reset.log"
 
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+"$REPO_ROOT/tinygpu/build/Debug/tgpu-conformance-client" \
   fault-query --service org.tinygrad.tinygpu.driver2 \
   --scope client --max-text-bytes 192 --expect-redacted \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/fault-query.log
+  --log "$REPO_ROOT/logs/p1-tinygpu-owner/fault-query.log"
 ```
 
 The malformed cases must return status 12 before queue mutation or signal allocation; stale/cross-client handles must return status 5; queue reset must be accepted only for the queue owner and must explicitly fail pending fences; fault text must be at most 192 bytes and must not contain raw registers, addresses, prompts, or tokens. No invocation uses a socket/proxy command.
@@ -452,12 +463,12 @@ The malformed cases must return status 12 before queue mutation or signal alloca
 ### P1 device recovery
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+"$REPO_ROOT/tinygpu/build/Debug/tgpu-conformance-client" \
   device-recovery --service org.tinygrad.tinygpu.driver2 \
   --recovery-service org.tinygrad.tinygpu.recovery \
   --preflight-normal-reset-denied --fault-source physical \
   --expect-device-epoch-increment --expect-stale-handle-rejection \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/device-recovery.log
+  --log "$REPO_ROOT/logs/p1-tinygpu-owner/device-recovery.log"
 ```
 
 The fixed client first proves that a normal inference connection receives `TGPU_STATUS_PERMISSION_DENIED` for device reset, then uses the exact recovery role and entitlement. If physical fault injection is unavailable, the command must record `physical_fault_injection: unavailable` and `status: blocked`; it must not claim recovery success and must not substitute the old kernel-proof/raw-proxy control. Once hardware injection exists, the command requires a bounded fault, serialized recovery, incremented `device_epoch`, stale-handle rejection, and a clean new-client capability query. The fixed CLI remains the task-5 implementation target even while the physical injector is unavailable.
@@ -465,9 +476,9 @@ The fixed client first proves that a normal inference connection receives `TGPU_
 ### P1 exact G0 binding
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+"$REPO_ROOT/tinygpu/build/Debug/tgpu-conformance-client" \
   g0-binding --service org.tinygrad.tinygpu.driver2 \
-  --g0-report ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/.superpowers/swarm/reports/g0-wmma-conformance.md \
+  --g0-report "$REPO_ROOT/.superpowers/swarm/reports/g0-wmma-conformance.md" \
   --require-status-field g0_status=pass \
   --require-record-id-field g0_record_id \
   --require-image-sha256-field g0_image_sha256 \
@@ -475,7 +486,7 @@ ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build
   --require-entry-field g0_entry \
   --require-pci-id 1002:7551 --require-architecture gfx1201 \
   --expect-recomputed-digest-match --expect-no-fallback \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/g0-binding.log
+  --log "$REPO_ROOT/logs/p1-tinygpu-owner/g0-binding.log"
 ```
 
 The client reads exactly the accepted report fields `g0_record_id`, `g0_image_sha256`, `g0_target`, and `g0_entry`, passes only opaque audit metadata plus image bytes to the TGPU client, and requires the executable-admission response's recomputed digest/target/entry to match those values. The DriverKit implementation does not parse a P3 Kernel Pack. Missing report, non-pass status, digest/target/entry mismatch, target other than `1002:7551`/`gfx1201`, or fallback is fail-closed. No command regenerates G0.
@@ -485,7 +496,7 @@ The client reads exactly the accepted report fields `g0_record_id`, `g0_image_sh
 ### P3 schema
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 mkdir -p build/native-r9700-runtime
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   native_r9700/amdev_packets.cpp native_r9700/runtime_contract.cpp \
@@ -518,7 +529,7 @@ Expected observations:
 ### P3 malformed-pack rejection (focused observation)
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 "$PY" -m pytest tests/native_r9700/test_kernel_pack_manifest.py -v
 ```
 
@@ -527,7 +538,7 @@ Expected: every malformed record exits through offline validation with a named r
 ### P3 scalar migration
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 "$PY" -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_kernel_pack_manifest.py \
@@ -576,7 +587,7 @@ The F2 G0 publication command is copied verbatim below. P3 adds no CLI defaults,
       test -s .superpowers/swarm/reports/g0-wmma-conformance.md || status=$?
     fi
     if [ "$status" -eq 0 ]; then
-      ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+      "$PY" -m pytest \
         tests/native_r9700/test_wmma_lane_map_asset.py \
         tests/native_r9700/test_linear_wmma_f16_asset.py \
         tests/native_r9700/test_hsa_code_image_generator.py \
@@ -618,8 +629,9 @@ The copied F2 invocation retains the complete argument set: `--asset-root`, `--s
 Set these variables explicitly in every command block:
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
-QWEN_MODEL=${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
+MODEL_HUB="${MODEL_HUB:?set MODEL_HUB to the Hugging Face hub cache}"
+QWEN_MODEL="$MODEL_HUB/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff"
 MANIFEST=docs/upstream-reference-manifest.yaml
 ```
 

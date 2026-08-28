@@ -50,7 +50,7 @@ The model card at the pinned model revision declares `base_model: Qwen/Qwen3.8-2
 The only accepted local model directory is:
 
 ```text
-${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
+<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
 ```
 
 The repository checkout has no `mlx_models/` Qwen snapshot. The path above is an explicit Hugging Face cache snapshot; its symlink targets resolve to the three exact blobs listed below. Every command must pass this path explicitly (or an equivalent path whose files and digests are proven identical). A missing directory, missing sidecar, missing symlink target, wrong revision, wrong size, or wrong digest is a hard blocker with a loud `missing local Qwen model weights`/`model identity mismatch` error. There is no floating `main`, latest-download, alternate model-directory, or Llama fallback.
@@ -349,8 +349,8 @@ The following sections are ready to insert verbatim under the shared ledger's Q1
 Set these variables explicitly in every command block:
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
-QWEN_MODEL=${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
+QWEN_MODEL=<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
 MANIFEST=docs/upstream-reference-manifest.yaml
 ```
 

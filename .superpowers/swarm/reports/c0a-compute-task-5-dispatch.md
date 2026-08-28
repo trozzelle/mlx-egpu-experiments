@@ -26,8 +26,8 @@ No validation, tests, linters, formatters, package-manager commands, hardware co
 Supervisor validation commands from the task doc:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Supervisor should also run the exact C0B SDMA transfer proof if this task changes transfer behavior:
@@ -87,8 +87,8 @@ No validation, tests, linters, formatters, package-manager commands, hardware co
 Supervisor validation commands from the task doc:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ```sh
@@ -96,8 +96,8 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_tra
 ```
 
 Supervisor post-fix validation:
-- RED before implementation: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_kernel_proof_contract_self_test_reports_minimal_u32_shape -v` failed because `sdma_h2d_status`/`sdma_d2h_status` were absent.
-- GREEN no-hardware: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `0`; `17 passed in 18.58s`.
+- RED before implementation: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_kernel_proof_contract_self_test_reports_minimal_u32_shape -v` failed because `sdma_h2d_status`/`sdma_d2h_status` were absent.
+- GREEN no-hardware: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `0`; `17 passed in 18.58s`.
 - Hardware SDMA preservation: `logs/c0b-native-amdev-sdma-transfer.log` at `2026-08-17T17:26:23Z` exited `0` with `sdma_submit_status: pass`, `sdma_timeline_status: pass`, `host_device_transfer_status: pass`, and no compiler warnings.
 - Hardware kernel prerequisite: `logs/c0b-native-amdev-kernel-ref.log` at `2026-08-17T17:26:32Z` exited `1` as expected with `kernel_blob_load_status: pass`, `kernarg_write_status: pass`, `sdma_h2d_status: pass`, `sdma_d2h_status: not_run`, `compute_ring_setup_status: pass`, `compute_hqd_active_status: pass`, `failure_stage: kernel_dispatch_submit`, and `host_device_transfer_status: not_run_blocked_by_kernel_dispatch_submit`.
 
@@ -124,8 +124,8 @@ Blocked by `compute_doorbell_not_consumed`.
 - Inferred blocker label: `compute_doorbell_not_consumed`. HQD queue 0 remains active and has the expected direct-PM4 PQ control/doorbell offset, but `doorbell_hit` is clear, HQD rptr remains `0`, and `CP_STAT` is idle. The command processor never fetched the ring packet, so CPU comparison and final D2H readback are correctly not run.
 
 ### Validation
-- RED before implementation: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_pm4_dispatch_sequence_self_test_reports_direct_dispatch_contract -v` failed because the PM4 self-test still reported the old placeholder `packet_count: 12`/`dispatch_word_count: 59` lines without the implemented source-backed packet construction.
-- GREEN no-hardware: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `0`; `17 passed in 19.87s`.
+- RED before implementation: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_pm4_dispatch_sequence_self_test_reports_direct_dispatch_contract -v` failed because the PM4 self-test still reported the old placeholder `packet_count: 12`/`dispatch_word_count: 59` lines without the implemented source-backed packet construction.
+- GREEN no-hardware: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `0`; `17 passed in 19.87s`.
 - Hardware blocker run: the command embedded at `logs/c0c-native-amdev-kernel-dispatch.log` compiled without warnings and exited `1` with emitted `failure_stage: kernel_timeline_timeout` plus diagnostic evidence supporting the inferred `compute_doorbell_not_consumed` blocker label.
 
 ## Task set 4: Repeated-run report and review packet

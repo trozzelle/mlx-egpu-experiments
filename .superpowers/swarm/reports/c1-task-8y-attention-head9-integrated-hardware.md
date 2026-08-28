@@ -9,7 +9,7 @@ Target is Llama layer0 `query_head=9`, GQA `kv_head=2`, context hidden columns `
 ## RED evidence
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head9_embedded_operands_use_kernel_layouts tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head9_tokens0_5_cols576_640_chain -q
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head9_embedded_operands_use_kernel_layouts tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head9_tokens0_5_cols576_640_chain -q
 ```
 
 Pre-implementation result: exited `1`; `3 failed, 2 passed in 10.95s`. Failures showed missing embedded bridge operand array `kC1AttentionScoresHead9Tokens0_5ScaledMaskedQScaledChunkBytes`, runner help missing `layer0_attention_scores_softmax_context_head9_tokens0_5_cols576_640_chain`, and runtime wrapper rejecting the chain as unsupported with `wrapper_exit_status: 2`.
@@ -47,7 +47,7 @@ Pre-implementation result: exited `1`; `3 failed, 2 passed in 10.95s`. Failures 
 Fixture generation command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures
+${PY} -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures
 ```
 
 Result: exited `0`; wrote `66` fixture files to `tests/native_r9700/fixtures`, including refreshed `layer_trace_fixtures.npz` and `fixtures_schema.json`.
@@ -55,7 +55,7 @@ Result: exited `0`; wrote `66` fixture files to `tests/native_r9700/fixtures`, i
 Focused tests command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head9_embedded_operands_use_kernel_layouts tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head9_tokens0_5_cols576_640_chain -q
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head9_embedded_operands_use_kernel_layouts tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head9_tokens0_5_cols576_640_chain -q
 ```
 
 Result: exited `0`; `5 passed in 10.96s`.
@@ -77,13 +77,13 @@ build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_at
 Focused pytest wrapper equivalent:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head9_tokens0_5_cols576_640_chain -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head9_tokens0_5_cols576_640_chain -q
 ```
 
 ## Supervisor verification
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k 'head9_tokens0_5_cols576_640_chain or attention_head9_embedded_operands_use_kernel_layouts' -q && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_primitive_bridge && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner && build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_attention_scores_softmax_context_head9_tokens0_5_cols576_640_chain
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k 'head9_tokens0_5_cols576_640_chain or attention_head9_embedded_operands_use_kernel_layouts' -q && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_primitive_bridge && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner && build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_attention_scores_softmax_context_head9_tokens0_5_cols576_640_chain
 ```
 
 Result: focused runtime contract `2 passed, 119 deselected in 6.36s`; real hardware primitive-chain proof exited `0` with `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `max_abs_diff: 1.862645149230957e-09`, `max_ulp_diff: 8`, `mismatch_count: 0`, `byte_mismatch_count: 22`, and log `logs/c1-runner-primitive-chain-proof-layer0_attention_scores_softmax_context_head9_tokens0_5_cols576_640_chain-2026-08-20T19:33:34Z.log`.

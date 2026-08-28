@@ -57,7 +57,7 @@ Correctness: pass evidence includes CPU comparison, byte count, success/failure 
 
 ## Verification
 
-- Focused pytest: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `11 passed in 9.94s`.
+- Focused pytest: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `11 passed in 9.94s`.
 - Hardware transfer proof command from `docs/tasks/native-r9700-producer/validation-commands.md` -> `logs/c0b-native-amdev-sdma-transfer.log` timestamp `2026-08-17T13:31:58Z`, `exit_status: 0`, `wrapper_exit_status: 0`, and pass tokens listed above.
 
 ## Remaining blocker

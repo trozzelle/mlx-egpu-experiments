@@ -79,7 +79,7 @@ The original seven review RED failures plus the forged-identity follow-up are cl
 Historical RED evidence for the review-correction tests is recorded as **7 failed, 25 passed in 1.75s** (`artifact://357`). The exact focused supervisor command was:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_text_adapter.py \
   tests/native_r9700/test_qwen_affine4_source.py \
   tests/native_r9700/test_model_weight_binder_contract.py -v
@@ -90,8 +90,8 @@ Supervisor follow-up RED evidence (`artifact://409`) exercised a forged metadata
 The source-pin producer and inventory commands recorded for the GREEN gate are:
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
-QWEN_MODEL=${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
+QWEN_MODEL=<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
 MANIFEST=docs/upstream-reference-manifest.yaml
 
 "$PY" -m native_r9700.qwen_text_adapter \

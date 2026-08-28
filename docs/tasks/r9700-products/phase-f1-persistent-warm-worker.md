@@ -136,7 +136,7 @@ git diff --check docs/tasks/r9700-products/phase-f1-persistent-warm-worker.md \
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_service_protocol.py \
   tests/native_r9700/test_model_service.py \
   tests/native_r9700/test_native_resource_client.py -v
@@ -177,7 +177,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_resident_memory_contract.py \
   tests/native_r9700/test_model_weight_binder_contract.py \
   tests/native_r9700/test_runtime_lifecycle.py \
@@ -221,7 +221,7 @@ The supervisor's existing native-runner build/no-model smoke and the active-ledg
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_native_worker_evidence.py \
   tests/native_r9700/test_serving.py \
   tests/native_r9700/test_kv_cache.py \
@@ -261,7 +261,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_benchmark.py \
   tests/native_r9700/test_native_worker_evidence.py \
   tests/native_r9700/test_serving.py -v
@@ -272,7 +272,7 @@ Then the supervisor runs the exact commands recorded by task set 1 under `F1 per
 ## Phase validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 ```
 
 Supervisor also requires the task-set-5 process smoke, fresh hardware logs, final review with zero Critical/Important findings, and `git diff --check` before marking F1 Done.

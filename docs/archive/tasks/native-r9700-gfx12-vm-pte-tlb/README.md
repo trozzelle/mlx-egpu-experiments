@@ -42,7 +42,7 @@ C0A minimal kernel proof, only if transfer passes
 Focused no-hardware contract suite:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Hardware transfer proof command remains the C0B command in `docs/tasks/native-r9700-producer/validation-commands.md` and writes `logs/c0b-native-amdev-sdma-transfer.log`.

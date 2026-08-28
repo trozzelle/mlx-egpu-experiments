@@ -15,7 +15,7 @@ The no-hardware C++ probe requires exact 1 GiB geometry, rejects an undersized B
 ## Supervisor RED command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_vram_layout.py -q
+${PY} -m pytest tests/native_r9700/test_vram_layout.py -q
 ```
 
 ## Intended initial RED state

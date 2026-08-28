@@ -121,7 +121,7 @@ Pack identity is immutable, exact, and sufficient for later model/HAL evidence; 
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_hsa_code_image_loader.py -v
 ```
@@ -155,7 +155,7 @@ Malformed, unpinned, unlicensed, wrong-target/resource/ISA/numerical/evidence re
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_manifest.py \
   tests/native_r9700/test_kernel_toolchain.py \
   tests/native_r9700/test_hsa_code_image_generator.py -v
@@ -188,7 +188,7 @@ Scalar B0 controls load/dispatch identically; new rejection/identity evidence ex
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_kernel_assets.py \
   tests/native_r9700/test_kernel_catalog.py \
@@ -223,7 +223,7 @@ P3 consumes exactly the same image/digests/descriptors/shapes/numerics/results; 
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_kernel_pack_manifest.py \
   tests/native_r9700/test_kernel_assets.py \
@@ -264,7 +264,7 @@ Every production-selected kernel has concrete pack/evidence; scalar and G0 paths
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_kernel_pack_manifest.py \
   tests/native_r9700/test_kernel_assets.py \
@@ -277,7 +277,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 Supervisor runs task-set-1 hardware commands plus:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_kernel_pack_manifest.py \
   tests/native_r9700/test_kernel_toolchain.py \

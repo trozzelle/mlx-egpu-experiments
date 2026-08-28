@@ -41,12 +41,12 @@ The no-hardware `mec-rs64-pipe-activation` self-test proves, without hardware, t
 
 ## Supervisor verification commands (do NOT run in OMP task mode)
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 mkdir -p build/native-r9700-runtime
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp \
   -o build/native-r9700-runtime/native_amdev_transfer_probe
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 ```
 Expected: build exit `0`; pytest `21 passed` (20 prior + 1 new `mec-rs64-pipe-activation` self-test). Hardware validation per plan Task 2 Step 1 (optional in this task).
 

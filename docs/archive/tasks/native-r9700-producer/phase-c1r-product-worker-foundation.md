@@ -51,7 +51,7 @@ Pure packet tests prove byte-identical legacy packet values. `runtime.cpp` no lo
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_amdev_packets.py -q
+${PY} -m pytest tests/native_r9700/test_amdev_packets.py -q
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra -c native_r9700/amdev_packets.cpp -I native_r9700 -o build/native-r9700-runtime/amdev_packets.o
 ```
 
@@ -80,8 +80,8 @@ No-hardware validation rejects invalid ownership/range transitions; C0B transfer
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_device_memory_contract.py -q
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/native_r9700/test_device_memory_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 The supervisor, not the task worker, runs the existing C0B hardware command from `validation-commands.md` after review.
@@ -109,7 +109,7 @@ The catalog is the one source of fixture metadata. Tests no longer need the reti
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_fixture_catalog.py tests/native_r9700/test_ref_fixtures.py -q
+${PY} -m pytest tests/native_r9700/test_fixture_catalog.py tests/native_r9700/test_ref_fixtures.py -q
 ```
 
 ## Task set 4: Focus runtime tests on behavior
@@ -135,7 +135,7 @@ All runtime tests execute without opening archived C++ and still reject missing/
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_lifecycle.py tests/native_r9700/test_runtime_protocol.py tests/native_r9700/test_native_worker_evidence.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_lifecycle.py tests/native_r9700/test_runtime_protocol.py tests/native_r9700/test_native_worker_evidence.py -q
 ```
 
 ## Phase validation

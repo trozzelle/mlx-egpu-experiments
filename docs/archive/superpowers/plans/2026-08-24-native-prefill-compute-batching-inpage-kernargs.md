@@ -6,7 +6,7 @@
 
 **Architecture:** The ChatGPT diagnosis (2026-08-24) reclassifies the `rptr=0` failure: the CP *did* fetch the stream (live `CP_HQD_PQ_RPTR = 0x31` = dword 49, immediately after `DISPATCH_DIRECT` at dwords 44–48); the stall is **post-dispatch** — the launched kernel did not drain, pointing at the new separate sysmem allocation being unreadable through GFXHUB. The fix never adds a new allocation: it keeps the known-good `compute_control.sys_pages[1]` → `kKernargsVa` (page 6) PTE exactly as-is and slices that one 4 KiB page into `10 × 256 B` slots (`kKernargsVa + slot*0x100`). Slot 0 is byte-identical to the legacy path, so it must reproduce the golden checksum before any batching begins.
 
-**Tech Stack:** C++17 (`xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra`), pinned Python `${HOME}/.pyenv/versions/3.12.8/bin/python3`, pytest. Hardware: shared AMD Radeon AI PRO R9700 (`1002:7551`, gfx1201) via TinyGPU socket `APL_REMOTE_SOCK=${TMPDIR}/tinygpu.sock`.
+**Tech Stack:** C++17 (`xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra`), pinned Python `${PY}`, pytest. Hardware: shared AMD Radeon AI PRO R9700 (`1002:7551`, gfx1201) via TinyGPU socket `APL_REMOTE_SOCK=${TMPDIR}/tinygpu.sock`.
 
 ## Global Constraints
 
@@ -18,8 +18,8 @@
 - The two pre-existing test failures (`test_pm4_dispatch_words_preserve_the_frozen_59_dword_c0a25_stream`, `test_raw_hip_asset_generator.py`) are out of scope; do not "fix" them.
 - Do not sweep the pre-existing uncommitted archive reorg (`.superpowers/swarm/ → docs/archive/`) or the ` M ` phase/ln files into commits.
 - Serialize all hardware access (hardware lock, Task 0.2 of v2). Cold-reset the TinyGPU server between A/B hardware runs; never test a failed queue on poisoned state.
-- Pinned interpreter for all Python: `PY=${HOME}/.pyenv/versions/3.12.8/bin/python3`.
-- Native prefill CLI requires `NATIVE_R9700_PREFILL_RUNNER=${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer/build/native-r9700-runtime/native_r9700_runner`.
+- Pinned interpreter for all Python: `PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"`.
+- Native prefill CLI requires `NATIVE_R9700_PREFILL_RUNNER=<former-native-r9700-worktree>/build/native-r9700-runtime/native_r9700_runner`.
 
 ## Current state (verified 2026-08-24)
 

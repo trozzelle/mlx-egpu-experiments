@@ -5,7 +5,7 @@
 - Prior phase doc read: `docs/archive/tasks/amdev-doorbell-delivery/phase-4-doorbell-source-grounding.md`.
 - Prior reviewed reports read: `.superpowers/swarm/reports/c0a-compute-task-7-bar2-doorbell-index.md`, `.superpowers/swarm/reports/c0a-compute-task-7-mec-doorbell-range.md`, `.superpowers/swarm/reports/c0a-compute-task-7-gdc-s2a-routing.md`, `.superpowers/swarm/reports/c0a-compute-task-7-doorbell-source-grounding.md`, and `.superpowers/swarm/reports/c0a-compute-task-7-doorbell-source-grounding-review.md`.
 - Current blocker: `compute_doorbell_not_consumed` after BAR2 MEC doorbell submission; reviewed Phase 4 selected `blocked_source_gap` and explicitly did not allow runtime-path implementation.
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 
 ## Goal
 Resolve the remaining source gaps that block C0 by answering two concrete questions with cited evidence: which gfx1201/TinyGPU doorbell assignment family selects compute queue 0, and whether the current GDC/S2A route entries cover the native BAR2 MEC doorbell write at byte offset `0x18`. This phase remains diagnostic-only unless a consolidated decision report selects exactly one evidence-backed follow-up lane.
@@ -46,7 +46,7 @@ Agents update only their row and append evidence/notes as work completes.
 ### Source refs
 - Plan sections: `docs/archive/superpowers/plans/2026-08-17-doorbell-source-gap-resolution.md` lines 20-25 and 91-124.
 - Prior gap report: `.superpowers/swarm/reports/c0a-compute-task-7-bar2-doorbell-index.md`.
-- Local Tinygrad refs: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py` lines 315-347; `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/ops_amd.py` lines 880-887; `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/am.py` lines 3388-3392.
+- Local Tinygrad refs: `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py` lines 315-347; `<tinygrad-checkout>/tinygrad/runtime/ops_amd.py` lines 880-887; `<tinygrad-checkout>/tinygrad/runtime/autogen/am/am.py` lines 3388-3392.
 - Native refs: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp` lines 297-300 and 4558-4568.
 - Linux cross-check refs: `drivers/gpu/drm/amd/amdgpu/amdgpu_doorbell.h` and `drivers/gpu/drm/amd/amdgpu/gfx_v12_0.c`.
 
@@ -75,7 +75,7 @@ No executor command. Supervisor validates by reading the report for required fie
 ### Source refs
 - Plan sections: `docs/archive/superpowers/plans/2026-08-17-doorbell-source-gap-resolution.md` lines 20-25 and 126-155.
 - Prior gap report: `.superpowers/swarm/reports/c0a-compute-task-7-gdc-s2a-routing.md`.
-- Local Tinygrad refs: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py` lines 42-48 and 271-273; `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/regs.py` GDC/S2A field definitions.
+- Local Tinygrad refs: `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py` lines 42-48 and 271-273; `<tinygrad-checkout>/tinygrad/runtime/autogen/am/regs.py` GDC/S2A field definitions.
 - Native refs: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp` lines 548-552 and 3686-3716.
 - Linux cross-check refs: `drivers/gpu/drm/amd/amdgpu/nbif_v6_3_1.c` and `drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd.c`.
 
@@ -131,8 +131,8 @@ No executor command. Supervisor validates by reading the report for required fie
 Supervisor runs exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: all existing tests plus the added no-hardware contract pass.
@@ -243,21 +243,21 @@ Documentation-only validation is `git diff --check` after the plan is written.
 Documentation-only/source-audit validation before instrumentation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git diff --check
 ```
 
 Execution verification after instrumentation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Hardware verification after instrumentation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0d-native-amdev-doorbell-source-gap.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 
@@ -266,7 +266,7 @@ Expected hardware result before the blocker is fixed: command may exit nonzero, 
 Final phase validation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git diff --check
 ```
 

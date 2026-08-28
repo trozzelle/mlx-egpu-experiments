@@ -26,11 +26,11 @@ The fixed-count `num_layers=0` mutation remains rejected by the existing positiv
 ## Focused supervisor commands
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kv_cache.py \
   -k 'strict_native_zero_prefix_npz_emits_atomic_readable_mlx_cache or strict_native_npz_keeps_num_layers_positive_validation' -v
 
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_model_service.py \
   -k test_prefill_s1_accepts_public_token_and_sends_empty_native_prefix -v
 ```

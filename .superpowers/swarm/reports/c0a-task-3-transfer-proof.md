@@ -33,7 +33,7 @@ Relevant source anchors:
 Focused pytest:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Latest result: `11 passed in 9.94s`.

@@ -25,11 +25,11 @@ Findings:
 
 - Security RED: serving focused suite exited 1 with three expected failures: unsafe request ID reached subprocess, producer command logged raw `--token-ids-json`, and top-level CLI command logged raw `--token-ids-json`.
 - Prefill RED: `test_prefill_cli_accepts_token_ids_json_without_fixture_name` exited 1 because the prefill log contained raw `[11, 22, 33]`.
-- GREEN focused C2 serving suite: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -v` → `16 passed in 0.08s`.
-- GREEN focused prefill suite: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py -v` → `8 passed in 2.11s`.
-- Native Python slice: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_kv_cache.py tests/native_r9700/test_parity.py tests/native_r9700/test_serving.py -v` → `53 passed, 2 warnings in 3.99s`.
-- Full native package suite: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v` → `119 passed, 2 warnings in 9.76s`.
-- Full Python suite: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v` → `159 passed, 2 warnings in 42.77s`.
+- GREEN focused C2 serving suite: `${PY} -m pytest tests/native_r9700/test_serving.py -v` → `16 passed in 0.08s`.
+- GREEN focused prefill suite: `${PY} -m pytest tests/native_r9700/test_prefill.py -v` → `8 passed in 2.11s`.
+- Native Python slice: `${PY} -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_kv_cache.py tests/native_r9700/test_parity.py tests/native_r9700/test_serving.py -v` → `53 passed, 2 warnings in 3.99s`.
+- Full native package suite: `${PY} -m pytest tests/native_r9700 -v` → `119 passed, 2 warnings in 9.76s`.
+- Full Python suite: `${PY} -m pytest tests -v` → `159 passed, 2 warnings in 42.77s`.
 - Producer-unavailable smoke regenerated: `C2 serving status=pass prompts=1`.
 - Full C2 fixture integration/report regenerated: `C2 serving status=pass prompts=3`.
 - Raw-token leakage check across `logs/c2-serving/result.json`, `logs/c2-serving/run.log`, `logs/c2-serving-unavailable/result.json`, `logs/c2-serving-unavailable/run.log`, and C2-created prefill logs found no `--token-ids-json '[...]'` or `[128000, 791` matches; redacted markers are present.

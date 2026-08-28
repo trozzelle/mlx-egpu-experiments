@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Native proof code must not import, shell out to, dynamically load, or require tinygrad at runtime.
 - Substantial tinygrad-derived C++ must include the MIT notice and file/line provenance comments beside ported logic.
 - No guessed gfx12 PTE flags, register offsets, VM context values, or TLB flush sequences. Each constant must cite a tinygrad source line or generated AMD header line.
@@ -37,13 +37,13 @@
 
 - Current blocker: `.superpowers/swarm/reports/c0b-task-5-transfer-proof.md` records `failure_stage: vm_mapping` after TinyGPU.app discovery, BAR/MMIO, MAP_SYSMEM_FD page-list parsing, and SDMA packet encoding.
 - Existing C++ stop point: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp` lines 1279-1348 maps staging/readback sysmem, builds SDMA packets, then fails closed at `vm_mapping` because PTE/root-table/TLB work is missing.
-- PTE write semantics: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/amdev.py` lines 120-143.
-- VM page-table traversal: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/memory.py` lines 115-170 and `map_range` lines 199-216.
+- PTE write semantics: `<tinygrad-checkout>/tinygrad/runtime/support/am/amdev.py` lines 120-143.
+- VM page-table traversal: `<tinygrad-checkout>/tinygrad/runtime/support/memory.py` lines 115-170 and `map_range` lines 199-216.
 - AM memory manager shape: `amdev.py` lines 199-205 uses VA base `0x200000000000`, VA shifts `[12, 21, 30, 39]`, 48-bit VA, first level `AMDGPU_VM_PDB2`, 32 MiB boot memory, and reserved page tables on small BAR.
-- gfx12 PTE constants: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/am.py` lines 4114-4144.
-- gfx12 MTYPE_UC value: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/soc_12.py` line 7 defines `MTYPE_UC := 3`.
-- VMID0 context and TLB flush sequence: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py` lines 70-172.
-- Sysmem allocation semantics: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/system.py` lines 258-268 maps host/sysmem pages as `AddrSpace.SYS`, `snooped=True`, `uncached=True`.
+- gfx12 PTE constants: `<tinygrad-checkout>/tinygrad/runtime/autogen/am/am.py` lines 4114-4144.
+- gfx12 MTYPE_UC value: `<tinygrad-checkout>/tinygrad/runtime/autogen/am/soc_12.py` line 7 defines `MTYPE_UC := 3`.
+- VMID0 context and TLB flush sequence: `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py` lines 70-172.
+- Sysmem allocation semantics: `<tinygrad-checkout>/tinygrad/runtime/support/system.py` lines 258-268 maps host/sysmem pages as `AddrSpace.SYS`, `snooped=True`, `uncached=True`.
 
 ---
 
@@ -165,7 +165,7 @@ assert "--self-test am-vm-tlb-sequence" in completed.stdout
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected RED: the new tests fail because the self-tests are unknown or help output does not list them. Existing five tests remain logically unchanged.
@@ -190,7 +190,7 @@ Needs review.
 - `ip.py` lines 70-172 for VMID0 context/TLB sequence.
 
 ## Supervisor command to run
-`${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v`
+`${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v`
 
 ## Expected RED
 New VM self-tests fail because implementation is absent.
@@ -292,7 +292,7 @@ Add `run_am_vm_pte_encoding_self_test`, `run_am_vm_page_table_plan_self_test`, a
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected after Task 2: all existing tests plus the three VM self-tests pass.
@@ -439,7 +439,7 @@ gc_tlb_flush_status: pass|fail|skipped_gc_hub_not_initialized|not_run
 Run pytest:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Then run the existing transfer command from `docs/tasks/native-r9700-producer/validation-commands.md`.
@@ -489,7 +489,7 @@ Only fix errors exposed after VM mapping succeeds. The current SDMA packet self-
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Run the hardware transfer command from `validation-commands.md`:

@@ -1,7 +1,7 @@
 # C1 batch 1344:1600 MLP + attention primitive chains
 
 ## Scope
-- Worktree: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-c1-batch-1344`
+- Worktree: `<repo-root>/.worktrees/native-r9700-c1-batch-1344`
 - Branch: `feature/native-r9700-c1-batch-1344`
 - Added MLP down full-inner bands: cols1344:1408, cols1408:1472, cols1472:1536, cols1536:1600.
 - Added integrated attention scores->softmax->context chains: head21 cols1344:1408 kv_head5, head22 cols1408:1472 kv_head5, head23 cols1472:1536 kv_head5, head24 cols1536:1600 kv_head6.
@@ -54,7 +54,7 @@ Result: help lists the four new MLP chains and four new attention chains.
 - Runtime/fake-bridge marker values were updated from observed hardware outputs after the packed arrays passed CPU comparison.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py tests/native_r9700/test_runtime_contract.py -q -k '1344 or 1408 or 1472 or 1536 or 1600 or future_mlp_down or future_attention or future_heads_embedded or future_cols_embedded or help_lists'
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py tests/native_r9700/test_runtime_contract.py -q -k '1344 or 1408 or 1472 or 1536 or 1600 or future_mlp_down or future_attention or future_heads_embedded or future_cols_embedded or help_lists'
 ```
 Result: `42 passed, 229 deselected in 235.82s`; bridge and runner compile exited `0` with no compiler output.
 

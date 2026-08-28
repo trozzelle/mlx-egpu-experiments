@@ -44,9 +44,9 @@ Remaining C1R-6 blockers
 Regression proof after C1R-6n
 - Review gate `agent://C1R6nReview` approved blocking correctness and reported two P3 accuracy findings: runner help omitted Q and the Q wrapper test docstring said V.
 - Fixes landed in `native_r9700/runner.cpp` and `tests/native_r9700/test_runtime_contract.py`; added direct help assertion for Q.
-- Focused review-fix tests: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_q_proj_full_inner_cols8_accum_chain -q` exited `0` with `2 passed in 2.71s`.
-- Native focused suite: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` exited `0` with `162 passed, 2 warnings in 51.08s` after review fixes.
-- Full repository suite: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -q` exited `0` with `202 passed, 2 warnings in 84.36s` after review fixes.
+- Focused review-fix tests: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_q_proj_full_inner_cols8_accum_chain -q` exited `0` with `2 passed in 2.71s`.
+- Native focused suite: `${PY} -m pytest tests/native_r9700 -q` exited `0` with `162 passed, 2 warnings in 51.08s` after review fixes.
+- Full repository suite: `${PY} -m pytest tests -q` exited `0` with `202 passed, 2 warnings in 84.36s` after review fixes.
 - Re-review gate `agent://C1R6nReReview` approved with no findings.
 
 

@@ -4,7 +4,7 @@
 
 Current reviewed C0 state is **blocked on source-gap resolution**, not on a selected runtime fix.
 
-- Shared work boundary for execution: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary for execution: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Current checkpoint before this plan: `3ab2e95 Add MEC doorbell source grounding`.
 - Existing C0 diagnostic result: `compute_doorbell_probe_status: submitted`, timeout `doorbell_hit=0`, `hqd_pq_rptr=0x00000000`, `cp_stat=0x00000000`, classification `compute_doorbell_not_consumed`.
 - Reviewed Phase 4 decision: `selected_follow_up_lane: blocked_source_gap`; `ready_for_implementation_plan: false`; `implementation_dispatch_allowed: false`.
@@ -37,11 +37,11 @@ If exactly one answer resolves to a contradiction, write one narrow fix plan for
 
 ### Local TinyGPU/Tinygrad source
 
-- `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:315-347`: `AM_GFX.setup_ring(...)` sets `doorbell = am.AMDGPU_NAVI10_DOORBELL_MEC_RING0`, encodes `cp_hqd_pq_doorbell_control` with `doorbell_offset=doorbell*2`, and returns `doorbell`.
-- `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/ops_amd.py:880-887`: Tinygrad maps non-SDMA compute queues through `gfx.setup_ring(...)` and maps the returned doorbell with `doorbell64.view(doorbell_index * 8, 8, fmt='Q')`.
-- `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/am.py:3390-3391`: NAVI10 and DOORBELL64 assignment families define MEC ring 0 as index `3`.
-- `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:42-48`: Tinygrad encodes GDC/S2A doorbell route fields.
-- `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:271-273`: Tinygrad programs gfx12 compute doorbell routes on S2A ports 0 and 3 with AWIDs `0x3` and `0x6`, both using `awaddr_31_28_value=0x3`.
+- `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:315-347`: `AM_GFX.setup_ring(...)` sets `doorbell = am.AMDGPU_NAVI10_DOORBELL_MEC_RING0`, encodes `cp_hqd_pq_doorbell_control` with `doorbell_offset=doorbell*2`, and returns `doorbell`.
+- `<tinygrad-checkout>/tinygrad/runtime/ops_amd.py:880-887`: Tinygrad maps non-SDMA compute queues through `gfx.setup_ring(...)` and maps the returned doorbell with `doorbell64.view(doorbell_index * 8, 8, fmt='Q')`.
+- `<tinygrad-checkout>/tinygrad/runtime/autogen/am/am.py:3390-3391`: NAVI10 and DOORBELL64 assignment families define MEC ring 0 as index `3`.
+- `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:42-48`: Tinygrad encodes GDC/S2A doorbell route fields.
+- `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:271-273`: Tinygrad programs gfx12 compute doorbell routes on S2A ports 0 and 3 with AWIDs `0x3` and `0x6`, both using `awaddr_31_28_value=0x3`.
 
 ### Native probe source
 
@@ -96,9 +96,9 @@ Target:
 
 - Reports/docs only.
 - Source refs to inspect and cite:
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:315-347`
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/ops_amd.py:880-887`
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/am.py:3388-3392`
+  - `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:315-347`
+  - `<tinygrad-checkout>/tinygrad/runtime/ops_amd.py:880-887`
+  - `<tinygrad-checkout>/tinygrad/runtime/autogen/am/am.py:3388-3392`
   - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:297-300`
   - Linux `amdgpu_doorbell.h` NAVI10/DOORBELL64 constants
   - Linux `gfx_v12_0.c` compute ring doorbell setup and `WDOORBELL64` call
@@ -129,8 +129,8 @@ Target:
 
 - Reports/docs only.
 - Source refs to inspect and cite:
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:42-48,271-273`
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/regs.py` GDC/S2A entry field definitions
+  - `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:42-48,271-273`
+  - `<tinygrad-checkout>/tinygrad/runtime/autogen/am/regs.py` GDC/S2A entry field definitions
   - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:548-552,3686-3716`
   - Linux `nbif_v6_3_1.c` `nbif_v6_3_1_gc_doorbell_init`
   - Linux `amdgpu_amdkfd.c` SOC15 doorbell-routing comment
@@ -199,8 +199,8 @@ Acceptance:
 Supervisor validation after implementation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: all existing tests plus the added no-hardware contract pass. A count change is acceptable only because this task adds or extends a contract assertion.
@@ -217,7 +217,7 @@ Target:
 Command:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0d-native-amdev-doorbell-source-gap.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 
@@ -325,21 +325,21 @@ Follow-up classification must separate:
 Documentation-only plan creation verification:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git diff --check
 ```
 
 Execution verification after instrumentation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Hardware verification after instrumentation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0d-native-amdev-doorbell-source-gap.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 

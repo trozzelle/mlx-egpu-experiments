@@ -73,11 +73,11 @@ Both final proofs used `NATIVE_R9700_C1_PRIMITIVE_BRIDGE=/tmp/native_r9700_primi
   - `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `primitive_chain_proof_wrapper_status: pass`, `wrapper_exit_status: 0`, `exit_status: 0`
 
 ## Supervisor verification
-- Focused tests reran locally after handoff: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py tests/native_r9700/test_runtime_contract.py -q -k 'layer0_o_cols256_384_weight_tiles_use_dot2_pair_packing or cols256_384 or schema_json_matches_disk_digests'` -> `8 passed, 311 deselected in 22.46s`.
+- Focused tests reran locally after handoff: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py tests/native_r9700/test_runtime_contract.py -q -k 'layer0_o_cols256_384_weight_tiles_use_dot2_pair_packing or cols256_384 or schema_json_matches_disk_digests'` -> `8 passed, 311 deselected in 22.46s`.
 - Build artifacts rebuilt locally: `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/c1_primitive_bridge` and `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner` both exited `0` with no output.
 - Real hardware proofs reran locally with `NATIVE_R9700_C1_PRIMITIVE_BRIDGE=build/native-r9700-runtime/c1_primitive_bridge`: cols256:320 log `logs/c1-runner-primitive-chain-proof-layer0_o_proj_full_inner_cols256_320_tiled_accum_chain-2026-08-21T11:44:35Z.log`, cols320:384 log `logs/c1-runner-primitive-chain-proof-layer0_o_proj_full_inner_cols320_384_tiled_accum_chain-2026-08-21T11:44:38Z.log`; both returned `0` with `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, and `failure_stage: none`.
 - Review gate `C1ROProj256Review` first found a Critical packaging issue because the new split NPZ was untracked. Supervisor staged `tests/native_r9700/fixtures/layer_trace_o_full_inner_projection_cols256_384_fixtures.npz`; reviewer re-check confirmed `git diff --stat 2590e9d -- tests/native_r9700/fixtures/layer_trace_o_full_inner_projection_cols256_384_fixtures.npz` shows `Bin 0 -> 445371 bytes` and no Critical/Important issues remain.
-- Full native regression completed after review re-check: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> `428 passed, 2 warnings in 1596.47s` (`artifact://4528`).
+- Full native regression completed after review re-check: `${PY} -m pytest tests/native_r9700 -q` -> `428 passed, 2 warnings in 1596.47s` (`artifact://4528`).
 
 ## Blockers
 None.

@@ -11,9 +11,9 @@ Do not claim either acceptance gate until fresh hardware-backed artifact and exa
 
 ## Work boundary
 
-- Worktree: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+- Worktree: `<former-native-r9700-worktree>`
 - Branch: `feature/native-r9700-producer`
-- Pinned Python: `${HOME}/.pyenv/versions/3.12.8/bin/python3`
+- Pinned Python: `${PY}`
 - Native substrate: TinyGPU.app / `APLRemotePCIDevice` / `PCIIface`; AMD Radeon AI PRO R9700, `1002:7551`, `gfx1201`.
 - Current socket when hardware was healthy: `${TMPDIR}/tinygpu.sock`
 - Durable progress ledger: `.superpowers/swarm/progress.md`

@@ -6,7 +6,7 @@ Complete the C1R layer0 MLP down-projection primitive chain from the proven acti
 
 ## Work boundary
 
-- Path: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+- Path: `<former-native-r9700-worktree>`
 - Branch: `feature/native-r9700-producer`
 - Boundary type: current feature branch; no fallback worktree.
 
@@ -40,7 +40,7 @@ Complete the C1R layer0 MLP down-projection primitive chain from the proven acti
 ## Verification
 
 - Focused down tests:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_inner_cols0_64_to_cols0_64_fixture_matches_partial_fp32_oracle tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_mlp_down_proj_inner_cols0_64_to_cols0_64_tiled_accum_chain -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_inner_cols0_64_to_cols0_64_fixture_matches_partial_fp32_oracle tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_mlp_down_proj_inner_cols0_64_to_cols0_64_tiled_accum_chain -q`
   - Result: `2 passed in 2.97s`.
 - Bridge compile:
   - Command: `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -o build/native-r9700-runtime/native_r9700_primitive_bridge`

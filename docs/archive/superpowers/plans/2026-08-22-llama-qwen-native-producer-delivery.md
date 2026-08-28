@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Use `${HOME}/.pyenv/versions/3.12.8/bin/python3`; never use `python3` from `PATH`.
+- Use `${PY}`; never use `python3` from `PATH`.
 - Native product execution remains tinygrad-free. Tinygrad is permitted only for external comparison controls or source-generation inputs.
 - Llama acceptance requires real 16-layer GPU forward work and fp16 K/V `(1,8,N,64)` per layer; do not change `native_r9700/kv_cache.py` or the mlx-lm S-1/final-token rule.
 - Qwen is text-only in this plan. Reject image/video/control tokens before device allocation. It uses its own 64-entry hybrid cache ABI and must not use Llama K/V cache serialization.
@@ -154,8 +154,8 @@ Hardware commands are supervisor-only and never concurrent with source workers. 
 Run only after every named RED contract is green:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/native_r9700 -q
 build/native-r9700-runtime/native_r9700_runner --kernel-proof
 build/native-r9700-runtime/native_r9700_runner --vram-smoke
 build/native-r9700-runtime/native_r9700_runner --llama-embed-smoke --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --token-id 128000

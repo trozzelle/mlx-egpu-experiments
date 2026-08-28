@@ -29,7 +29,7 @@ Evidence validation must reject, while preserving `native_prefill_acceptance == 
 ## Supervisor RED commands (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_model_weight_binder_contract.py \
   tests/native_r9700/test_layer0_executor_contract.py -q
 ```

@@ -39,7 +39,7 @@ Reuse the proven `fp16_rope_split_half_layer0_q_pairs8` primitive for 20 residen
 Generated with:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct
+${PY} -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct
 ```
 
 Measured fixture sizes/digests after Q prefix regeneration:
@@ -60,7 +60,7 @@ Q prefix expected chunked fp16 stream:
 Focused fixture/runtime tests:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype \
   tests/native_r9700/test_ref_fixtures.py::test_layer0_q_rope_tokens0_5_head0_full_head_fixture_matches_split_half_oracle \
   tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_q_rope_tokens0_5_head0_full_head_chain \
@@ -113,6 +113,6 @@ Important markers:
 
 Targeted reviewer `C1R6wQRopeReview` found two Minor issues: missing runner help discoverability and a stale C1R-6v validation heading. Supervisor fixed both, re-ran focused tests, recompiled, re-ran Q prefix hardware proof, full native regression, and whitespace gate.
 
-Full native regression after review fixes: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> `192 passed, 2 warnings in 98.99s`.
+Full native regression after review fixes: `${PY} -m pytest tests/native_r9700 -q` -> `192 passed, 2 warnings in 98.99s`.
 
 Whitespace gate after review fixes: `git diff --check` -> exit 0, no output.

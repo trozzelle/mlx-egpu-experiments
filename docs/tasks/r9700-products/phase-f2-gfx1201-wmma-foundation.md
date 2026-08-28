@@ -138,7 +138,7 @@ git diff --check docs/tasks/r9700-products/phase-f2-gfx1201-wmma-foundation.md \
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_wmma_lane_map_asset.py \
   tests/native_r9700/test_hsa_code_image_generator.py \
   tests/native_r9700/test_hsa_code_image_loader.py -v
@@ -214,7 +214,7 @@ git diff --check docs/upstream-reference-manifest.yaml \
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_toolchain.py \
   tests/native_r9700/test_hsa_code_image_generator.py \
   tests/native_r9700/test_hsa_code_image_loader.py \
@@ -261,7 +261,7 @@ Supervisor accepts the physical-layout `offline_review` record before marking ta
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_linear_wmma_f16_asset.py \
   tests/native_r9700/test_kernel_assets.py \
   tests/native_r9700/test_kernel_catalog.py -v
@@ -300,7 +300,7 @@ Supervisor runs standalone/G0 commands only after task-set-2 and task-set-3B acc
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_linear_wmma_f16_asset.py \
   tests/native_r9700/test_block_prefill_runtime_contract.py -v
 ```
@@ -345,7 +345,7 @@ git diff --check .superpowers/swarm/reports/g0-wmma-conformance.md \
 ## Phase validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_toolchain.py \
   tests/native_r9700/test_hsa_code_image_generator.py \
   tests/native_r9700/test_hsa_code_image_loader.py \

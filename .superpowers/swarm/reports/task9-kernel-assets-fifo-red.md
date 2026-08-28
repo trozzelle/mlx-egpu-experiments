@@ -15,7 +15,7 @@ This is deliberately a direct child: lexical containment and `O_NOFOLLOW` do not
 Run the selector under Python's bounded subprocess timeout so a blocking loader is observed as a timeout rather than allowed to hang the supervisor:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c 'import subprocess; subprocess.run(["${HOME}/.pyenv/versions/3.12.8/bin/python3", "-m", "pytest", "tests/native_r9700/test_kernel_assets.py::test_file_backed_llama_kernel_assets_fail_closed_without_hardware", "-q"], check=True, timeout=30)'
+${PY} -c 'import subprocess; subprocess.run(["${PY}", "-m", "pytest", "tests/native_r9700/test_kernel_assets.py::test_file_backed_llama_kernel_assets_fail_closed_without_hardware", "-q"], check=True, timeout=30)'
 ```
 
 A timeout is the intended current RED observation; after the nonblocking descriptor implementation, the probe returns promptly and the selector passes.

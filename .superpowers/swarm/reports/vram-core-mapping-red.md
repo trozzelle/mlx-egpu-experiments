@@ -47,7 +47,7 @@ The production callback/backend remains responsible for the source-grounded AMDG
 ## Supervisor RED command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_resident_memory_contract.py -q
+${PY} -m pytest tests/native_r9700/test_resident_memory_contract.py -q
 ```
 
 ## Intended initial RED state

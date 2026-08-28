@@ -17,7 +17,7 @@ the nine reviewed asset identities, but physical AMDev HSA resident dispatch
 still needs an image-entry-aware dynamic-buffer backend before it can execute a
 layer or publish K/V.
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_hsa_code_image_generator.py \
   tests/native_r9700/test_kernel_assets.py \
   tests/native_r9700/test_llama_stage_layout.py \

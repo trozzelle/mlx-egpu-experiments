@@ -58,11 +58,11 @@ Both proofs used `NATIVE_R9700_C1_PRIMITIVE_BRIDGE=build/native-r9700-runtime/c1
   - `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `primitive_chain_proof_wrapper_status: pass`, `wrapper_exit_status: 0`
 
 ## Supervisor verification
-- Focused tests reran locally after handoff: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest ... -q` over O-proj schema/oracle/packing/wrapper contracts -> `13 passed in 39.46s`.
+- Focused tests reran locally after handoff: `${PY} -m pytest ... -q` over O-proj schema/oracle/packing/wrapper contracts -> `13 passed in 39.46s`.
 - Real hardware proofs reran locally with `NATIVE_R9700_C1_PRIMITIVE_BRIDGE=build/native-r9700-runtime/c1_primitive_bridge`: cols128:192 log `logs/c1-runner-primitive-chain-proof-layer0_o_proj_full_inner_cols128_192_tiled_accum_chain-2026-08-21T10:27:01Z.log`, cols192:256 log `logs/c1-runner-primitive-chain-proof-layer0_o_proj_full_inner_cols192_256_tiled_accum_chain-2026-08-21T10:27:04Z.log`; both returned `0` with `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, and `failure_stage: none`.
 - Review gate `C1ROProj128Review` found no Critical/Important blockers and accepted the slice for the partial/native-prefill-open boundary.
 - Split-fixture repair after full-regression failure: `layer_trace_o_full_inner_projection_fixtures.npz` was split into a cols0:128 base fixture (`543b67c42c774db932b02dacc01222ab354c2ff7c95366c658894acc01e51edd`, 445649 bytes) and `layer_trace_o_full_inner_projection_cols128_256_fixtures.npz` (`c66d07c51a1a9e212b250728f05039e3351d4e38bd7a36c21925073476756beb`, 445678 bytes), restoring the 512 KiB committed-blob invariant without changing primitive-chain math.
-- Full native regression after split repair passed: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> `421 passed, 2 warnings in 1565.64s` (`artifact://4461`).
+- Full native regression after split repair passed: `${PY} -m pytest tests/native_r9700 -q` -> `421 passed, 2 warnings in 1565.64s` (`artifact://4461`).
 - Split review gate `C1ROProj128SplitReview` found no Critical/Important blockers; its only Minor finding was the stale report hash/source evidence now corrected here.
 
 ## Decisions

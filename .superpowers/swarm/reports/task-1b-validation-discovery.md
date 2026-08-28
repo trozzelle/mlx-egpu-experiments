@@ -5,8 +5,8 @@
 ## 1. tinygrad baseline — importable and LLM module present at pinned repo path
 
 - `python3 -c "import tinygrad; print(tinygrad.__file__)"` →
-  `${HOME}/Development/ml/tools/tinygrad/tinygrad/__init__.py`. tinygrad is installed
-  from a **local checkout** at `${HOME}/Development/ml/tools/tinygrad/` (not site-packages).
+  `<tinygrad-checkout>/tinygrad/__init__.py`. tinygrad is installed
+  from a **local checkout** at `<tinygrad-checkout>/` (not site-packages).
 - `import tinygrad.llm` → OK (`tinygrad/llm/` is a package). `tinygrad/llm/` exists at the pinned
   repo path with `__init__.py`, `__main__.py`, `cli.py`, `gguf.py`, `model.py`, `serve.py` —
   matches `docs/pinned-upstream-interfaces.md` §1 ("Package moved from `tinygrad/llm.py` →
@@ -30,8 +30,8 @@
   Selected interface: `PCIIface` (over USB4), `is_am=True`, 8 SDMA engines, device_id 0, target
   arch **gfx1201** (RDNA4 / gfx12-class). This matches the Radeon AI PRO R9700 and the
   `ops_amd.py` supported-arch assert `(9,4,2)|(9,5,0)|gfx11|gfx12`.
-- The `~/Library/Caches/tinygrad/downloads/` cache holds the TinyGPU USB4 toolchain
-  (`TinyGPU_…/TinyGPU_c0d024f9ff0e1dc8fdf217f255da7101d91e8323.zip`) and `fw/` firmware blobs —
+- The `<tinygrad-cache>/downloads/` cache held the TinyGPU USB4 toolchain
+  (`<tinygpu-toolchain-archive>`) and `fw/` firmware blobs —
   consistent with §4 ("macOS AMD transport = USB/DMA (TinyGPU)"; `AMDDevice` selects `USBIface`
   on macOS). Here it boots through the PCIIface-over-USB4 path.
 
@@ -41,7 +41,7 @@ Ran the real baseline (no server, no long benchmark) against the locally-cached 
 
 ```
 JITBEAM=2 DEV=AMD python3 -m tinygrad.llm \
-  --model ${HOME}/Library/Caches/tinygrad/downloads/3cdb17618469285f97f176c434543c9c \
+  --model <local-model-cache> \
   --max_context 1024
 → using model "Llama 3.2 1B Instruct" with 1,021,800,576 bytes and 1,498,482,688 params
 → >>> (interactive prompt reached)

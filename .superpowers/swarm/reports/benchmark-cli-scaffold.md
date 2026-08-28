@@ -16,4 +16,4 @@
 - Real benchmark execution remains blocked until Task 5 emits accepted native C2 serving JSON with hardware log path, timing counters, and token-exact evidence.
 
 ## Supervisor commands
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_benchmark.py -q`
+- `${PY} -m pytest tests/native_r9700/test_benchmark.py -q`

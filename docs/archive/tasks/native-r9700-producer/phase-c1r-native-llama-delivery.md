@@ -60,7 +60,7 @@ Source workers can implement kernels without changing stage names, shapes, or la
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_llama_stage_layout.py \
   tests/native_r9700/test_kernel_catalog.py -q
 ```
@@ -89,7 +89,7 @@ Each asset has one RED/GREEN contract for exact geometry/dtype/provenance/window
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_llama_rmsnorm_asset.py \
   tests/native_r9700/test_llama_kv_projection_asset.py \
   tests/native_r9700/test_llama_v_projection_asset.py -q
@@ -119,7 +119,7 @@ All source contracts explicitly reject non-fp16 K/V, fixture provenance, V rotat
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_llama_rope_kv_asset.py \
   tests/native_r9700/test_llama_attention_hsa_assets.py -q
 ```
@@ -150,7 +150,7 @@ One log proves real model token/weight input, R9700 identity, device-resident st
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_native_hsa_prefill_contract.py -q
 ```
 
@@ -179,7 +179,7 @@ A short real request produces a full 16-layer fp16 NPZ with request-bound R9700 
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_native_hsa_prefill_contract.py \
   tests/native_r9700/test_kv_cache.py -q
 ```
@@ -209,7 +209,7 @@ C1R and C2R logs show native producer evidence, accepted cache, final-token-only
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_parity.py \
   tests/native_r9700/test_serving.py -q
 ```

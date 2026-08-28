@@ -87,8 +87,8 @@ No command validates this decision alone. Supervisor/reviewer validates by readi
 Supervisor uses these exact commands after fixes as applicable; executors do not run them in OMP task mode:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ```sh
@@ -123,8 +123,8 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_tra
 Supervisor final checks from source plan lines 875-885:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 git diff --check
 ```
 

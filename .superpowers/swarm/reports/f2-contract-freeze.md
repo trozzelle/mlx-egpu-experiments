@@ -77,8 +77,8 @@ D[15][15] = v7{31}
 Expected-layout command (the supervisor must materialize exactly the pinned checkout; a missing checkout is a blocker, not permission to use another revision):
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
-CALC=${HOME}/Development/ml/tools/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
+CALC=<tools-root>/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py
 $PY "$CALC" --architecture gfx1201 --instruction v_wmma_f32_16x16x16_f16 --detail-instruction
 $PY "$CALC" --architecture gfx1201 --instruction v_wmma_f32_16x16x16_f16 --register-layout --A-matrix --csv
 $PY "$CALC" --architecture gfx1201 --instruction v_wmma_f32_16x16x16_f16 --register-layout --B-matrix --csv
@@ -285,7 +285,7 @@ The shared file `docs/tasks/native-r9700-producer/validation-commands.md` was in
   inverse_fixture=build/f2-wmma/f2-wmma-physical-layout-inverse.npz
   log=logs/f2/wmma-physical-layout-proof.log
   {
-    printf "%s\n" "command: tools/f2-wmma-layout-proof --source-layout-version f16-row-major-nk-source-v1 --physical-layout-version f2-wmma-physical-tile-v1 --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/samples/simple_hgemm.cpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/rocwmma.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/io_config.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/io_layout.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/mapping_util.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/accessors_impl.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/layout/matrix_layout_traits_impl.hpp --rocwmma-symbols matrix_b,col_major,fragment,load_matrix_sync,IOConfig,GetMappingUtil --aiter-source \$AITER_CHECKOUT/aiter/ops/flydsl/kernels/flash_attn_func_gfx1201.py --calculator-source ${HOME}/Development/ml/tools/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py --local-source native_r9700/kernels/llama_gate_up_projection_f16.cpp --layout-spec build/f2-wmma/f2-wmma-physical-layout-spec.json --inverse-fixture build/f2-wmma/f2-wmma-physical-layout-inverse.npz --output logs/f2/wmma-physical-layout-proof.json"
+    printf "%s\n" "command: tools/f2-wmma-layout-proof --source-layout-version f16-row-major-nk-source-v1 --physical-layout-version f2-wmma-physical-tile-v1 --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/samples/simple_hgemm.cpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/rocwmma.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/io_config.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/io_layout.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/mapping_util.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/accessors_impl.hpp --rocwmma-source \$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/layout/matrix_layout_traits_impl.hpp --rocwmma-symbols matrix_b,col_major,fragment,load_matrix_sync,IOConfig,GetMappingUtil --aiter-source \$AITER_CHECKOUT/aiter/ops/flydsl/kernels/flash_attn_func_gfx1201.py --calculator-source <tools-root>/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py --local-source native_r9700/kernels/llama_gate_up_projection_f16.cpp --layout-spec build/f2-wmma/f2-wmma-physical-layout-spec.json --inverse-fixture build/f2-wmma/f2-wmma-physical-layout-inverse.npz --output logs/f2/wmma-physical-layout-proof.json"
     date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"
     tools/f2-wmma-layout-proof \
       --source-layout-version f16-row-major-nk-source-v1 \
@@ -299,7 +299,7 @@ The shared file `docs/tasks/native-r9700-producer/validation-commands.md` was in
       --rocwmma-source "$ROCWMMA_CHECKOUT/projects/rocwmma/library/include/rocwmma/internal/layout/matrix_layout_traits_impl.hpp" \
       --rocwmma-symbols matrix_b,col_major,fragment,load_matrix_sync,IOConfig,GetMappingUtil \
       --aiter-source "$AITER_CHECKOUT/aiter/ops/flydsl/kernels/flash_attn_func_gfx1201.py" \
-      --calculator-source ${HOME}/Development/ml/tools/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py \
+      --calculator-source <tools-root>/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py \
       --local-source native_r9700/kernels/llama_gate_up_projection_f16.cpp \
       --layout-spec "$layout_spec" \
       --inverse-fixture "$inverse_fixture" \
@@ -320,8 +320,8 @@ The required output is a concrete `EvidenceRef` with `record_kind: offline_revie
 /bin/bash -o pipefail -c '
   set -u
   mkdir -p build/f2-wmma logs/f2
-  PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
-  CALC=${HOME}/Development/ml/tools/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py
+  PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
+  CALC=<tools-root>/amd_matrix_instruction_calculator-2ef91896bcdc4d26624f952e5c905c787cd9bc9e/matrix_calculator.py
   detail=logs/f2/wmma-calculator-detail.txt
   a_map=logs/f2/wmma-calculator-a.csv
   b_map=logs/f2/wmma-calculator-b.csv
@@ -439,7 +439,7 @@ P3's G0 migration MUST copy the complete hardware invocation in the block below,
       test -s .superpowers/swarm/reports/g0-wmma-conformance.md || status=$?
     fi
     if [ "$status" -eq 0 ]; then
-      ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+      ${PY} -m pytest \
         tests/native_r9700/test_wmma_lane_map_asset.py \
         tests/native_r9700/test_linear_wmma_f16_asset.py \
         tests/native_r9700/test_hsa_code_image_generator.py \

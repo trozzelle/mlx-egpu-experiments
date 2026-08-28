@@ -17,8 +17,8 @@ next_blocker: cp_mec_rs64_context_still_multicausal_needs_source_mapping
 - Added pytest coverage for the new classifier self-test and updated help coverage.
 
 ## Verification
-- Focused regression: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_classifier_self_test_reports_rs64_exception -v` -> `1 passed in 1.51s`.
-- Full focused suite: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `20 passed in 27.17s`.
+- Focused regression: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_classifier_self_test_reports_rs64_exception -v` -> `1 passed in 1.51s`.
+- Full focused suite: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `20 passed in 27.17s`.
 - Hardware rerun: `logs/c0h-native-amdev-rs64-context.log` -> `wrapper_exit_status: 1`, no CPU pass tokens, and `compute_doorbell_consumption_classification: rs64_exception_context_needed`.
 
 ## Forbidden changes avoided

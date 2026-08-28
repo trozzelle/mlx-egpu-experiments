@@ -42,33 +42,33 @@ Qwen3.8-27B remains a separate target-expansion contract because it uses MLX-VLM
 Use the pinned interpreter from `docs/tasks/native-r9700-producer/validation-commands.md`; do not rely on `python3` from `PATH`.
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 ```
 
 Common checks:
 
 ```sh
-$PY -m pytest tests -v
-$PY -m pytest tests/native_r9700 -v
-$PY -m py_compile tinygrad_kv_worker/harness.py
+"$PY" -m pytest tests -v
+"$PY" -m pytest tests/native_r9700 -v
+"$PY" -m py_compile tinygrad_kv_worker/harness.py
 git diff --check
 ```
 
 Focused examples:
 
 ```sh
-$PY -m pytest tests/native_r9700/test_serving.py -v
-$PY -m pytest tests/native_r9700/test_runtime_contract.py -q
-$PY -m pytest tests/test_native_amdev_transfer_contract.py -v
+"$PY" -m pytest tests/native_r9700/test_serving.py -v
+"$PY" -m pytest tests/native_r9700/test_runtime_contract.py -q
+"$PY" -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Native Python CLIs:
 
 ```sh
-$PY -m native_r9700.loader --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct
-$PY -m native_r9700.prefill --model <mlx-model-dir> --token-ids-json '[...]' --producer-kind cpu_reference --out <prefill.npz> --log <prefill.log>
-$PY -m native_r9700.kv_cache --prefill-npz <prefill.npz> --out <prompt-cache.safetensors> --log <kv-cache.log>
-$PY -m native_r9700.serving --model <mlx-model-dir> --fixtures-dir tests/native_r9700/fixtures --threshold-tokens 128 --max-new-tokens 4 --artifacts-dir logs/c2-serving --json logs/c2-serving/result.json --log logs/c2-serving/run.log
+"$PY" -m native_r9700.loader --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct
+"$PY" -m native_r9700.prefill --model <mlx-model-dir> --token-ids-json '[...]' --producer-kind cpu_reference --out <prefill.npz> --log <prefill.log>
+"$PY" -m native_r9700.kv_cache --prefill-npz <prefill.npz> --out <prompt-cache.safetensors> --log <kv-cache.log>
+"$PY" -m native_r9700.serving --model <mlx-model-dir> --fixtures-dir tests/native_r9700/fixtures --threshold-tokens 128 --max-new-tokens 4 --artifacts-dir logs/c2-serving --json logs/c2-serving/result.json --log logs/c2-serving/run.log
 ```
 
 Current C++ runner build shape (kept in sync with `RUNNER_SOURCES` in `tests/native_r9700/test_block_prefill_runtime_contract.py`):
@@ -99,8 +99,9 @@ build/native-r9700-runtime/native_r9700_runner --native-prefill-proof \
 Phase 0 GPU parity control command pattern:
 
 ```sh
-DEV=AMD JITBEAM=2 HF_HOME=${HOME}/Development/ml/models \
-  $PY -m tinygrad_kv_worker.harness \
+: "${MODEL_ROOT:?set MODEL_ROOT to the local model cache root}"
+DEV=AMD JITBEAM=2 HF_HOME="$MODEL_ROOT" \
+  "$PY" -m tinygrad_kv_worker.harness \
   --gguf mlx_models/meta-Llama-3.2-1B-Instruct.F16.gguf \
   --mlx mlx_models/meta-Llama-3.2-1B-Instruct \
   --out docs/path-a-validation-results.md --run-tag meta-f16-final
@@ -145,11 +146,11 @@ DEV=AMD JITBEAM=2 HF_HOME=${HOME}/Development/ml/models \
 
 ## Runtime/Tooling Preferences
 
-- Python: `${HOME}/.pyenv/versions/3.12.8/bin/python3`.
+- Python: `${PY}`.
 - Python dependencies are source/import-grounded, not lockfile-grounded: `pytest`, `numpy`, `safetensors`, `mlx`, `mlx_lm`, `tinygrad` for specific harness paths.
 - No package/build metadata is present (`pyproject.toml`, `requirements*.txt`, `setup.py`, `Makefile`, `CMakeLists.txt` absent). Run modules directly from repo root.
 - C++: macOS `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra`.
-- Tinygrad comparison/control env: `DEV=AMD`, `JITBEAM=2`, `HF_HOME=${HOME}/Development/ml/models`; TinyGPU discovery may need `PYTHONPATH=${HOME}/Development/ml/tools/tinygrad`.
+- Tinygrad comparison/control env: `DEV=AMD`, `JITBEAM=2`, and caller-defined `MODEL_ROOT`/`HF_HOME`; TinyGPU discovery may need caller-defined `TINYGRAD_ROOT`/`PYTHONPATH`.
 - Hardware target: AMD Radeon AI PRO R9700, `1002:7551`, `gfx1201`, via TinyGPU.app `APLRemotePCIDevice` / `PCIIface`. Stale libusb/`USBIface` probes are negative controls, not acceptance evidence.
 - `.gitignore` excludes `.worktrees/`, `__pycache__/`, `*.pyc`, `mlx_models/`, `logs/`, and `build/`.
 

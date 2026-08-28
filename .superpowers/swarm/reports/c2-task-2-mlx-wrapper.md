@@ -23,9 +23,9 @@ Status: **Done**.
 
 ## Verification
 
-- RED for final review finding: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -v` exited 1 with `FileExistsError` from `artifacts_dir.mkdir(...)` in `test_bad_artifacts_dir_before_acceptance_falls_back_to_native_full_prompt`.
-- GREEN focused C2 wrapper suite: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -v` → `14 passed in 0.09s`.
-- Native Python slice: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_kv_cache.py tests/native_r9700/test_parity.py tests/native_r9700/test_serving.py -v` → `51 passed, 2 warnings in 4.00s`.
+- RED for final review finding: `${PY} -m pytest tests/native_r9700/test_serving.py -v` exited 1 with `FileExistsError` from `artifacts_dir.mkdir(...)` in `test_bad_artifacts_dir_before_acceptance_falls_back_to_native_full_prompt`.
+- GREEN focused C2 wrapper suite: `${PY} -m pytest tests/native_r9700/test_serving.py -v` → `14 passed in 0.09s`.
+- Native Python slice: `${PY} -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_kv_cache.py tests/native_r9700/test_parity.py tests/native_r9700/test_serving.py -v` → `51 passed, 2 warnings in 4.00s`.
 - Producer-unavailable smoke: `python -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --producer-model /tmp/native-r9700-missing-producer-model --fixtures-dir tests/native_r9700/fixtures --prompt-name prompt-1 --max-new-tokens 4 --threshold-tokens 128 --producer-timeout-s 5 --artifacts-dir logs/c2-serving-unavailable --json logs/c2-serving-unavailable/result.json --log logs/c2-serving-unavailable/run.log` → `C2 serving status=pass prompts=1`.
 - Full C2 integration/report: `python -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --max-new-tokens 4 --threshold-tokens 128 --producer-timeout-s 300 --artifacts-dir logs/c2-serving --json logs/c2-serving/result.json --log logs/c2-serving/run.log --report docs/path-a-validation-results.md` → `C2 serving status=pass prompts=3`.
 

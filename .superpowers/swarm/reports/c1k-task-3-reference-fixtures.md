@@ -99,7 +99,7 @@ arrays, independent of the mlx oracle.
 
 ## Verification (focused + combined)
 
-- Focused: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -v` → 7 passed.
+- Focused: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -v` → 7 passed.
 - Combined focused suite (both lanes): `... -m pytest tests/native_r9700 -v`
   → **57 passed**, including Lane A2's `TestPrimitiveFixtureSeam` tests for
   cast/matmul/rms_norm/silu consuming the on-disk `primitives_fixtures.npz`.
@@ -107,20 +107,20 @@ arrays, independent of the mlx oracle.
 ## Exact commands for the supervisor
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 
 # Generate (or regenerate) the reference fixtures. Default --model is
 # mlx_models/meta-Llama-3.2-1B-Instruct; the reference safetensors live under
 # the phase-0 worktree here, so pass them explicitly when mlx_models/ is absent.
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures \
+${PY} -m native_r9700.ref_fixtures \
   --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures
 
 # Focused fixture tests.
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -v
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -v
 
 # Combined focused suite (Lane A2 + Lane B2) — exercises the primitive seam.
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 ```
 
 ## Constraints honored

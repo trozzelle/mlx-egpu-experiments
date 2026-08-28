@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Current checkpoint before this plan: `661b7ef Resolve C0 doorbell blocker to CP/MEC status`.
 - Known untracked file `docs.zip` remains untouched.
 - Current blocker: `cp_mec_rs64_exception_status_needs_source_grounding`.
@@ -81,7 +81,7 @@ Create `docs/archive/tasks/amdev-doorbell-delivery/phase-9-cp-mec-rs64-source-gr
 ## Source grounding
 - Parent plan: `docs/archive/superpowers/plans/2026-08-17-cp-mec-rs64-exception-grounding.md`.
 - Current reviewed blocker: `cp_mec_rs64_exception_status_needs_source_grounding` from `.superpowers/swarm/reports/c0a-compute-task-10-cp-mec-visibility-review.md`.
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 
 ## Selected lane
 - `selected_lane: rs64_exception_context_diagnostic`
@@ -155,7 +155,7 @@ Append a new wave section to `.superpowers/swarm/gx1202-compute-dispatch-supervi
 Source-ground the reviewed RS64 exception-status blocker and authorize only diagnostic RS64 context readbacks.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Forbidden: BAR2 index/value, GDC/S2A route values, CP MEC doorbell ranges, PM4 packet sequence, scheduler behavior, retry loops, AQL behavior, Linux HIP fallback, allocator/runtime framework, and C1/C2/C3 work.
 - Validation policy: OMP task executors do not run tests, linters, formatters, package managers, git commands, project-wide suites, compiles, or hardware commands; supervisor runs verification.
 
@@ -183,7 +183,7 @@ Source-ground the reviewed RS64 exception-status blocker and authorize only diag
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git diff --check docs/archive/tasks/amdev-doorbell-delivery/phase-9-cp-mec-rs64-source-grounding.md .superpowers/swarm/progress.md .superpowers/swarm/gx1202-compute-dispatch-supervisor.md .superpowers/swarm/reports/c0a-compute-task-11-rs64-source-grounding.md
 ```
 
@@ -249,8 +249,8 @@ In `EXPECTED_COMPUTE_DOORBELL_CONSUMPTION_LINES`, insert these two exact strings
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
 ```
 
 Expected: fail because `native_amdev_transfer_probe.cpp` does not yet emit `cp_mec_rs64_context_reads:`.
@@ -373,8 +373,8 @@ In `run_compute_doorbell_consumption_self_test()`, print the new contract lines 
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
 ```
 
 Expected: pass.
@@ -384,8 +384,8 @@ Expected: pass.
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: all tests pass.
@@ -453,7 +453,7 @@ forbidden_changes_made: false
 Run exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0h-native-amdev-rs64-context.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 
@@ -576,8 +576,8 @@ Change only the symbol named by Task 6. Do not touch any other field, helper, or
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: all tests pass.
@@ -587,7 +587,7 @@ Expected: all tests pass.
 Run exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0i-native-amdev-rs64-one-field-fix.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 
@@ -636,8 +636,8 @@ c0a_compute_20_status: done_cpu_pass_or_reviewed_blocker
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: all tests pass.
@@ -647,7 +647,7 @@ Expected: all tests pass.
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git diff --check
 ```
 
@@ -658,7 +658,7 @@ Expected: no output.
 Commit only reviewed/verified Phase 9 changes:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git add docs/archive/superpowers/plans/2026-08-17-cp-mec-rs64-exception-grounding.md docs/archive/tasks/amdev-doorbell-delivery/phase-9-cp-mec-rs64-source-grounding.md .superpowers/swarm/progress.md .superpowers/swarm/gx1202-compute-dispatch-supervisor.md .superpowers/swarm/reports/c0a-compute-task-11-rs64-source-grounding.md .superpowers/swarm/reports/c0a-compute-task-11-rs64-source-grounding-review.md .superpowers/swarm/reports/c0a-compute-task-11-rs64-context-contract.md .superpowers/swarm/reports/c0a-compute-task-11-rs64-context-instrumentation.md .superpowers/swarm/reports/c0a-compute-task-11-rs64-context.md .superpowers/swarm/reports/c0a-compute-task-11-rs64-context-review.md .superpowers/swarm/reports/c0a-compute-task-12-rs64-one-field-fix.md .superpowers/swarm/reports/c0a-compute-task-12-final-review.md tests/test_native_amdev_transfer_contract.py experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp
 git commit -m "Resolve CP/MEC RS64 source-grounding blocker"
 ```
@@ -672,12 +672,12 @@ If Task 7 records a reviewed blocker without source/test changes, omit nonexiste
 Run before any completion claim:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git diff --check
 ```
 

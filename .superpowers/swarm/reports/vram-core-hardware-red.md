@@ -36,7 +36,7 @@ result, CPU tensor computation, or a `MAP_SYSMEM` model buffer substitute.
 ## Supervisor RED command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_vram_contract.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_vram_contract.py -q
 ```
 
 ## Intended current RED state

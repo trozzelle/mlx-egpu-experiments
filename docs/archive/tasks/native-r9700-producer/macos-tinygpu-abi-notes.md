@@ -117,7 +117,7 @@ Task set 4 needs the same substrate plus the compute-queue path:
 - TinyGPU.app/kernel extension boundary: privileged PCI discovery/access, server process lifecycle, config/BAR/reset/reBAR operations, MMIO and BAR byte transport, sysmem pinning/mapping, physical page list exposure, and fd passing.
 - Native Path C boundary: a tinygrad-free client for the RemoteCmd ABI, AMD register/memory/queue programming rederived from the referenced source, deterministic transfer/kernel proofs, logging, and CPU comparison.
 - tinygrad reference boundary: allowed for comparison/discovery commands only (`JITBEAM=2 DEV=AMD ...`); not allowed inside the native producer or proofs.
-- License/safety: `${HOME}/Development/ml/tools/tinygrad/LICENSE` lines 1-7 are MIT and permit use/copy with copyright and permission notice, but this task's safety boundary is stricter: do not vendor or copy tinygrad code. Use source paths and line references to rederive the minimum native behavior. If a later decision intentionally reuses substantial tinygrad code, it must carry the MIT notice and be approved as a separate scope change.
+- License/safety: `<tinygrad-checkout>/LICENSE` lines 1-7 are MIT and permit use/copy with copyright and permission notice, but this task's safety boundary is stricter: do not vendor or copy tinygrad code. Use source paths and line references to rederive the minimum native behavior. If a later decision intentionally reuses substantial tinygrad code, it must carry the MIT notice and be approved as a separate scope change.
 
 ## Blocked or unresolved facts
 
@@ -125,7 +125,7 @@ Task set 2 pins the visible client-side ABI entry points: active transport, devi
 
 Unresolved facts for later work:
 
-- TinyGPU.app server/kernel-extension source is not present in `${HOME}/Development/ml/tools/tinygrad/`; only the client ABI is visible. If the server rejects a native client, task set 3 must record the exact RemoteCmd and response/error.
+- TinyGPU.app server/kernel-extension source is not present in `<tinygrad-checkout>/`; only the client ABI is visible. If the server rejects a native client, task set 3 must record the exact RemoteCmd and response/error.
 - Exact native code-object generation/loading for `gfx1201` is task set 4 work. This note identifies the queue/dispatch path but does not provide a kernel blob.
 - Interrupt semantics are only indirectly visible through `PCIIface.sleep` and interrupt draining; transfer proof should rely on timeline memory polling and explicit error logging first.
 

@@ -1,8 +1,8 @@
 contract_name: cp_mec_doorbell_range
 
 source_refs:
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:293-295 — tinygrad programs `regCP_MEC_DOORBELL_RANGE_LOWER = 0x100 * xcc` and `regCP_MEC_DOORBELL_RANGE_UPPER = 0x100 * xcc + 0xf8` per XCC.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/regs.py:5968-5969 — gfx12/gc_12_0_0 defines `doorbell_range_lower` and `doorbell_range_upper` fields at bits `(2, 11)` for `regCP_MEC_DOORBELL_RANGE_LOWER/UPPER`.
+  - <tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:293-295 — tinygrad programs `regCP_MEC_DOORBELL_RANGE_LOWER = 0x100 * xcc` and `regCP_MEC_DOORBELL_RANGE_UPPER = 0x100 * xcc + 0xf8` per XCC.
+  - <tinygrad-checkout>/tinygrad/runtime/autogen/am/regs.py:5968-5969 — gfx12/gc_12_0_0 defines `doorbell_range_lower` and `doorbell_range_upper` fields at bits `(2, 11)` for `regCP_MEC_DOORBELL_RANGE_LOWER/UPPER`.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:297-300 — native path fixes `kExpectedXccCount = 1`, `kMecDoorbellIndex = 3`, and BAR2 byte offset `index * sizeof(uint64_t)`.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:2805-2822 — direct-PM4 topology validation requires GC IP gfx1201, GC instance `0`, and GC instance count `1`.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:3537-3559 — compute debug/readback selects `ME=1, pipe=0, queue=0` through `regGRBM_GFX_CNTL`.

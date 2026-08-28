@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Current checkpoint: `9862430 Resolve C0 RS64 context blocker`.
 - Kept change: `encode_hqd_pq_control_direct_pm4()` drops `kUnordDispatch` (bit 28), so `hqd_pq_control` encodes `0x0000050c` matching tinygrad `ip.py:329`. (Note: this change was uncommitted working-tree state before the swarm and is carried into commit `30d573b` (Task 1); it is not present at checkpoint `9862430`.)
 - Do NOT change BAR2 index/value, GDC/S2A route values, CP MEC doorbell ranges, PM4 packet sequence, scheduler behavior, retry loops, AQL behavior, Linux HIP fallback, or C1/C2/C3 work under this plan.
@@ -112,10 +112,10 @@ If the line is absent from the expected-lines tuple, add it only if the self-tes
 - [ ] **Step 6: Rebuild and run focused pytest**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 mkdir -p build/native-r9700-runtime
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 ```
 
 Expected: build exit `0`; pytest `20 passed`.
@@ -172,9 +172,9 @@ if (compute_control != nullptr && compute_control->sys_pages.size() < 10) {
 - [ ] **Step 3: Rebuild and run focused pytest**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 ```
 
 Expected: build exit `0`; pytest `20 passed`.
@@ -237,9 +237,9 @@ The old `write_compute_ring_words` performed a `mmio_read` at `kRingVramPaddr` t
 - [ ] **Step 4: Rebuild and run focused pytest**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 ```
 
 Expected: build exit `0`; pytest `20 passed` (any self-test that triggered the removed VM-based ring verification must be updated to the sysmem write path — see Step 5 if a focused test fails).
@@ -269,7 +269,7 @@ git commit -m "feat: write compute ring words into sysmem mapping"
 - [ ] **Step 1: Run the hardware kernel proof**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 log=logs/c0k-native-amdev-sysmem-ring-backing.log
 build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof > "$log" 2>&1
 status=$?
@@ -295,8 +295,8 @@ Dispatch `reviewer` to confirm the report cites source/log lines and the classif
 - [ ] **Step 5: Final verification and checkpoint**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 git diff --check
 ```
 

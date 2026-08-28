@@ -26,7 +26,7 @@ The five generated Qwen fixture files are the complete Q1 fixture set. Existing 
 
 The only admitted local model directory is:
 
-`${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff`
+`<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff`
 
 The source-pin record reports `status=pass`, `fallback_used=false`, and `local_shard_count=3`. The identity is:
 

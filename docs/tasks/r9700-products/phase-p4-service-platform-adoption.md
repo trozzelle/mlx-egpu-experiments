@@ -108,7 +108,7 @@ One model handle owns and releases all HAL/pack resources exactly once; failure 
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_model_service.py \
   tests/native_r9700/test_resident_memory_contract.py \
   tests/native_r9700/test_model_weight_binder_contract.py \
@@ -144,7 +144,7 @@ HAL graph output/evidence matches direct path for focused stages and full B0 cor
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_layer0_executor_contract.py \
   tests/native_r9700/test_native_hsa_prefill_contract.py \
   tests/native_r9700/test_hal_amdev_contract.py \
@@ -177,7 +177,7 @@ HAL-backed requests are at least as diagnosable as direct; fault/reset/client/pr
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_native_worker_evidence.py \
   tests/native_r9700/test_serving.py \
   tests/native_r9700/test_benchmark.py \
@@ -215,7 +215,7 @@ Run direct and HAL services on identical inputs for C1R/C2R, repeated warm reque
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_model_service.py \
   tests/native_r9700/test_hal_contract.py \
   tests/native_r9700/test_hal_amdev_contract.py \
@@ -230,7 +230,7 @@ Supervisor runs exact `P4 direct/HAL comparison`, `P4 fault cleanup`, and `P4 G1
 ## Phase validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 ```
 
 P4 additionally requires fresh side-by-side hardware logs, G1 decision, final review, clean caller cutover, and `git diff --check`.

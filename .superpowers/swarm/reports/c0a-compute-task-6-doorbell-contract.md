@@ -17,7 +17,7 @@
 - No production C++ or hardware path edits were made before RED validation.
 
 ## Supervisor RED validation
-- Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v`
+- Command: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v`
 - Exit status: `1`
 - Observed failure: `subprocess.CalledProcessError`
 - Probe stdout: `failure_text: unknown self-test 'compute-doorbell-delivery'`; `exit_status: 1`
@@ -32,9 +32,9 @@
 - Added the `main` `--self-test compute-doorbell-delivery` dispatch branch after `pm4-dispatch-sequence`.
 
 ## Supervisor GREEN validation
-- Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v`
+- Command: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v`
 - Result: `1 passed in 1.22s`
-- Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_help_lists_hardware_modes -v`
+- Command: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_help_lists_hardware_modes -v`
 - Result: `1 passed in 1.17s`
 
 ## Non-goals preserved

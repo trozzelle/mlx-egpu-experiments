@@ -46,8 +46,10 @@ Fixture layout (under ``--fixtures-dir``, default ``tests/native_r9700/fixtures`
 Regenerable by command (supervisor runs this; see
 docs/tasks/native-r9700-producer/validation-commands.md):
 
-  ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures \
-      --generate --model <mlx-model-dir> --fixtures-dir tests/native_r9700/fixtures
+  PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
+  MODEL="${MODEL:?set MODEL to the MLX model directory}"
+  "$PY" -m native_r9700.ref_fixtures \
+      --generate --model "$MODEL" --fixtures-dir tests/native_r9700/fixtures
 
 The default ``--model`` is ``mlx_models/meta-Llama-3.2-1B-Instruct``. When the
 local worktree lacks ``mlx_models/`` (the reference safetensors live under the

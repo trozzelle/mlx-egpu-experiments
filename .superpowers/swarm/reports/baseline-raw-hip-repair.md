@@ -6,7 +6,7 @@ The captured full-suite run reached
 `tests/native_r9700/test_raw_hip_asset_generator.py::test_fresh_embed_row_source_generates_admitted_raw_code_and_manifest` and invoked the generator with the exact test argv:
 
 ```text
-${HOME}/.pyenv/versions/3.12.8/bin/python3 experiments/native-r9700-runtime/generate_raw_hip_gfx1201_asset.py --source native_r9700/kernels/llama_embed_row_f16.cpp --target gfx1201 --schema '{"name":"llama-embed-row-f16-v1","bytes":24,"fields":[{"name":"embedding_rows","offset":0,"type":"uint64"},{"name":"hidden_output","offset":8,"type":"uint64"},{"name":"selected_row","offset":16,"type":"uint64"}]}' --out-dir ${TMPDIR}/pytest-of-<user>/pytest-27/test_fresh_embed_row_source_ge1/raw-hip-asset
+${PY} experiments/native-r9700-runtime/generate_raw_hip_gfx1201_asset.py --source native_r9700/kernels/llama_embed_row_f16.cpp --target gfx1201 --schema '{"name":"llama-embed-row-f16-v1","bytes":24,"fields":[{"name":"embedding_rows","offset":0,"type":"uint64"},{"name":"hidden_output","offset":8,"type":"uint64"},{"name":"selected_row","offset":16,"type":"uint64"}]}' --out-dir ${TMPDIR}/pytest-of-user/pytest-27/test_fresh_embed_row_source_ge1/raw-hip-asset
 ```
 
 The subprocess returned `2` with `generation failed: COMGR ELF contains unexpected allocated sections` at the admission gate. The source is the reviewed pointer-only kernel in `native_r9700/kernels/llama_embed_row_f16.cpp`; it contains no static, constant, LDS, host, or embedded data machinery that should create a loadable data section.
@@ -19,7 +19,7 @@ The old raw admission expected the allocated set to be exactly `.text` and `.rod
 
 Thus `.note` is the first rejected allocated section (the old error hid its name), and the other eight envelope sections are rejected for the same mistaken reason. The existing HSA image remains the source-grounded precedent: it admits this exact envelope, while the raw asset contract intentionally emits only `.text` and the one `.rodata` AMDHSA descriptor.
 
-A retained direct-COMGR ELF artifact at `${TMPDIR}/pytest-of-<user>/pytest-27/test_generator_compiles_fresh_0/task9-gfx1201/task9_probe_gfx1201.hsaco` was inspected without invoking generation. Its section table confirms the envelope's exact type/flag profile: `.note` `SHT_NOTE`/`0x2`, `.dynsym` `SHT_DYNSYM`/`0x2`, `.gnu.hash`/`0x2`, `.hash`/`0x2`, `.dynstr` `SHT_STRTAB`/`0x2`, `.rodata` `SHT_PROGBITS`/`0x2`, `.text` `SHT_PROGBITS`/`0x6`, `.dynamic` `SHT_DYNAMIC`/`0x3`, and `.relro_padding` `SHT_NOBITS`/`0x3`. The accepted HIP manifest adds the one-byte `.bss` `SHT_NOBITS` linker sentinel with the same `0x3` flags. The `.dynamic` table is the known 112-byte, seven-entry table containing only `DT_HASH`, `DT_STRTAB`, `DT_SYMTAB`, `DT_STRSZ`, `DT_SYMENT`, `DT_GNU_HASH`, and `DT_NULL`; it contains no relocation or dependency tag.
+A retained direct-COMGR ELF artifact at `${TMPDIR}/pytest-of-user/pytest-27/test_generator_compiles_fresh_0/task9-gfx1201/task9_probe_gfx1201.hsaco` was inspected without invoking generation. Its section table confirms the envelope's exact type/flag profile: `.note` `SHT_NOTE`/`0x2`, `.dynsym` `SHT_DYNSYM`/`0x2`, `.gnu.hash`/`0x2`, `.hash`/`0x2`, `.dynstr` `SHT_STRTAB`/`0x2`, `.rodata` `SHT_PROGBITS`/`0x2`, `.text` `SHT_PROGBITS`/`0x6`, `.dynamic` `SHT_DYNAMIC`/`0x3`, and `.relro_padding` `SHT_NOBITS`/`0x3`. The accepted HIP manifest adds the one-byte `.bss` `SHT_NOBITS` linker sentinel with the same `0x3` flags. The `.dynamic` table is the known 112-byte, seven-entry table containing only `DT_HASH`, `DT_STRTAB`, `DT_SYMTAB`, `DT_STRSZ`, `DT_SYMENT`, `DT_GNU_HASH`, and `DT_NULL`; it contains no relocation or dependency tag.
 The first strict-envelope implementation used `0x6FFFFFF5` for `DT_GNU_HASH`; the ELF tag is `0x6FFFFEF5` (the `e` nibble is required). The supervisor's diagnostic rerun decoded the exact current sequence as `[(0x6, 0x4e8), (0xb, 0x18), (0x5, 0x598), (0xa, 0x48), (0x6ffffef5, 0x548), (0x4, 0x570), (0x0, 0x0)]`, i.e. `DT_SYMTAB`, `DT_SYMENT`, `DT_STRTAB`, `DT_STRSZ`, `DT_GNU_HASH`, `DT_HASH`, and `DT_NULL`. The predicate was corrected to this exact tag value; the table remains fail-closed.
 
 ## Change
@@ -46,7 +46,7 @@ The full captured baseline also contains unrelated failures (including HardwareL
 Run the focused contract from the repository root after reviewing the diff:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_raw_hip_asset_generator.py -q
+${PY} -m pytest tests/native_r9700/test_raw_hip_asset_generator.py -q
 ```
 
 If COMGR is available, the focused test itself regenerates into its pytest temporary directory. Inspect that temporary output (not the checked-in `native_r9700/kernels/llama-assets` directory) and require exactly one `.code` plus one `.json`; inspect the manifest's `elf_admission.loadable_progbits == [".text", ".rodata"]`, zero relocation count, descriptor/resource provenance, and digest binding. The existing HSA manifest and a side-effect-free section-table inspection of the retained COMGR ELF are the required evidence for the accepted metadata envelope; no generated raw code should be copied into production by this repair.

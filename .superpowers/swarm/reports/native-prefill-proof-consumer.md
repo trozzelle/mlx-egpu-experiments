@@ -28,4 +28,4 @@
 - Static tool inspection confirmed the new runner/runtime path, parsed evidence fields, CLI log propagation, and fail-closed tests are present.
 
 ## Suggested supervisor commands
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_native_worker_preserves_layer0_prefill_blocker_evidence tests/native_r9700/test_runtime_contract.py::test_native_prefill_proof_consumes_layer0_blocker_and_remains_fail_closed tests/native_r9700/test_prefill.py::test_prefill_cli_logs_native_layer0_blocker_evidence -q`
+- `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_native_worker_preserves_layer0_prefill_blocker_evidence tests/native_r9700/test_runtime_contract.py::test_native_prefill_proof_consumes_layer0_blocker_and_remains_fail_closed tests/native_r9700/test_prefill.py::test_prefill_cli_logs_native_layer0_blocker_evidence -q`

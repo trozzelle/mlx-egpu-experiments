@@ -10,7 +10,7 @@ The future `native_r9700.qwen_text_adapter` boundary owns metadata-only access t
 this reviewed local snapshot:
 
 ```text
-${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
+<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
 ```
 
 It must expose `CANONICAL_QWEN_TEXT_SNAPSHOT`, `QwenTextConfig`,
@@ -38,7 +38,7 @@ claim producer acceptance. It has no Llama fallback: text configuration is not
 ## Supervisor RED command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_qwen_text_adapter.py -q
+${PY} -m pytest tests/native_r9700/test_qwen_text_adapter.py -q
 ```
 
 ## Intended current RED

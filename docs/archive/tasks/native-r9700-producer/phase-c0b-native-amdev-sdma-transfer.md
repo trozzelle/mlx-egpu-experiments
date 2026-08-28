@@ -17,7 +17,7 @@ Build and verify the smallest tinygrad-free host-device transfer proof on the wo
 - C0A-2 device visibility is Done: TinyGPU.app/IOKit PCI sees `APLRemotePCIDevice '1002:7551'`, `PCIIface`, `pcibus usb4`, `arch gfx1201`.
 - C0A-3 ABI pinning is Done: RemoteCmd/sysmem fd/BAR/MMIO/config operations and AMDev/SDMA source anchors are pinned.
 - User approved the `Native AMDev/SDMA Boundary Design` and selected minimal MIT tinygrad slice porting as the reuse policy.
-- Work boundary remains `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Work boundary remains `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 
 ## Orchestration map
 
@@ -77,7 +77,7 @@ Non-goals: no `native_amdev_transfer_probe.cpp`, no production source, no hardwa
 Supervisor runs:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected before task set 2: FAIL with `AssertionError: native transfer probe source missing`.
@@ -118,7 +118,7 @@ Non-goals: no TinyGPU.app hardware connection, no BAR mapping, no VM mapping, no
 Supervisor runs:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected after task set 2: 2 passed.
@@ -192,7 +192,7 @@ Non-goals: no general allocator API, no SDMA submission, no compute queue, no ke
 Supervisor runs:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ## Task set 5: SDMA transfer proof
@@ -271,7 +271,7 @@ git diff --check docs/archive/tasks/native-r9700-producer/README.md docs/archive
 
 ## Phase validation
 
-- Focused no-hardware pytest: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v`.
+- Focused no-hardware pytest: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v`.
 - Final hardware transfer command: exact command added by task set 5 to `validation-commands.md`.
 - Documentation whitespace: `git diff --check` over touched docs/reports.
 - Reviewer gate before C0B final state is accepted.

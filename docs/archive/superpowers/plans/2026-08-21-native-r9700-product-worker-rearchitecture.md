@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Use `${HOME}/.pyenv/versions/3.12.8/bin/python3`; never use `python3` from `PATH`.
+- Use `${PY}`; never use `python3` from `PATH`.
 - The active first target is Llama 3.2 1B fp16 with 16 layers and per-layer fp16 K/V `(1, 8, N, 64)`.
 - Preserve the KV interchange format and mlx-lm `S-1` injection rule. The final prompt token goes to `generate_step`; the producer owns all preceding KV truth.
 - `r9700_native` accepts only real R9700 model-forward work. CPU may load, orchestrate, compare, and serialize; it must not supply accepted model math.
@@ -95,7 +95,7 @@ Add a no-hardware test that invokes every active runner mode without `NATIVE_R97
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q -k legacy_proof_unavailable
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q -k legacy_proof_unavailable
 ```
 
 Expected: failure because the current fallback still builds `native_r9700/c1_primitive_bridge.cpp`.
@@ -113,7 +113,7 @@ Delete tests that parse archived bridge arrays or require its byte layout. Keep 
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime_contract.cpp native_r9700/amdev_packets.cpp native_r9700/amdev_session.cpp native_r9700/device_memory.cpp native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner
 ```
 
@@ -154,7 +154,7 @@ Use `datetime.now(timezone.utc)` and an alphanumeric UTC suffix. Create only the
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_run_paths.py -q
+${PY} -m pytest tests/native_r9700/test_run_paths.py -q
 ```
 
 Expected: pass. Document `NATIVE_R9700_RUN_ROOT` as the sole product-run output setting.
@@ -194,7 +194,7 @@ Move, without changing emitted words, the current source-grounded encoder bodies
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_amdev_packets.py -q
+${PY} -m pytest tests/native_r9700/test_amdev_packets.py -q
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra -c native_r9700/amdev_packets.cpp -I native_r9700 -o build/native-r9700-runtime/amdev_packets.o
 ```
 
@@ -233,8 +233,8 @@ Move TinyGPU connection, BAR/VM setup, and C0-proven transfer helper use behind 
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_device_memory_contract.py -q
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/native_r9700/test_device_memory_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Then run the existing C0B native AMDev/SDMA transfer command recorded in `validation-commands.md`. Expected: no-hardware contracts pass; hardware log reports the selected substrate, `1002:7551`, `gfx1201`, exact CPU comparison, and `exit_status: 0`.
@@ -282,7 +282,7 @@ Move fixed geometry/fixture metadata into `FixtureSpec` entries. Replace repeate
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_fixture_catalog.py tests/native_r9700/test_ref_fixtures.py -q
+${PY} -m pytest tests/native_r9700/test_fixture_catalog.py tests/native_r9700/test_ref_fixtures.py -q
 ```
 
 Expected: catalog validates all committed fixtures and existing oracle tests pass.
@@ -310,7 +310,7 @@ Remove `_archived_bridge_source_text_or_skip` and every test that parses archive
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_lifecycle.py tests/native_r9700/test_runtime_protocol.py tests/native_r9700/test_native_worker_evidence.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_lifecycle.py tests/native_r9700/test_runtime_protocol.py tests/native_r9700/test_native_worker_evidence.py -q
 ```
 
 Expected: all active runtime tests run without opening the forensic archive.
@@ -349,7 +349,7 @@ Parse only `--model`, `--token-ids-json`, `--out`, and `--log` for native prefil
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_lifecycle.py tests/native_r9700/test_runtime_protocol.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_lifecycle.py tests/native_r9700/test_runtime_protocol.py -q
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime_contract.cpp native_r9700/amdev_packets.cpp native_r9700/amdev_session.cpp native_r9700/device_memory.cpp native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner
 ```
 

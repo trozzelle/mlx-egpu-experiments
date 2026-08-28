@@ -3,7 +3,7 @@
 **Agent:** SysmemRingAlloc
 **Plan:** docs/archive/superpowers/plans/2026-08-17-sysmem-ring-backing-isolation.md, Task 1
 **Date:** 2026-08-17
-**Worktree:** ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer (branch `feature/native-r9700-producer`, checkpoint `9862430`)
+**Worktree:** <former-native-r9700-worktree> (branch `feature/native-r9700-producer`, checkpoint `9862430`)
 
 ## Status: IMPLEMENTED (source edits complete) — build/test not run (per constraints)
 
@@ -69,9 +69,9 @@ Plan Task 1 **Step 1** contained a typo (`kComputeControlKernargsCpuOffset = kPa
 
 ## Verification commands for supervisor (not run by agent)
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 mkdir -p build/native-r9700-runtime
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 ```
 Expected: build exit `0`; pytest `20 passed`.

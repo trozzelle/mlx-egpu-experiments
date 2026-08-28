@@ -9,7 +9,7 @@
 ## Expected RED command
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_attention_kv.py -v
+cd <former-native-r9700-worktree> && ${PY} -m pytest tests/native_r9700/test_attention_kv.py -v
 ```
 
 Expected RED before production implementation: pytest collection succeeds, then the focused tests fail with a clear missing/unimplemented `native_r9700.attention` API message. The model-backed parity test skips only when the local Llama MLX model or committed `tests/native_r9700/fixtures/kv_state.npz` is absent.
@@ -24,6 +24,6 @@ Expected RED before production implementation: pytest collection succeeds, then 
 - Delta report formatting must include `layer=0`, `n_prefix=5`, `K max`, and `V mean`.
 - Bad Llama-3 `rope_scaling` fails loudly through both frequency generation and model-config driven KV production.
 
-Update: added a CLI/log RED test invoking `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.attention --model <local llama dir> --fixtures-dir tests/native_r9700/fixtures --layer 0 --prompt-name prompt-0 --log <tmp_path>/c1-attention-kv-layer0.log`; after implementation it must exit 0 and write `layer=0`, `n_prefix=5`, `K max`, `K mean`, `V max`, `V mean`, and `exit_status: 0`.
+Update: added a CLI/log RED test invoking `${PY} -m native_r9700.attention --model <local llama dir> --fixtures-dir tests/native_r9700/fixtures --layer 0 --prompt-name prompt-0 --log <tmp_path>/c1-attention-kv-layer0.log`; after implementation it must exit 0 and write `layer=0`, `n_prefix=5`, `K max`, `K mean`, `V max`, `V mean`, and `exit_status: 0`.
 
 Validation was not run, per the task constraint that the supervisor owns RED verification.

@@ -9,7 +9,7 @@
   - `docs/archive/tasks/gx1202-compute-dispatch/phase-5-review-decision-checkpoint.md`
 - Ledger path: `.superpowers/swarm/progress.md`
 - Rows preserved: existing Tinygrad KV Path A and Native R9700 Producer rows are preserved. C0A-5 remains `Blocked`; C0A-6 and C1/C2/C3 rows remain blocked until C0A-5 passes twice or the user approves a split/fallback decision.
-- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; current feature branch, not a new fallback.
+- Work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; current feature branch, not a new fallback.
 
 ## Orchestration map
 - Sequential blockers:
@@ -34,7 +34,7 @@
   - Direct PM4 is allowed only for one GC/XCC; multi-XCC must fail closed at `multi_xcc_aql_required`.
   - Kernel text provenance gap in Phase 4 must be resolved before embedding/loading bytes.
 - Verification gates:
-  - Focused pytest: `cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v`.
+  - Focused pytest: `cd <former-native-r9700-worktree> && ${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v`.
   - Hardware kernel proof: exact `--kernel-proof` command from `docs/tasks/native-r9700-producer/validation-commands.md`.
   - SDMA recovery/transfer proof: exact `--transfer-proof` command from `docs/tasks/native-r9700-producer/validation-commands.md` when compute runs leave state suspect or transfer behavior changes.
   - Final whitespace check: `git diff --check`.
@@ -46,7 +46,7 @@
 Add RED no-hardware compute contract tests for Phase 1 without touching production C++.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every agent stays there.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; every agent stays there.
 - Only `tests/test_native_amdev_transfer_contract.py` and `.superpowers/swarm/reports/c0a-compute-task-1-contracts.md` may be changed.
 - Executor does not run tests, linters, formatters, package managers, git commands, hardware commands, or project-wide suites; supervisor runs verification.
 - Preserve TinyGPU.app/APLRemotePCIDevice/PCIIface as acceptance path; no tinygrad runtime dependency.
@@ -74,7 +74,7 @@ Add RED no-hardware compute contract tests for Phase 1 without touching producti
 Implement the minimal no-hardware `am_compute` constants, deterministic encoders, self-tests, help output, and dispatch wiring that turn the verified RED contract GREEN without changing hardware behavior.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every agent stays there.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; every agent stays there.
 - Modify `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`; read `tests/test_native_amdev_transfer_contract.py` but change it only if supervisor-created test alignment requires correction.
 - Executor does not run tests, linters, formatters, package managers, git commands, hardware commands, or project-wide suites; supervisor runs verification.
 - Preserve all existing `--transfer-proof` and `--kernel-proof` behavior. No BAR/MMIO writes or hardware path changes in this phase.
@@ -109,7 +109,7 @@ Implement the minimal no-hardware `am_compute` constants, deterministic encoders
 Add the Phase 2 no-hardware GC hub sequence contract and source-only direct-PM4 topology validation surface without writing GC registers.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every agent stays there.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; every agent stays there.
 - Modify `tests/test_native_amdev_transfer_contract.py` and `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`.
 - Executor does not run tests, linters, formatters, package managers, git commands, hardware commands, or project-wide suites; supervisor runs verification.
 - No GC register writes, no compute ring setup, no MQD/HQD setup, no PM4 dispatch, no fallback decision.
@@ -140,7 +140,7 @@ Add the Phase 2 no-hardware GC hub sequence contract and source-only direct-PM4 
 Implement source-grounded GC register definitions, GC VMID0 programming, GC TLB flush helper, and the `gc-hub-sequence` no-hardware self-test/help surface. Do not integrate hardware paths yet.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every agent stays there.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; every agent stays there.
 - Modify `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`; update `tests/test_native_amdev_transfer_contract.py` only if needed to preserve the existing RED contract exactly.
 - Executor does not run tests, linters, formatters, package managers, git commands, hardware commands, or project-wide suites; supervisor runs verification.
 - No MEC/HQD/MQD programming, no compute doorbell, no PM4 dispatch, no AQL implementation, no guessed register offsets.
@@ -172,7 +172,7 @@ Implement source-grounded GC register definitions, GC VMID0 programming, GC TLB 
 Integrate direct-PM4 topology validation, GC VMID0 programming, and GC TLB flush into the kernel proof path with precise fail-closed stages and reviewer gate before Phase 3.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every agent stays there.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; every agent stays there.
 - Modify `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp` and `.superpowers/swarm/reports/c0a-compute-task-3-gc-preflight.md`.
 - Executor does not run tests, linters, formatters, package managers, git commands, hardware commands, or project-wide suites; supervisor runs verification.
 - Preserve `--transfer-proof` SDMA recovery semantics. If a shared helper needs a switch, use the narrowest explicit flag/enum; do not introduce a VM framework or second mapping implementation.
@@ -204,7 +204,7 @@ Integrate direct-PM4 topology validation, GC VMID0 programming, and GC TLB flush
 Add deterministic compute ring/HQD log surface and no-hardware contract for Phase 3 without writing MQD/HQD registers or changing hardware flow.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every agent stays there.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; every agent stays there.
 - Validation policy: OMP task executors do not run tests, linters, formatters, package managers, git commands, or hardware commands; supervisor runs verification after the wave.
 - Do not add MQD builder/reset, HQD register writes, doorbell writes, kernel blob load, PM4 dispatch, AQL, scheduler abstractions, fallback path, or C1/C2/C3 work.
 
@@ -231,7 +231,7 @@ Add deterministic compute ring/HQD log surface and no-hardware contract for Phas
 Add source-indexed v12 compute MQD construction and a bounded stale HQD reset/dequeue helper without integrating hardware setup yet.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every agent stays there.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; every agent stays there.
 - Validation policy: OMP task executors do not run tests, linters, formatters, package managers, git commands, or hardware commands; supervisor runs verification after the wave.
 - Do not call reset/setup from `run_kernel_proof_scaffold`; Task set 3 owns integration/hardware.
 - Do not add kernel blob load, kernargs, PM4 dispatch, AQL path, generic scheduler, allocator, or fallback path.
@@ -260,7 +260,7 @@ Add source-indexed v12 compute MQD construction and a bounded stale HQD reset/de
 Integrate one direct-PM4 gfx1201 compute queue setup into `--kernel-proof`: compute-control mapping, fixed compute VM mappings, MQD write/readback, HQD register copy, activation, and precise pass/blocker reporting.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every agent stays there.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; every agent stays there.
 - Validation policy: OMP task executors do not run tests, linters, formatters, package managers, git commands, hardware commands, or project-wide suites; supervisor runs focused pytest, hardware, and review after the wave.
 - No kernel blob load, kernargs population beyond zeroing fixed page, PM4 dispatch, AQL path, final pass claim, scheduler/allocator/framework, fallback path, or C1/C2/C3 work.
 - Preserve `--transfer-proof`; do not force transfer proof through compute setup.
@@ -291,7 +291,7 @@ Integrate one direct-PM4 gfx1201 compute queue setup into `--kernel-proof`: comp
 # Goal
 Prepare kernel-proof prerequisites after reviewed HQD activation: a reusable single-copy SDMA primitive and a source-grounded kernel text/kernargs/blob-loading path, without submitting PM4 dispatch yet.
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every agent stays there.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; every agent stays there.
 - TinyGPU.app/APLRemotePCIDevice native probe only; no runtime tinygrad dependency, no AQL path, no multi-XCC workaround, no compute doorbell, no PM4 dispatch.
 - Executors run no tests, linters, formatters, package managers, git commands, hardware commands, or project-wide suites. Supervisor validates after the wave.
 - Coordination risk: both tasks edit `native_amdev_transfer_probe.cpp`; Task set 1 owns SDMA helper factoring, Task set 2 owns kernel text/kernargs/VM/log contracts. If overlap appears, agents coordinate by `hub` and preserve the shared function signatures below.
@@ -317,7 +317,7 @@ Prepare kernel-proof prerequisites after reviewed HQD activation: a reusable sin
 # Goal
 Submit the source-grounded direct-PM4 packet after Task sets 1-2, poll the compute timeline, and either run D2H/CPU compare on timeline pass or preserve a precise native blocker.
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Native TinyGPU.app/APLRemotePCIDevice path only; no AQL fallback, no scheduler/allocator framework, no runtime tinygrad dependency.
 - Direct-PM4 compute wptr/doorbell unit remains dwords.
 ### Supervisor gates
@@ -332,7 +332,7 @@ Submit the source-grounded direct-PM4 packet after Task sets 1-2, poll the compu
 # Goal
 Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, and run final review before any checkpoint claim.
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - No fallback implementation, no C1/C2/C3 execution, no user approval simulation, no push.
 - C0 scope changes require explicit user approval; the current recommendation does not change C0 scope.
 ### Supervisor gates
@@ -347,7 +347,7 @@ Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, 
 - Source docs read: `docs/archive/tasks/amdev-doorbell-delivery/phase-1-no-hardware-contract.md`, `phase-2-diagnostic-proof.md`, `phase-3-review-ledger-checkpoint.md`, and `docs/archive/superpowers/plans/2026-08-17-mec-doorbell-delivery.md`.
 - Ledger path: `.superpowers/swarm/progress.md`.
 - Rows preserved: C0A Compute 1-15 remain as recorded; C0A/C1/C2/C3 remain blocked until CPU-verified pass tokens exist or user-approved fallback/split changes the path.
-- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; current feature branch, no new fallback worktree.
+- Work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; current feature branch, no new fallback worktree.
 
 ### Orchestration map
 - Sequential blockers:
@@ -367,7 +367,7 @@ Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, 
   - Emitted `failure_stage` and inferred `compute_doorbell_probe_classification` stay separate in logs/reports/ledgers.
   - Executors do not run tests, linters, formatters, package managers, hardware commands, or git commands; supervisor runs verification.
 - Verification gates:
-  - RED: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v` exits nonzero for missing C++ self-test.
+  - RED: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v` exits nonzero for missing C++ self-test.
   - GREEN: same focused pytest passes, and `test_help_lists_hardware_modes` passes.
   - Instrumentation: full `tests/test_native_amdev_transfer_contract.py -v` passes.
   - Hardware: exact Phase 2 command writes `logs/c0d-native-amdev-doorbell-delivery.log` with all five `compute_doorbell_probe_*` fields.
@@ -405,7 +405,7 @@ Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, 
 - Source docs read: `docs/archive/superpowers/plans/2026-08-17-doorbell-source-gap-resolution.md`, `docs/archive/tasks/amdev-doorbell-delivery/phase-4-doorbell-source-grounding.md`, `.superpowers/swarm/progress.md`, and this supervisor artifact.
 - Ledger path: `.superpowers/swarm/progress.md`.
 - Rows preserved: C0A Compute 1-17 remain as recorded; C0A/C1/C2/C3 remain blocked until CPU pass tokens exist or user-approved fallback/split changes the path.
-- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; current feature branch, no new fallback worktree.
+- Work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; current feature branch, no new fallback worktree.
 - Phase task doc: `docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`.
 
 ### Orchestration map
@@ -430,7 +430,7 @@ Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, 
   - If source-only reports expose a cited contradiction, instrumentation pauses and the consolidated decision selects the one narrow allowed lane.
 - Verification gates:
   - Source-only wave: supervisor reads both reports and checks every `matches|contradicts|gap` claim has cited evidence.
-  - Instrumentation wave if needed: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v`.
+  - Instrumentation wave if needed: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v`.
   - Hardware if instrumentation lands: exact `--kernel-proof` command writing `logs/c0d-native-amdev-doorbell-source-gap.log`; nonzero remains acceptable if route readback fields exist.
   - Final: fresh `git diff --check` plus any required instrumentation pytest/hardware evidence before checkpoint.
 - Publish boundary: supervisor may create local checkpoint commits after reviewed/verified waves; agents never commit or push; push remains user responsibility.
@@ -457,7 +457,7 @@ Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, 
 - Source docs read: `docs/archive/superpowers/plans/2026-08-17-c0-doorbell-blocker-resolution.md`, `docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md`, `.superpowers/swarm/progress.md`, this supervisor artifact, and Task 8 reports/logs.
 - Ledger path: `.superpowers/swarm/progress.md`.
 - Rows preserved: C0A Compute 1-18 remain as recorded; C0A Compute 19 opened for the user-approved blocker-resolution ladder; C1/C2/C3 remain blocked until CPU pass tokens exist or user-approved fallback/split changes the path.
-- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; current feature branch, no new fallback worktree.
+- Work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; current feature branch, no new fallback worktree.
 - Phase task doc: `docs/archive/tasks/amdev-doorbell-delivery/phase-6-doorbell-blocker-resolution.md`.
 
 ### Orchestration map
@@ -485,8 +485,8 @@ Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, 
   - Executor agents do not run tests, linters, formatters, package managers, project-wide suites, git commands, or hardware commands; supervisor runs validation.
 - Verification gates:
   - Source-gap exit wave: supervisor reads report fields and reviewer accepts `hqd_pq_diagnostic_authorized: true` with `route_fix_authorized: false`.
-  - RED contract wave: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v` must fail for missing self-test/output.
-  - GREEN instrumentation wave: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` must pass.
+  - RED contract wave: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v` must fail for missing self-test/output.
+  - GREEN instrumentation wave: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` must pass.
   - Hardware wave: exact `--kernel-proof` command writing `logs/c0e-native-amdev-doorbell-consumption.log`; nonzero remains acceptable only if `compute_doorbell_consumption_timeout` and `compute_doorbell_consumption_classification` exist.
   - Final: fresh focused pytest plus `git diff --check` before checkpoint.
 - Publish boundary: supervisor may create local checkpoint commits after reviewed/verified waves; agents never commit or push; push remains user responsibility.
@@ -515,7 +515,7 @@ Classify the accepted native PM4 blocker, preserve C0A/C1/C2/C3 blocking state, 
 Resolve the reviewed `mqd_hqd_copy_mismatch` lane by changing only MQD/HQD encoding/index/copy-span source needed for `cp_hqd_pq_control`.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Forbidden: BAR2 index/value, GDC/S2A route values, CP MEC doorbell ranges, PM4 packet sequence, scheduler behavior, retry loops, AQL behavior, Linux HIP fallback, allocator/runtime framework, and C1/C2/C3 work.
 - Validation policy: OMP task executors do not run tests, linters, formatters, package managers, git commands, project-wide suites, compiles, or hardware commands; supervisor runs RED/GREEN/hardware verification.
 
@@ -547,7 +547,7 @@ Resolve the reviewed `mqd_hqd_copy_mismatch` lane by changing only MQD/HQD encod
 Expose CP/MEC RS64 status for the reviewed non-MQD blocker after `mqd_hqd_mismatch_count=0`.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Forbidden: BAR2 index/value, GDC/S2A route values, CP MEC doorbell ranges, PM4 packet sequence, scheduler behavior, retry loops, AQL behavior, Linux HIP fallback, allocator/runtime framework, and C1/C2/C3 work.
 - Validation policy: OMP task executors do not run tests, linters, formatters, package managers, git commands, project-wide suites, compiles, or hardware commands; supervisor runs verification.
 
@@ -577,7 +577,7 @@ Expose CP/MEC RS64 status for the reviewed non-MQD blocker after `mqd_hqd_mismat
 Source-ground the reviewed RS64 exception-status blocker and authorize only diagnostic RS64 context readbacks.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Forbidden: BAR2 index/value, GDC/S2A route values, CP MEC doorbell ranges, PM4 packet sequence, scheduler behavior, retry loops, AQL behavior, Linux HIP fallback, allocator/runtime framework, and C1/C2/C3 work.
 - Validation policy: OMP task executors do not run tests, linters, formatters, package managers, git commands, project-wide suites, compiles, or hardware commands; supervisor runs verification.
 
@@ -606,7 +606,7 @@ Source-ground the reviewed RS64 exception-status blocker and authorize only diag
 Add a test-first, diagnostic-only RS64 context readback contract and implementation for the reviewed `rs64_exception_context_diagnostic` lane.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Forbidden: BAR2 index/value, GDC/S2A route values, CP MEC doorbell ranges, PM4 packet sequence, scheduler behavior, retry loops, AQL behavior, Linux HIP fallback, allocator/runtime framework, and C1/C2/C3 work.
 - Validation policy: OMP task executors do not run tests, linters, formatters, package managers, git commands, project-wide suites, compiles, or hardware commands; supervisor runs verification.
 
@@ -638,7 +638,7 @@ Add a test-first, diagnostic-only RS64 context readback contract and implementat
 Run the reviewed RS64 context diagnostic hardware proof and classify the next lane without guessing a behavior fix.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Forbidden unless reviewed hardware selects a one-field fix: BAR2 index/value, GDC/S2A route values, CP MEC doorbell ranges, PM4 packet sequence, scheduler behavior, retry loops, AQL behavior, Linux HIP fallback, allocator/runtime framework, and C1/C2/C3 work.
 - Validation policy: hardware and report are supervisor-owned; reviewers do not run tests, compiles, hardware, package managers, or git commands.
 
@@ -668,7 +668,7 @@ Run the reviewed RS64 context diagnostic hardware proof and classify the next la
 Finalize Phase 9 as a reviewed blocker, with no unauthorized source behavior fix.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Forbidden: any source behavior fix, BAR2 index/value change, GDC/S2A route value change, CP MEC doorbell range change, PM4 packet sequence change, scheduler/retry/AQL/fallback/allocator/runtime/C1/C2/C3 work.
 - Validation policy: supervisor runs verification; final reviewer is read-only and does not run tests, compiles, hardware, package managers, or git commands.
 
@@ -696,7 +696,7 @@ Finalize Phase 9 as a reviewed blocker, with no unauthorized source behavior fix
 Move the native compute dispatch ring from fixed VRAM backing to sysmem/GART backing as a single-variable diagnostic for the C0 `kernel_timeline_timeout` blocker, preserving the kept `unord_dispatch=0` change.
 
 # Constraints
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer` (current feature branch; no new fallback worktree).
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer` (current feature branch; no new fallback worktree).
 - Plan: `docs/archive/superpowers/plans/2026-08-17-sysmem-ring-backing-isolation.md` (Tasks 1-4).
 - Forbidden: BAR2 index/value, GDC/S2A route values, CP MEC doorbell ranges, PM4 packet sequence, scheduler/retry/AQL/fallback/allocator/runtime framework, C1/C2/C3 work, and changing ring VA/MQD ring addr/ring size/VM indices.
 - Validation policy: OMP task executors never run tests, linters, formatters, package managers, git, project-wide suites, compiles, or hardware commands; supervisor runs verification after each wave.

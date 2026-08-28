@@ -116,7 +116,7 @@ Mock conformance covers every frozen object/command/error path and portable head
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_hal_contract.py -v
 ```
 
@@ -148,7 +148,7 @@ Host-visible buffer/executable operations match direct behavior/evidence, deferr
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_hal_amdev_contract.py \
   tests/native_r9700/test_device_memory_contract.py \
   tests/native_r9700/test_hsa_code_image_loader.py -v
@@ -206,7 +206,7 @@ Portable command semantics produce deterministic direct-equivalent output/eviden
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_hal_amdev_contract.py \
   tests/native_r9700/test_pm4_timeline_contract.py \
   tests/native_r9700/test_gpu_timestamp_pm4_contract.py \
@@ -244,7 +244,7 @@ Run direct AMDev and HAL paths against identical buffers/executables for copy, f
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_hal_contract.py \
   tests/native_r9700/test_hal_amdev_contract.py \
   tests/native_r9700/test_runtime_lifecycle.py \
@@ -258,7 +258,7 @@ Supervisor runs exact `P2 AMD conformance` and `P2 G0 equivalence` commands from
 Supervisor runs task-set-1 exact build/hardware commands plus:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_hal_contract.py \
   tests/native_r9700/test_hal_amdev_contract.py \
   tests/native_r9700/test_runtime_lifecycle.py \

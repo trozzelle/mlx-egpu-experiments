@@ -33,7 +33,7 @@ invocations fail before the required lifecycle/output observations.
 ## Focused supervisor command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_native_worker_evidence.py \
   -k 'build_registry_reaches_prepare_with_concrete_pack_and_budget or worker_smoke_mode_accepts_frozen_options_and_closes_one_registry or worker_warm_mode_reuses_one_handle_and_generation_for_ten_prefills' -v
 ```

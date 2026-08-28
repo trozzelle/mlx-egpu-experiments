@@ -15,7 +15,7 @@ The same no-hardware probe applies the observed `MEMSIZE` to rejection of a BAR 
 ## Supervisor RED command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_vram_layout.py -q
+${PY} -m pytest tests/native_r9700/test_vram_layout.py -q
 ```
 
 ## Intended RED state

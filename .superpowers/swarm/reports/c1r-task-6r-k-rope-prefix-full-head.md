@@ -63,11 +63,11 @@ Key markers:
 
 ## Verification
 
-- Focused contract suite: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_k_rope_tokens0_5_head0_full_head_fixture_matches_split_half_oracle tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_rope_tokens0_5_head0_full_head_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_rejects_missing_k_rope_prefix_source_arrays_marker -q` exited `0` with `4 passed in 3.40s`.
+- Focused contract suite: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_k_rope_tokens0_5_head0_full_head_fixture_matches_split_half_oracle tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_rope_tokens0_5_head0_full_head_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_rejects_missing_k_rope_prefix_source_arrays_marker -q` exited `0` with `4 passed in 3.40s`.
 - Bridge/runner compile: `xcrun --sdk macosx clang++ ... native_r9700/c1_primitive_bridge.cpp ...` and `xcrun --sdk macosx clang++ ... native_r9700/runtime.cpp native_r9700/runner.cpp ...` exited `0`.
 - Hardware proof above exited `0`.
 ## Final verification after review
 
 - Review gate: `agent://C1R6rReview` approved with no findings.
-- Full native regression: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` exited `0` with `174 passed, 2 warnings in 75.97s`.
+- Full native regression: `${PY} -m pytest tests/native_r9700 -q` exited `0` with `174 passed, 2 warnings in 75.97s`.
 - Diff whitespace: `git diff --check` exited `0`.

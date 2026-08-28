@@ -12,7 +12,7 @@ Source-ground the `compute_doorbell_not_consumed` follow-up before any write-pat
 ## Dependencies
 - Phase 3 is complete: the diagnostic final review accepted the C0D classification and preserved C0A/C1/C2/C3 blocking state.
 - `.superpowers/swarm/reports/c0a-compute-task-6-doorbell-delivery.md` exists and records `compute_doorbell_probe_status: submitted`, timeout `doorbell_hit=0`, `hqd_pq_rptr=0x00000000`, `cp_stat=0x00000000`, and `compute_doorbell_probe_classification: compute_doorbell_not_consumed`.
-- Work stays in `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Work stays in `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - This phase is source-grounding and decision work only: no register write, PM4 packet change, queue-field change, scheduler, retry loop, fallback substrate, C1/C2/C3 execution, or hardware proof.
 
 ## Orchestration map
@@ -42,7 +42,7 @@ Agents update only their row and append evidence/notes as work completes.
 
 ### Target
 - Inspect only:
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/am.py`
+  - `<tinygrad-checkout>/tinygrad/runtime/autogen/am/am.py`
   - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`
   - `.superpowers/swarm/reports/c0a-compute-task-6-doorbell-delivery.md`
   - `logs/c0d-native-amdev-doorbell-delivery.log` if present.
@@ -83,8 +83,8 @@ No command is required for this read-only source audit. The supervisor validates
 
 ### Target
 - Inspect only:
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py`
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/regs.py`
+  - `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py`
+  - `<tinygrad-checkout>/tinygrad/runtime/autogen/am/regs.py`
   - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`
   - `.superpowers/swarm/reports/c0a-compute-task-6-doorbell-delivery.md`
   - `logs/c0d-native-amdev-doorbell-delivery.log` if present.
@@ -126,7 +126,7 @@ No command is required for this read-only source audit. The supervisor validates
 
 ### Target
 - Inspect only:
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py`
+  - `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py`
   - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`
   - `.superpowers/swarm/reports/c0a-compute-task-6-doorbell-delivery.md`
   - `logs/c0d-native-amdev-doorbell-delivery.log` if present.
@@ -241,7 +241,7 @@ Phase complete requires:
 - If execution updates docs or reports, supervisor runs exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git diff --check
 ```
 

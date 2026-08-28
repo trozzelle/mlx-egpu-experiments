@@ -17,10 +17,10 @@ Fix:
 Verification:
 - First looped-regex run failed because the regex was over-escaped and matched no kernel symbol.
 - Regex corrected to `rf"{symbol}\s*=\s*\{{\{{(?P<body>.*?)\}}\}};"`.
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_kernel_sha_matches_embedded_text -q` -> 1 passed in 0.03s.
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q` -> 19 passed in 18.90s.
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> 138 passed, 2 warnings in 23.35s.
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -q` -> 178 passed, 2 warnings in 57.04s.
+- `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_kernel_sha_matches_embedded_text -q` -> 1 passed in 0.03s.
+- `${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q` -> 19 passed in 18.90s.
+- `${PY} -m pytest tests/native_r9700 -q` -> 138 passed, 2 warnings in 23.35s.
+- `${PY} -m pytest tests -q` -> 178 passed, 2 warnings in 57.04s.
 - `git diff --check native_r9700/runtime.h native_r9700/runtime.cpp native_r9700/runner.cpp native_r9700/c1_primitive_bridge.cpp tests/native_r9700/test_runtime_contract.py docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/reports/c1r-task-6-fp16-cast.md .superpowers/swarm/reports/c1r-task-6-review.md` -> exit 0.
 
 Status: Fixed; focused re-review approved.

@@ -40,14 +40,14 @@ compute_hqd_active_status: not_run
 Executor did not run validation. Supervisor must run this exact command from the worktree:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ## Supervisor verification after Task set 1
 
 ```text
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 pytest: 17 passed in 16.69s
 ```
 
@@ -90,14 +90,14 @@ Accepted. This task changed the no-hardware/log contract only; no register-write
 Executor did not run validation. Supervisor must run this exact command from the worktree:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ### Supervisor verification after Task set 2
 
 ```text
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 pytest: 17 passed in 16.48s
 ```
 
@@ -176,8 +176,8 @@ If final HQD activation write/readback is the failure point, `compute_hqd_active
 Executor did not run validation. Supervisor must run this exact pytest command from the worktree:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Supervisor must run this exact hardware command from the same worktree:
@@ -193,7 +193,7 @@ Reviewer is required before Phase 4 because this task writes MEC/HQD compute que
 Implemented and supervisor-verified. Executor ran no tests, linters, formatters, package managers, git commands, hardware commands, or project-wide suites.
 
 ### Supervisor verification after Task set 3
-- Initial focused no-hardware contract: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `0`: `17 passed in 18.10s`.
+- Initial focused no-hardware contract: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `0`: `17 passed in 18.10s`.
 - Initial hardware `--kernel-proof`: command above wrote `logs/c0-macos-egpu-minimal-runtime.log` at `2026-08-17T16:46:39Z`, exited `1` as expected for the Phase 4 blocker, and reached `host_device_transfer_status: pass`, `vm_gc_context_status: pass`, `gc_tlb_flush_status: pass`, `compute_ring_setup_status: pass`, `compute_hqd_active_status: pass`, `kernel_launch_status: blocked`, `cpu_comparison_status: not_run_blocked_by_kernel_blob_load`, `failure_stage: kernel_blob_load`, and the exact `failure_text` listed above.
 - Initial transfer preservation: `/bin/bash -o pipefail -c '... --transfer-proof ...'` wrote `logs/c0b-native-amdev-sdma-transfer.log` at `2026-08-17T16:46:51Z`, exited `0`, and reached `sdma_timeline_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `failure_stage: none`, and `wrapper_exit_status: 0`.
 - Review found 2 Important findings: shifted MQD/HQD copy dword layout from `regCP_HQD_HQ_STATUS0`/EOP onward, and missing direct-PM4 write-pointer unit handoff. Fix report: `.superpowers/swarm/reports/c0a-compute-task-4-hqd-fix.md`.

@@ -13,10 +13,10 @@
 
 **Owner:** P1 DriverKit integration review
 
-**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
-**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `<former-tinygpu-worktree>` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `<repo-root>/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `<repo-root>/tinygpu/build/`.
 
-**Evidence checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
+**Evidence checkout:** `<repo-root>` (`feature/r9700-products-wave-a`)
 
 ## Changed files
 
@@ -139,7 +139,7 @@ The readiness assertions do not add allocation-failure injection hooks. Existing
 Run from the installer directory after the source seam is intentionally supplied or to capture the expected missing-seam RED:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUFixedTransport.cpp \
@@ -151,7 +151,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 Expected current RED: compilation stops because `TinyGPUDriverExtension/TGPUFixedTransport.cpp` and `TGPUFixedTransport.h` do not exist. No operation or provider state is reached.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUResponseValidator.cpp \
@@ -163,7 +163,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 Expected current RED: compilation stops because `TinyGPUDriverExtension/TGPUResponseValidator.cpp` and `TGPUResponseValidator.h` do not exist.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TinyGPUResourceTable.cpp \
@@ -175,7 +175,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 Expected current RED: after the existing table implementation is found, compilation stops at the new `TinyGPUResourceTable::IsReady()` calls because the public readiness method is absent.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUBufferRequestValidator.cpp \

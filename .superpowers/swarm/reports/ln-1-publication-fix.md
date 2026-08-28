@@ -27,6 +27,6 @@ The narrow `TracePublicationOps` seam is private to `runtime_contract.cpp`; prod
 Not run by this worker, per assignment. The focused command remains:
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 $PY -m pytest tests/native_r9700/test_runtime_vram_contract.py -q
 ```

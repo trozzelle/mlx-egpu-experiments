@@ -32,10 +32,10 @@ Implement the smallest source-grounded SDMA ring setup/submission path inside th
 
 The implementation must cite these source facts beside the copied constants or algorithms:
 
-- SDMA IP setup: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py` lines 497-556.
+- SDMA IP setup: `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py` lines 497-556.
 - SDMA teardown/reset: `ip.py` lines 524-535 disable the active queue and soft-reset SDMA; repeated native proof runs must perform this before setup because TinyGPU.app server state outlives the probe process.
 - Doorbell aperture setup: `ip.py` lines 30-48 and 515-522.
-- SDMA submit/write-pointer/doorbell flow: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/ops_amd.py` lines 524-560 and queue doorbell lines 679-688.
+- SDMA submit/write-pointer/doorbell flow: `<tinygrad-checkout>/tinygrad/runtime/ops_amd.py` lines 524-560 and queue doorbell lines 679-688.
 - CPU-visible queue allocation shape: `ops_amd.py` lines 875-887 and 1058-1063.
 - SDMA copy packet fields: `ops_amd.py` lines 474-481 and generated packet definitions in `tinygrad/runtime/autogen/am/sdma_6_0_0.py` lines 7-67.
 - SDMA fence packet fields: `sdma_6_0_0.py` lines 232-273 and field helpers around lines 2991-3042.

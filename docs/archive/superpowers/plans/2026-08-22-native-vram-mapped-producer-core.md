@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Use `${HOME}/.pyenv/versions/3.12.8/bin/python3` for Python commands.
+- Use `${PY}` for Python commands.
 - Work only on `feature/native-r9700-producer` in the shared worktree.
 - Require PCI `1002:7551` and `gfx1201` in any hardware evidence.
 - Do not use `MAP_SYSMEM_FD` for model buffers; it remains C0 staging/control only.

@@ -19,8 +19,8 @@ Focused tests in `tests/native_r9700/test_serving.py` cover the C2 fallback/erro
 
 - Initial C2 RED: focused serving suite failed with missing `native_r9700.serving` module/API before wrapper implementation.
 - Review-driven RED: focused suite failed on `test_bad_artifacts_dir_before_acceptance_falls_back_to_native_full_prompt` with `FileExistsError` escaping from `artifacts_dir.mkdir(...)`.
-- Final GREEN: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -v` → `14 passed in 0.09s`.
-- Native Python slice after fixes: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_kv_cache.py tests/native_r9700/test_parity.py tests/native_r9700/test_serving.py -v` → `51 passed, 2 warnings in 4.00s`.
+- Final GREEN: `${PY} -m pytest tests/native_r9700/test_serving.py -v` → `14 passed in 0.09s`.
+- Native Python slice after fixes: `${PY} -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_kv_cache.py tests/native_r9700/test_parity.py tests/native_r9700/test_serving.py -v` → `51 passed, 2 warnings in 4.00s`.
 
 ## Reviewer disposition
 

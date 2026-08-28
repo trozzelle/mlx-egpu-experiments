@@ -54,8 +54,8 @@ A prompt-0 `r9700_native` run produces an atomic valid 16-layer fp16 K/V NPZ wit
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_native_worker_evidence.py tests/native_r9700/test_prefill.py -q
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.kv_cache --prefill-npz <observed-native-prefill.npz> --out <observed-native-prompt-cache.safetensors> --log <observed-kv-cache.log>
+${PY} -m pytest tests/native_r9700/test_native_worker_evidence.py tests/native_r9700/test_prefill.py -q
+${PY} -m native_r9700.kv_cache --prefill-npz <observed-native-prefill.npz> --out <observed-native-prompt-cache.safetensors> --log <observed-kv-cache.log>
 ```
 
 The second command is run only with observed paths emitted by the supervisor-owned native prompt-0 run.
@@ -85,8 +85,8 @@ All Phase-0 prompts have `producer_kind=r9700_native`, `P == R`, valid cache and
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_parity.py -q
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700/test_parity.py -q
+${PY} -m pytest tests/native_r9700 -v
 ```
 
 The supervisor runs the exact native parity commands discovered by this task only after focused tests and review pass.
@@ -117,8 +117,8 @@ Large prompts use the accepted native producer and remain token-exact. Pre-accep
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py tests/test_harness_c2_serving.py -q
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700/test_serving.py tests/test_harness_c2_serving.py -q
+${PY} -m pytest tests/native_r9700 -v
 git diff --check
 ```
 

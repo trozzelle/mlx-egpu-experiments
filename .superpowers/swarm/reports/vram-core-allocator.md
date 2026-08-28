@@ -9,7 +9,7 @@ This boundary consumes only `VramLayout`; it has no TinyGPU or tinygrad imports 
 ## Supervisor GREEN command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_vram_allocator.py -q
+${PY} -m pytest tests/native_r9700/test_vram_allocator.py -q
 ```
 
 Per assignment, no commands or tests were run.

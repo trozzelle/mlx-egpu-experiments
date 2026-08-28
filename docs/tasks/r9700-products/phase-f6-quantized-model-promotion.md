@@ -140,7 +140,7 @@ Stage/executor/cache contracts pass deterministically for all Q1 fixtures; no st
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_text_adapter.py \
   tests/native_r9700/test_qwen_hybrid_state_spill.py \
   tests/native_r9700/test_qwen_layer_executor.py \
@@ -177,7 +177,7 @@ Memory plan fits proven capacity or fails with a precise blocker; no hidden dyna
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_resident_memory_contract.py \
   tests/native_r9700/test_vram_layout.py \
   tests/native_r9700/test_vram_allocator.py \
@@ -216,7 +216,7 @@ Native Qwen artifact is model-bound, hardware-backed, finite, stable, and passes
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_hsa_kernel_assets.py \
   tests/native_r9700/test_qwen_native_stage_sources.py \
   tests/native_r9700/test_qwen_parity.py \
@@ -260,7 +260,7 @@ git diff --check .superpowers/swarm/reports/f6-final-review.md \
 ## Phase validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 ```
 
 Phase completion additionally requires task-set-1 hardware commands, accepted Q1 corpus, B0 C1R/C2R, final review, and `git diff --check`.

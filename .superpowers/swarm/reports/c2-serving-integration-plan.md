@@ -9,7 +9,7 @@
 ## Verified C1R smoke
 Command:
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --producer-model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --prompt-name prompt-0 --threshold-tokens 2 --max-new-tokens 4 --artifacts-dir artifacts/c1r-prefill-smoke --json .superpowers/swarm/reports/c1r-prefill-smoke-result.json --log logs/c1r-prefill-smoke.log --report .superpowers/swarm/reports/c1r-prefill-smoke-report.md
+${PY} -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --producer-model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --prompt-name prompt-0 --threshold-tokens 2 --max-new-tokens 4 --artifacts-dir artifacts/c1r-prefill-smoke --json .superpowers/swarm/reports/c1r-prefill-smoke-result.json --log logs/c1r-prefill-smoke.log --report .superpowers/swarm/reports/c1r-prefill-smoke-report.md
 ```
 Result: exit `0`, `gate_result=pass`, `route=native_producer`, `accepted_cache=true`, decoded tokens `[12366, 13, 578, 469]` match baseline exactly.
 

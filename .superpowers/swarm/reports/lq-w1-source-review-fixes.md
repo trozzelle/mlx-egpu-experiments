@@ -7,7 +7,7 @@
 Focused supervisor command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_qwen_affine4_source.py -q
+${PY} -m pytest tests/native_r9700/test_qwen_affine4_source.py -q
 ```
 
 ## Llama K source test isolation
@@ -17,5 +17,5 @@ The K source ABI contract moved to `tests/native_r9700/test_llama_k_projection_s
 Focused supervisor command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_llama_k_projection_source.py -q
+${PY} -m pytest tests/native_r9700/test_llama_k_projection_source.py -q
 ```

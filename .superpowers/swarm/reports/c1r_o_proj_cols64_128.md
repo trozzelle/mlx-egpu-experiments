@@ -49,10 +49,10 @@ Result: exit 0. Key markers:
 Full log: `logs/c1-runner-primitive-chain-proof-layer0_o_proj_full_inner_cols64_128_tiled_accum_chain-2026-08-21T09:37:56Z.log`.
 
 ## Supervisor verification
-- Focused tests reran locally after agent handoff: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_o_projection_full_inner_cols64_128_fixture_matches_fp32_matmul_oracle tests/native_r9700/test_ref_fixtures.py::test_layer_trace_o_full_inner_projection_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_o_proj_full_inner_cols64_128_tiled_accum_chain tests/native_r9700/test_runtime_contract.py::test_layer0_o_cols64_128_weight_tiles_use_dot2_pair_packing -q` -> `4 passed in 12.42s`.
+- Focused tests reran locally after agent handoff: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_o_projection_full_inner_cols64_128_fixture_matches_fp32_matmul_oracle tests/native_r9700/test_ref_fixtures.py::test_layer_trace_o_full_inner_projection_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_o_proj_full_inner_cols64_128_tiled_accum_chain tests/native_r9700/test_runtime_contract.py::test_layer0_o_cols64_128_weight_tiles_use_dot2_pair_packing -q` -> `4 passed in 12.42s`.
 - Real hardware wrapper reran locally: `build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_o_proj_full_inner_cols64_128_tiled_accum_chain` -> exit `0`, `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `failure_stage: none`; log `logs/c1-runner-primitive-chain-proof-layer0_o_proj_full_inner_cols64_128_tiled_accum_chain-2026-08-21T09:40:23Z.log`.
 - Review gate `C1ROProjReview` found no Critical/Important/Minor issues and accepted the slice for the partial/native-prefill-open boundary.
-- Full native regression after supervisor verification: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> `414 passed, 2 warnings in 1543.01s` (`artifact://4392`).
+- Full native regression after supervisor verification: `${PY} -m pytest tests/native_r9700 -q` -> `414 passed, 2 warnings in 1543.01s` (`artifact://4392`).
 
 ## Remaining blockers
 None for this narrow chain. Broader cols128:2048, fused full-hidden pass, native prefill acceptance, and Qwen remain out of scope/deferred.

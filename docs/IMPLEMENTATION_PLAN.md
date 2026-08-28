@@ -23,7 +23,7 @@
 - Qwen research is separate from Llama acceptance.
 - No TCP/network exposure before a focused transport/security review.
 - No upstream source, translated sequence, firmware, or generated image enters production without manifest provenance, license status, digests, target scope, and local conformance.
-- Use `${HOME}/.pyenv/versions/3.12.8/bin/python3`; do not rely on `python3` from `PATH`.
+- Use `${PY}`; do not rely on `python3` from `PATH`.
 - Keep direct `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra` build conventions; do not introduce a build system without a separate decision.
 
 ## Authority and starting state

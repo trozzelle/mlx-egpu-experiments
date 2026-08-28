@@ -9,7 +9,7 @@ Validation happens before physical allocation or callback activity: an output po
 ## Supervisor GREEN command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_resident_memory_contract.py -q
+${PY} -m pytest tests/native_r9700/test_resident_memory_contract.py -q
 ```
 
 Per assignment, no commands or tests were run.

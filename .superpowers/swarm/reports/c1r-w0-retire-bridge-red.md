@@ -11,11 +11,11 @@ With `NATIVE_R9700_C1_PRIMITIVE_BRIDGE` absent, the active `--native-prefill-pro
 RED (before production cutover):
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k legacy_proof_unavailable -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k legacy_proof_unavailable -q
 ```
 
 GREEN (after production cutover):
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k legacy_proof_unavailable -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k legacy_proof_unavailable -q
 ```

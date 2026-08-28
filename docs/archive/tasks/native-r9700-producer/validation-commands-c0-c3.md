@@ -7,7 +7,7 @@ This file is the shared command ledger for `docs/tasks/native-r9700-producer/`. 
 Use this Python for Python-side validation in this repo:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3
+${PY}
 ```
 
 Do not rely on `python3` from `PATH`.
@@ -17,7 +17,7 @@ For AMD eGPU/tinygrad comparison runs that intentionally use tinygrad:
 ```sh
 DEV=AMD
 JITBEAM=2
-HF_HOME=${HOME}/Development/ml/models
+HF_HOME=<model-root>
 ```
 
 Path C native producer commands must not import or call tinygrad unless explicitly running a comparison/control command outside the producer path.
@@ -27,7 +27,7 @@ Path C native producer commands must not import or call tinygrad unless explicit
 ### Existing Python regression suite
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
+${PY} -m pytest tests -v
 ```
 
 Expected last known result from Phase 0 handoff:
@@ -39,7 +39,7 @@ Expected last known result from Phase 0 handoff:
 ### Existing harness syntax check
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m py_compile tinygrad_kv_worker/harness.py
+${PY} -m py_compile tinygrad_kv_worker/harness.py
 ```
 
 Expected last known result from Phase 0 handoff: exit 0.
@@ -49,8 +49,8 @@ Expected last known result from Phase 0 handoff: exit 0.
 This is a regression/control command for the validated tinygrad producer path, not a Path C native command:
 
 ```sh
-DEV=AMD JITBEAM=2 HF_HOME=${HOME}/Development/ml/models \
-  ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m tinygrad_kv_worker.harness \
+DEV=AMD JITBEAM=2 HF_HOME=<model-root> \
+  ${PY} -m tinygrad_kv_worker.harness \
   --gguf mlx_models/meta-Llama-3.2-1B-Instruct.F16.gguf \
   --mlx mlx_models/meta-Llama-3.2-1B-Instruct \
   --out docs/path-a-validation-results.md \
@@ -68,8 +68,8 @@ Gate PASS; report written to docs/path-a-validation-results.md
 This is the correct macOS visibility check for the existing tinygrad R9700 path. It is a reference/discovery command, not a Path C native producer command: it imports tinygrad to prove the substrate used by the working Phase 0 path.
 
 ```sh
-JITBEAM=2 DEV=AMD PYTHONPATH=${HOME}/Development/ml/tools/tinygrad \
-  ${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "from tinygrad.runtime.support.system import System; from tinygrad import Device; devs=System.list_devices(0x1002, ((0xffff,(0x74a1,0x744c,0x7480,0x7550,0x7551,0x7590,0x75a0)),), None); print('amd_pci_devices', devs); d=Device['AMD']; print('iface', type(d.iface).__name__); print('arch', d.arch); print('pcibus', getattr(d.iface.pci_dev, 'pcibus', None)); print('pci_dev_class', type(d.iface.pci_dev).__name__)"
+JITBEAM=2 DEV=AMD PYTHONPATH=<tinygrad-checkout> \
+  ${PY} -c "from tinygrad.runtime.support.system import System; from tinygrad import Device; devs=System.list_devices(0x1002, ((0xffff,(0x74a1,0x744c,0x7480,0x7550,0x7551,0x7590,0x75a0)),), None); print('amd_pci_devices', devs); d=Device['AMD']; print('iface', type(d.iface).__name__); print('arch', d.arch); print('pcibus', getattr(d.iface.pci_dev, 'pcibus', None)); print('pci_dev_class', type(d.iface.pci_dev).__name__)"
 ```
 
 Observed supervisor result:
@@ -112,7 +112,7 @@ The stale libusb-only command below remains a negative control and must not be u
 This is the no-hardware RED/GREEN contract for `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`. Task set 1 expects RED before production source exists; task set 2 and later must make it green without importing tinygrad or using libusb as the acceptance path.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected RED result before C0B task set 2:
@@ -195,7 +195,7 @@ OMP task executors record this command for the supervisor; they do not run it in
 This split-out implementation plan and task-doc set completed the previous `failure_stage: vm_mapping` blocker. The SDMA follow-up completed the transfer command above; the latest hardware log records `failure_stage: none` and host-device transfer pass evidence.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 After SDMA ring setup/submission is implemented, supervisor reruns the C0B native AMDev/SDMA transfer proof command above and accepts only a real transfer pass or a later precise nonzero blocker.
@@ -262,8 +262,8 @@ Focused primitive tests (green with or without Lane B2's fixtures; skips only
 when the fixture file is absent):
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_primitives.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/native_r9700/test_primitives.py -v
 ```
 
 Expected **current state** (Lane B2 fixtures landed at
@@ -290,7 +290,7 @@ fails closed with the same failure stage and removes the requested NPZ output.
 Supervisor GREEN command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_runtime_contract.py -q
 ```
 
@@ -312,7 +312,7 @@ failure for wrong `rope_scaling`. Qwen3.8-27B is intentionally deferred and not
 part of this command.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_attention_kv.py -v
+cd <former-native-r9700-worktree> && ${PY} -m pytest tests/native_r9700/test_attention_kv.py -v
 ```
 
 Current observed RED before implementation: collection succeeded and the command
@@ -321,8 +321,8 @@ Current observed GREEN after task set 6: command exits `0` with **9 passed**.
 Supervisor CLI smoke:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.attention \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.attention \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --layer 0 \
@@ -347,7 +347,7 @@ emitter safetensors, parity harness wiring, and C++ runtime integration remain
 outside this task set.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py -v
+cd <former-native-r9700-worktree> && ${PY} -m pytest tests/native_r9700/test_prefill.py -v
 ```
 
 Observed RED before implementation: collection succeeded and the focused command
@@ -357,8 +357,8 @@ Observed GREEN after task set 7 plus C1-10 handoff fix: focused command exits
 Supervisor CLI smoke:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.prefill \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.prefill \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --prompt-name prompt-0 \
@@ -373,17 +373,17 @@ and `exit_status: 0`.
 C2 request-token producer smoke:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.prefill \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.prefill \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --token-ids-json '[128000, 791, 6864, 315, 9822, 374]' \
   --out logs/c1-prefill-tokenids-prompt0.npz \
   --log logs/c1-prefill-tokenids-prompt0.log
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.kv_cache \
+${PY} -m native_r9700.kv_cache \
   --prefill-npz logs/c1-prefill-tokenids-prompt0.npz \
   --out logs/c1-tokenids-prompt0-cache.safetensors \
   --log logs/c1-tokenids-kv-cache-prompt0.log
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "from mlx_lm.models.cache import load_prompt_cache; c,m=load_prompt_cache('logs/c1-tokenids-prompt0-cache.safetensors', return_metadata=True); print(len(c), c[0].offset, c[15].offset, m)"
+${PY} -c "from mlx_lm.models.cache import load_prompt_cache; c,m=load_prompt_cache('logs/c1-tokenids-prompt0-cache.safetensors', return_metadata=True); print(len(c), c[0].offset, c[15].offset, m)"
 ```
 
 Observed: prefill exits `0` with `n_prefix=5`, emitter exits `0`, and
@@ -402,7 +402,7 @@ before final cache output. Qwen support, decode/parity-harness wiring, C2
 integration, and C++ runtime integration remain outside this task set.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_kv_cache.py -v
+cd <former-native-r9700-worktree> && ${PY} -m pytest tests/native_r9700/test_kv_cache.py -v
 ```
 
 Observed RED before implementation: collection succeeded and the focused command
@@ -412,12 +412,12 @@ exits `0` with **13 passed**.
 Supervisor CLI smoke:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.kv_cache \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.kv_cache \
   --prefill-npz logs/c1-prefill-prompt0.npz \
   --out logs/c1-prompt0-cache.safetensors \
   --log logs/c1-kv-cache-prompt0.log
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "from mlx_lm.models.cache import load_prompt_cache; c,m=load_prompt_cache('logs/c1-prompt0-cache.safetensors', return_metadata=True); print(len(c), c[0].offset, c[15].offset, m)"
+${PY} -c "from mlx_lm.models.cache import load_prompt_cache; c,m=load_prompt_cache('logs/c1-prompt0-cache.safetensors', return_metadata=True); print(len(c), c[0].offset, c[15].offset, m)"
 ```
 
 Observed: emitter exits `0`; load smoke prints `16 5 5` and metadata
@@ -435,7 +435,7 @@ Path C report section replacement. Qwen support, C2 serving integration, C++
 runtime, and Native R9700/eGPU model-forward parity remain outside this task set.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_parity.py -v
+${PY} -m pytest tests/native_r9700/test_parity.py -v
 ```
 
 Observed RED before implementation: collection succeeded and the focused
@@ -447,8 +447,8 @@ with **16 passed**.
 Final C1 parity CLI shape for supervisor validation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.parity \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.parity \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --r-source both \
@@ -499,8 +499,8 @@ small fallback smoke and routes the two larger prompts through the producer.
 Focused wrapper/behavior tests:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/native_r9700/test_serving.py -v
 ```
 
 Expected RED before task set 2: missing `native_r9700.serving` module/API.
@@ -508,8 +508,8 @@ Expected RED before task set 2: missing `native_r9700.serving` module/API.
 C2 full fixture-suite integration CLI shape:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.serving \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.serving \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --max-new-tokens 4 \
@@ -529,8 +529,8 @@ without altering Path A or C1.
 C2 producer-unavailable fallback CLI shape:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.serving \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.serving \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --producer-model /tmp/native-r9700-missing-producer-model \
   --fixtures-dir tests/native_r9700/fixtures \
@@ -575,9 +575,9 @@ Behavior frozen by task set 1:
 Full native and Python suites after Python code changes:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/native_r9700 -v
+${PY} -m pytest tests -v
 ```
 
 
@@ -610,8 +610,8 @@ Regenerable by command (supervisor runs this; the default `--model` is
 explicitly when `mlx_models/` is absent in this worktree):
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.ref_fixtures \
   --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures
 ```
@@ -624,8 +624,8 @@ when the fixture dir is absent so the focused suite stays green
 independently):
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -v
 ```
 
 Combined focused suite (Lane A2 + Lane B2 — exercises the primitive seam and
@@ -694,8 +694,8 @@ reported as Native R9700 acceptance.
 Fixture generation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.ref_fixtures \
   --generate \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures
@@ -730,12 +730,12 @@ direct COMGR, extracts its raw `.text` and AMDHSA descriptor, and writes
 temporary review artifacts outside the worktree.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 OUT="$(mktemp -d)/task9-gfx1201"
-${HOME}/.pyenv/versions/3.12.8/bin/python3 \
+${PY} \
   experiments/native-r9700-runtime/generate_task9_gfx1201_asset.py \
   --source native_r9700/kernels/task9_probe_gfx1201.s \
-  --tinygrad-root ${HOME}/Development/ml/tools/tinygrad \
+  --tinygrad-root <tinygrad-checkout> \
   --out-dir "$OUT"
 cat "$OUT/task9_probe_gfx1201.json"
 ```
@@ -751,7 +751,7 @@ asset and must not be dispatched as one.
 Focused no-hardware regression:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_toolchain.py -q
 ```
 
@@ -767,7 +767,7 @@ Build and run the source-backed lower-BAR VRAM smoke after its focused
 no-hardware contracts are green:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 mkdir -p build/native-r9700-runtime
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   native_r9700/amdev_packets.cpp native_r9700/runtime_contract.cpp \
@@ -801,7 +801,7 @@ firmware start pair across the C0 replay reset, and uses the direct-PM4 4 KiB
 EOP encoding `0x09`.
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp \
   -o build/native-r9700-runtime/native_amdev_transfer_probe
@@ -819,7 +819,7 @@ Build the complete product closure, then dispatch one binder-selected Llama
 embedding row through the manifest-bound HSA image:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 mkdir -p build/native-r9700-runtime
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   native_r9700/amdev_packets.cpp native_r9700/runtime_contract.cpp \
@@ -854,7 +854,7 @@ re-run fresh with the complete product closure above (now including
 `device_memory.cpp` and the new `prefill_npz.cpp` atomic NPZ serializer):
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 APL_REMOTE_SOCK=${TMPDIR}/tinygpu.sock \
   build/native-r9700-runtime/native_r9700_runner --kernel-proof
 APL_REMOTE_SOCK=${TMPDIR}/tinygpu.sock \

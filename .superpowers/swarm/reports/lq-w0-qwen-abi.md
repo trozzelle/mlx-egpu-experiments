@@ -25,5 +25,5 @@
 ## Supervisor validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_qwen_text_adapter.py tests/native_r9700/test_qwen_hybrid_state_spill.py -q
+${PY} -m pytest tests/native_r9700/test_qwen_text_adapter.py tests/native_r9700/test_qwen_hybrid_state_spill.py -q
 ```

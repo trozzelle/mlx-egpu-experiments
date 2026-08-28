@@ -49,8 +49,8 @@ The classifier is CPU-side-only: it runs on the already-readback bytes and can n
 ## Supervisor validation commands (to run later; NOT run by executors)
 (a) Focused pytest:
 ```
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest 'tests/test_native_amdev_transfer_contract.py::test_compute_readback_classifier_self_test_reports_anomaly' -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest 'tests/test_native_amdev_transfer_contract.py::test_compute_readback_classifier_self_test_reports_anomaly' -v
 ```
 (b) Build:
 ```
@@ -58,8 +58,8 @@ xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700
 ```
 (c) Full focused suite:
 ```
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 ```
 
 ## Forbidden changes avoided

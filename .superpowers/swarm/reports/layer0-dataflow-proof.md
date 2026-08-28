@@ -62,7 +62,7 @@ Per assignment, I did not run tests, linters, formatters, package managers, hard
 Run after review as appropriate:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q
 ```
 
 Optional compile/smoke for this mode:

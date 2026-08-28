@@ -64,7 +64,7 @@ NATIVE_R9700_C1_PRIMITIVE_BRIDGE=build/native-r9700-runtime/native_r9700_primiti
 ```
 
 ## Supervisor verification
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_full_inner_to_cols640_704_chain or layer0_attention_head10_embedded_operands_use_kernel_layouts or layer0_attention_scores_softmax_context_head10_tokens0_5_cols640_704_chain' -q`
+- `${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_full_inner_to_cols640_704_chain or layer0_attention_head10_embedded_operands_use_kernel_layouts or layer0_attention_scores_softmax_context_head10_tokens0_5_cols640_704_chain' -q`
   - Result: exit 0; `3 passed, 121 deselected in 19.36s`.
 - `build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_mlp_down_proj_full_inner_to_cols640_704_tiled_accum_chain`
   - Result: real hardware primitive-chain proof exited 0 with `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `tolerance: fp32_abs<=2e-4_or_ulp<=64`, `max_abs_diff=1.9371509552001953e-06`, `max_ulp_diff=134952`, `mismatch_count=0`, `byte_mismatch_count=478`, and log `logs/c1-runner-primitive-chain-proof-layer0_mlp_down_proj_full_inner_to_cols640_704_tiled_accum_chain-2026-08-20T20:05:44Z.log`.

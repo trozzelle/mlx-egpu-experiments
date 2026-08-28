@@ -24,7 +24,7 @@ This is a reusable C1R boundary only for the known C0A25 minimal `uint32_t add-o
 Focused no-hardware contract:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q
 ```
 
 Result: `8 passed in 5.99s`.

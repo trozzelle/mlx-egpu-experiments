@@ -8,15 +8,15 @@
 
 ## RED
 - Command:
-  `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head8_embedded_operands_use_kernel_layouts tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head8_tokens0_5_cols512_576_chain -q`
+  `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head8_embedded_operands_use_kernel_layouts tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head8_tokens0_5_cols512_576_chain -q`
 - Result before runtime/bridge dispatch was added: failed with unsupported primitive chain `layer0_attention_scores_softmax_context_head8_tokens0_5_cols512_576_chain`; wrapper exit/status path reported `wrapper_exit_status: 2`.
 
 ## GREEN / focused verification
 - Fixture generation command:
-  `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures --generate --model ${HOME}/Development/ml/tools/egpu/.worktrees/tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures`
+  `${PY} -m native_r9700.ref_fixtures --generate --model <tinygrad-kv-worker-worktree>/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures`
   - Result: exited 0; wrote 61 fixture/schema files.
 - Focused tests command:
-  `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head8_embedded_operands_use_kernel_layouts tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head8_tokens0_5_cols512_576_chain -q`
+  `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head8_embedded_operands_use_kernel_layouts tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head8_tokens0_5_cols512_576_chain -q`
   - Result: exited 0; `5 passed in 10.56s`.
 - Bridge compile command:
   `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -o /tmp/native_r9700_c1_bridge_head8_check`
@@ -51,7 +51,7 @@
 ## Suggested supervisor hardware command
 ```bash
 NATIVE_R9700_C1_PRIMITIVE_BRIDGE=build/native-r9700-runtime/native_r9700_primitive_bridge \
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
 tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head8_tokens0_5_cols512_576_chain -q
 ```
 

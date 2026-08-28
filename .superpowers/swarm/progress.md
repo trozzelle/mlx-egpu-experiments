@@ -66,7 +66,7 @@ Waves: W1 = T1+T2 (parallel, disjoint files) → W2 = T3 (amdev_session.cpp) →
 
 ### Shared work boundary
 
-- Checkout: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a`
+- Checkout: `<repo-root>`
 - Branch: `feature/r9700-products-wave-a`
 - Boundary kind: fallback linked worktree created from `main`; every executor/reviewer uses this checkout and branch.
 - TinyGPU source, build, and task authority is the in-repository `tinygpu/` tree on this branch; upstream Tinygrad is read-only Port/Adapt provenance only, and no external TinyGPU checkout or branch is active.

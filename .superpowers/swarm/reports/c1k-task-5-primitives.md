@@ -128,8 +128,8 @@ Focused oracle total: **19 passing**; seam: **4 skipped** when fixtures absent;
 Focused (Lane A2 suite, green independently of Lane B2's fixtures):
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_primitives.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/native_r9700/test_primitives.py -v
 ```
 
 Expected (independently of Lane B2): **19 passed, 4 skipped** — 19 focused
@@ -144,8 +144,8 @@ command now runs all 4 seam comparisons against the real MLX reference tensors
 Combined (after both lanes land, per the C1-1/phase regression guard):
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests -v
 ```
 
 Lane B2 reports the combined `pytest tests/native_r9700` at **57 passed** with

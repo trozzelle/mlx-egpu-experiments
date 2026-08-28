@@ -55,7 +55,7 @@ Non-goals: no AMDev mechanics rewrite, no C++ module extraction, no hardware run
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime_contract.cpp native_r9700/amdev_packets.cpp native_r9700/amdev_session.cpp native_r9700/device_memory.cpp native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner
 ```
 
@@ -89,7 +89,7 @@ Non-goals: do not delete historical logs, build output, or forensic archives; do
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_run_paths.py -q
+${PY} -m pytest tests/native_r9700/test_run_paths.py -q
 git diff --check
 ```
 
@@ -97,7 +97,7 @@ Expected: both commands exit 0.
 
 ## Phase validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py tests/native_r9700/test_run_paths.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py tests/native_r9700/test_run_paths.py -q
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime_contract.cpp native_r9700/amdev_packets.cpp native_r9700/amdev_session.cpp native_r9700/device_memory.cpp native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner
 git diff --check
 ```

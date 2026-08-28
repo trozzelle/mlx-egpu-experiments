@@ -9,7 +9,7 @@
 ## Supervisor GREEN command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_kernel_assets.py -q
+${PY} -m pytest tests/native_r9700/test_kernel_assets.py -q
 ```
 
 ## Verification

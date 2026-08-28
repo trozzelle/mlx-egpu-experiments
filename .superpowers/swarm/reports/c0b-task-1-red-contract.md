@@ -14,10 +14,10 @@ Done. Supervisor verified the no-hardware pytest contract is RED for the expecte
 
 ## Supervisor command
 
-Run from `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`:
+Run from `<former-native-r9700-worktree>`:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ## Expected result before task set 2
@@ -49,5 +49,5 @@ xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra
 
 ## Supervisor verification
 
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `1` with both tests failing at `compile_probe(tmp_path)` on `AssertionError: native transfer probe source missing`.
+- `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `1` with both tests failing at `compile_probe(tmp_path)` on `AssertionError: native transfer probe source missing`.
 - `C0BRedReviewer` verdict: accept; no Critical, Important, or Minor findings.

@@ -14,13 +14,13 @@
 ## Focused supervisor commands
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_native_worker_evidence.py \
   -k 'serve_forever_with_no_registry_delegates_to_build_registry or worker_smoke_mode_accepts_frozen_options_and_closes_one_registry or worker_warm_mode_reuses_one_handle_and_generation_for_ten_prefills' -v
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_serving.py \
   -k 'r9700_native_main_wires_verified_registry_and_session_without_one_shot or semantically_invalid_evidence or declared_zero_prefix' -v
 ```

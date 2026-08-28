@@ -5,7 +5,7 @@ Scope reviewed:
 - `tests/test_native_amdev_transfer_contract.py`
 - `.superpowers/swarm/reports/c0a-compute-task-9-consumption-instrumentation.md`
 
-Reviewer did not run validation, build, lint, git, package-manager, hardware, or test commands. Supervisor verification reported separately: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `19 passed in 25.19s`.
+Reviewer did not run validation, build, lint, git, package-manager, hardware, or test commands. Supervisor verification reported separately: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `19 passed in 25.19s`.
 
 ## Severity counts
 

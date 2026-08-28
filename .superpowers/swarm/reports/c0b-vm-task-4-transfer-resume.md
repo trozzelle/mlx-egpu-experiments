@@ -9,7 +9,7 @@ Superseded by C0B-5 pass evidence. This report remains the historical VM/PTE/TLB
 - Focused pytest command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 - Fresh supervisor result after the Phase 2 source correction: `8 passed in 6.54s`.

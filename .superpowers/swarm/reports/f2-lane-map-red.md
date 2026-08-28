@@ -42,7 +42,7 @@ The binding source is the reviewed F2 freeze in `.superpowers/swarm/reports/f2-c
 After this RED wave, the exact focused contract command is:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_wmma_lane_map_asset.py \
   tests/native_r9700/test_hsa_code_image_generator.py \
   tests/native_r9700/test_hsa_code_image_loader.py -v
@@ -107,7 +107,7 @@ canonical JSON preimage:
 The exact focused RED command for supervisor execution is:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_wmma_lane_map_asset.py \
   tests/native_r9700/test_wmma_lane_map_runner.py -v
 ```

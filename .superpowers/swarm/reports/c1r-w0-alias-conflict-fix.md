@@ -13,13 +13,13 @@ The existing `failure_stage: output_path_conflict` response remains before `std:
 Focused GREEN selector:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q -k native_prefill_proof_rejects_lexically_distinct_output_and_log_path_aliases
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q -k native_prefill_proof_rejects_lexically_distinct_output_and_log_path_aliases
 ```
 
 Full runtime-contract validation:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q
 ```
 
 C++ compile validation:

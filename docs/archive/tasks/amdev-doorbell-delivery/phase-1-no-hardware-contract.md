@@ -11,7 +11,7 @@
 Create the no-hardware diagnostic contract for the MEC doorbell delivery primitive before touching the hardware path. This phase makes `--self-test compute-doorbell-delivery` a source-grounded contract that names the BAR2 doorbell, register reads, classifications, and help entry used by later diagnostic work.
 
 ## Dependencies
-- C0A Compute 15 checkpoint is complete; current branch is `feature/native-r9700-producer` in `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`.
+- C0A Compute 15 checkpoint is complete; current branch is `feature/native-r9700-producer` in `<former-native-r9700-worktree>`.
 - `tests/test_native_amdev_transfer_contract.py` already has `compile_probe(tmp_path)` and `run_self_test(exe, name)` helpers.
 - `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp` already registers no-hardware self-tests in `print_help` and the `--self-test` branch in `main`.
 
@@ -93,8 +93,8 @@ def test_compute_doorbell_delivery_self_test_reports_diagnostic_contract(tmp_pat
 Run exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v
 ```
 
 Expected result for this task set: failure with `subprocess.CalledProcessError` because `--self-test compute-doorbell-delivery` is not registered yet.
@@ -134,8 +134,8 @@ Expected result for this task set: failure with `subprocess.CalledProcessError` 
 Run exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v
 ```
 
 Expected result: pass.
@@ -143,8 +143,8 @@ Expected result: pass.
 Then run exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_help_lists_hardware_modes -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_help_lists_hardware_modes -v
 ```
 
 Expected result: pass.

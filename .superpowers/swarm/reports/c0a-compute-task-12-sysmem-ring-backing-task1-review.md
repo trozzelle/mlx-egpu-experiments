@@ -2,7 +2,7 @@
 
 **Reviewer:** Task1Reviewer
 **Plan:** docs/archive/superpowers/plans/2026-08-17-sysmem-ring-backing-isolation.md, Task 1
-**Worktree:** ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer (branch `feature/native-r9700-producer`)
+**Worktree:** <former-native-r9700-worktree> (branch `feature/native-r9700-producer`)
 **Read-only review.** No build/test/git/hardware executed.
 
 ## Severity counts

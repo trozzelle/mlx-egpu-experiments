@@ -16,6 +16,7 @@ from __future__ import annotations
 import importlib
 import json
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -23,7 +24,7 @@ import numpy as np
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_PYTHON = "${HOME}/.pyenv/versions/3.12.8/bin/python3"
+_PYTHON = sys.executable
 _EXPECTED_NUM_LAYERS = 16
 _EXPECTED_N_KV_HEADS = 8
 _EXPECTED_HEAD_DIM = 64

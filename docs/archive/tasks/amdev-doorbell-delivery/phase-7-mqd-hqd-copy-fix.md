@@ -5,7 +5,7 @@
 - Hardware report: `.superpowers/swarm/reports/c0a-compute-task-9-consumption-hardware.md`.
 - Decision report: `.superpowers/swarm/reports/c0a-compute-task-9-consumption-decision.md`.
 - Decision review: `.superpowers/swarm/reports/c0a-compute-task-9-consumption-decision-review.md`.
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 
 ## Selected lane
 - `selected_lane: mqd_hqd_copy_fix`
@@ -40,7 +40,7 @@ Add this exact expected self-test line to `EXPECTED_COMPUTE_MQD_ENCODING_LINES`:
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_mqd_encoding_self_test_reports_hqd_contract -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_mqd_encoding_self_test_reports_hqd_contract -v
 ```
 
 Expected RED result: fail until the C++ self-test exposes or corrects the exact value.
@@ -64,7 +64,7 @@ The focused MQD encoding self-test emits `hqd_copy_expect_cp_hqd_pq_control: 0x1
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ## Task set 4: Hardware proof

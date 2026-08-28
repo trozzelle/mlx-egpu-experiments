@@ -1,7 +1,7 @@
 # C1 final width 1856:2048 MLP + attention primitive chains
 
 ## Scope
-- Worktree: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`.
+- Worktree: `<former-native-r9700-worktree>`.
 - Branch: `feature/native-r9700-producer`.
 - Added final bounded Llama layer0 MLP down full-inner bands: cols1856:1920, cols1920:1984, cols1984:2048.
 - Added final integrated attention scores->softmax->context chains: head29 cols1856:1920 kv_head7, head30 cols1920:1984 kv_head7, head31 cols1984:2048 kv_head7.
@@ -22,19 +22,19 @@
 
 ## Verification
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m py_compile native_r9700/ref_fixtures.py tests/native_r9700/test_ref_fixtures.py tests/native_r9700/test_runtime_contract.py
+${PY} -m py_compile native_r9700/ref_fixtures.py tests/native_r9700/test_ref_fixtures.py tests/native_r9700/test_runtime_contract.py
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/c1_primitive_bridge_final_c1_check
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner
 ```
 Result: all exited `0` with no compiler output.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py tests/native_r9700/test_runtime_contract.py -q -k 'final_mlp_down_bands or final_attention_heads or 1856 or 1920 or 1984 or 2048 or head29 or head30 or head31'
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py tests/native_r9700/test_runtime_contract.py -q -k 'final_mlp_down_bands or final_attention_heads or 1856 or 1920 or 1984 or 2048 or head29 or head30 or head31'
 ```
 Result after review fix: `22 passed, 280 deselected in 98.78s`.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q
+${PY} -m pytest tests/native_r9700 -q
 ```
 Result after review fix: `411 passed, 2 warnings in 1283.19s` (`artifact://4307`).
 
@@ -56,11 +56,11 @@ Detailed runtime wrapper evidence after review fix: `logs/c1-final-c1-width-wrap
 - Added `--layer0-full-hidden-proof` aggregation for the current full-width proof-only boundary: 32 integrated attention heads/context bands plus 32 MLP down full-inner output bands.
 - The command still exits `1` by design and reports `layer0_full_hidden_proof_wrapper_status: blocked`, `native_prefill_acceptance: open`, `full_layer0_acceptance: blocked`, and `failure_stage: layer0_full_width_dataflow_not_fused`; this does not claim fused layer0 hardware dataflow or native prefill acceptance.
 - Root cause fixed during hardware verification: generated attention-context bridge constants for heads2:28 still emitted stale `layer_trace_fixtures.npz` SHA values from earlier fixture-generation batches even though the hardware outputs passed CPU comparison. Normalized those bridge fixture-hash constants to the current archive SHA `a28fca99ccc4b9eaf25226258496f21167b76b0c208dad7fdb6aa34bf794ca96`.
-- Focused contract: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_full_hidden_proof_wraps_available_components_without_claiming_prefill -q` -> `1 passed in 260.85s`.
+- Focused contract: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_full_hidden_proof_wraps_available_components_without_claiming_prefill -q` -> `1 passed in 260.85s`.
 - Real aggregate proof: `build/native-r9700-runtime/native_r9700_runner --layer0-full-hidden-proof` exited `1` as expected after all 64 component wrappers passed; evidence log `logs/c1-runner-layer0-full-hidden-proof-2026-08-21T07:45:57Z.log`.
 - Representative stale-hash repair checks for heads2, 9, and 28 returned `0` with `primitive_chain_proof_wrapper_status: pass` before rerunning the full aggregate.
 - Review fix: removed dead stale fixture-SHA rewrites from the fake-bridge attention marker generators so required lines inherit the current shared `layer_trace_fixtures.npz` hash. Focused full-hidden contract reran after this fix: `1 passed in 261.56s`.
-- Reviewer re-check after the cleanup found no remaining Critical/Important blockers. Fresh full native regression after the cleanup: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> `411 passed, 2 warnings in 1540.99s` (`artifact://4349`).
+- Reviewer re-check after the cleanup found no remaining Critical/Important blockers. Fresh full native regression after the cleanup: `${PY} -m pytest tests/native_r9700 -q` -> `411 passed, 2 warnings in 1540.99s` (`artifact://4349`).
 
 ## Review gate
 - `C1CompleteReview` found Important blockers before acceptance: head29:31 bridge context stage ranges were copied from the previous 1792:1856 band, final attention runtime/test fake metrics were stale, and the shared future-attention runtime wrapper branch did not validate per-head metrics or context stage ranges.

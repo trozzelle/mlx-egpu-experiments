@@ -55,8 +55,8 @@ Agents update only their row and append evidence/notes as work completes.
 Executor records this exact supervisor command; executor does not run it in OMP task mode:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected intermediate result depends on whether Task set 2 has implemented the C++ self-test; RED is acceptable until the self-test exists.
@@ -87,8 +87,8 @@ Expected intermediate result depends on whether Task set 2 has implemented the C
 Executor records these exact supervisor commands; executor does not run them in OMP task mode:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ```sh

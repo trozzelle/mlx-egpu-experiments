@@ -139,20 +139,16 @@ bool derive_vram_layout(uint32_t rcc_config_memsize, uint64_t bar0_bytes,
     }
   }
 
-  // MIT source provenance: tinygrad (MIT License),
-  // ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/amdev.py:279-296
-  // defines VRAM as `rreg(mmRCC_CONFIG_MEMSIZE) << 20` and identifies large BAR
-  // coverage as `vram.nbytes >= vram_size`.
-  // MIT source provenance: tinygrad (MIT License),
-  // ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/amdev.py:202-205
-  // passes `vram_size - reserved_vram_size`, `boot_size=(32 << 20)`, and
-  // `reserve_ptable=not large_bar`.
-  // MIT source provenance: tinygrad (MIT License),
-  // ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/amdev.py:320
-  // sets gfx12's tail reservation to `64 << 20`.
-  // MIT source provenance: tinygrad (MIT License),
-  // ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/memory.py:175-184
-  // creates the small-BAR table arena after boot, then physical payload after it.
+  // MIT source provenance: tinygrad revision
+  // d851aca9ae1faf4210cc0da4508bead7da57d7ee,
+  // tinygrad/runtime/support/am/amdev.py:279-296 defines VRAM as
+  // `rreg(mmRCC_CONFIG_MEMSIZE) << 20` and identifies large BAR coverage as
+  // `vram.nbytes >= vram_size`.
+  // amdev.py:202-205 passes `vram_size - reserved_vram_size`,
+  // `boot_size=(32 << 20)`, and `reserve_ptable=not large_bar`.
+  // amdev.py:320 sets gfx12's tail reservation to `64 << 20`.
+  // tinygrad/runtime/support/memory.py:175-184 creates the small-BAR table
+  // arena after boot, then physical payload after it.
   *layout = VramLayout{
       vram_bytes,
       kDiscoveryReservedBytes,

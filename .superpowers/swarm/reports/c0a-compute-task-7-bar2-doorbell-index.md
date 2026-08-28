@@ -1,9 +1,9 @@
 contract_name: bar2_mec_doorbell_index_value
 source_refs:
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/am.py:3388: generic AMDGPU_DOORBELL_ASSIGNMENT has AMDGPU_DOORBELL_MEC_RING0 := 16; this would contradict index 3 if this family applies.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/am.py:3390: AMDGPU_NAVI10_DOORBELL_ASSIGNMENT has AMDGPU_NAVI10_DOORBELL_MEC_RING0 := 3.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/am.py:3391: AMDGPU_DOORBELL64_ASSIGNMENT has AMDGPU_DOORBELL64_MEC_RING0 := 3.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/am.py:3392: AMDGPU_DOORBELL_ASSIGNMENT_LAYOUT1 has MEC_RING_START := 8 and MEC_RING_END := 15; this would contradict index 3 if this family applies.
+  - <tinygrad-checkout>/tinygrad/runtime/autogen/am/am.py:3388: generic AMDGPU_DOORBELL_ASSIGNMENT has AMDGPU_DOORBELL_MEC_RING0 := 16; this would contradict index 3 if this family applies.
+  - <tinygrad-checkout>/tinygrad/runtime/autogen/am/am.py:3390: AMDGPU_NAVI10_DOORBELL_ASSIGNMENT has AMDGPU_NAVI10_DOORBELL_MEC_RING0 := 3.
+  - <tinygrad-checkout>/tinygrad/runtime/autogen/am/am.py:3391: AMDGPU_DOORBELL64_ASSIGNMENT has AMDGPU_DOORBELL64_MEC_RING0 := 3.
+  - <tinygrad-checkout>/tinygrad/runtime/autogen/am/am.py:3392: AMDGPU_DOORBELL_ASSIGNMENT_LAYOUT1 has MEC_RING_START := 8 and MEC_RING_END := 15; this would contradict index 3 if this family applies.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:103: native kernel architecture is gfx1201.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:298-300: kMecDoorbellIndex = 3U, with the current native comment citing am.py:3390 NAVI10 MEC_RING0; kMecDoorbellBar2ByteOffset = kMecDoorbellIndex * sizeof(uint64_t), i.e. 0x18.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:386: kPm4DispatchDwordCount = 59U.

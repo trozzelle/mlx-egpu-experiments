@@ -18,7 +18,7 @@ Run one real prefill smoke scenario against the intended interface:
 4. If usable, move to C2 worker/serving integration.
 
 ## Smoke result
-- Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --producer-model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --prompt-name prompt-0 --threshold-tokens 2 --max-new-tokens 4 --artifacts-dir artifacts/c1r-prefill-smoke --json .superpowers/swarm/reports/c1r-prefill-smoke-result.json --log logs/c1r-prefill-smoke.log --report .superpowers/swarm/reports/c1r-prefill-smoke-report.md`
+- Command: `${PY} -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --producer-model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --prompt-name prompt-0 --threshold-tokens 2 --max-new-tokens 4 --artifacts-dir artifacts/c1r-prefill-smoke --json .superpowers/swarm/reports/c1r-prefill-smoke-result.json --log logs/c1r-prefill-smoke.log --report .superpowers/swarm/reports/c1r-prefill-smoke-report.md`
 - Result: exit `0`, `gate_result=pass`, `route=native_producer`, `accepted_cache=true`.
 - Decode check: prompt `prompt-0`, `S=6`, `n_prefix=5`, decoded tokens `[12366, 13, 578, 469]` exactly matched `baseline_r_tokens.json`.
 - Prefill artifact: `artifacts/c1r-prefill-smoke/prompt-0.prefill.npz`, `producer_kind=cpu_reference`, `num_layers=16`, fp16 K/V shape `(1, 8, 5, 64)`.

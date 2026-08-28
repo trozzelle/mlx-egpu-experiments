@@ -3,7 +3,7 @@
 **Date:** 2026-08-24  
 **Status:** Approved design  
 **Baseline:** `feature/native-r9700-producer` at `512a58a`  
-**Reference analysis:** `${HOME}/Downloads/ChatGPT-Diagnose R9700 Mapping Issues-20260824-1908.pdf`
+**Reference analysis:** `<reference-analysis>`
 
 ## Goal
 

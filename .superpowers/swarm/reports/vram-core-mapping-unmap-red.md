@@ -17,7 +17,7 @@ The existing successful rollback and successful `release_all()` probes remain un
 ## Supervisor RED command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_resident_memory_contract.py -q
+${PY} -m pytest tests/native_r9700/test_resident_memory_contract.py -q
 ```
 
 ## Intended RED state

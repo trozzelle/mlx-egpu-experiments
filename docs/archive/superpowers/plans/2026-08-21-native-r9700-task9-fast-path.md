@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Use `${HOME}/.pyenv/versions/3.12.8/bin/python3`; never `python3` from PATH.
+- Use `${PY}`; never `python3` from PATH.
 - Target Llama 3.2 1B fp16 first: 16 layers, 8 KV heads, head dim 64.
 - `r9700_native` accepts only real R9700 model-forward work. CPU may validate/serialize/compare but never provides accepted tensor math.
 - Preserve S-1 cache semantics: producer owns prefix K/V; mlx-lm receives only the final prompt token.

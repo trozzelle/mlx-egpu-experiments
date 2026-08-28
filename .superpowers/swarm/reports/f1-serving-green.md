@@ -20,7 +20,7 @@ Updated only `native_r9700/serving.py` and this report. The existing one-shot su
 ## Focused supervisor command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -v
+${PY} -m pytest tests/native_r9700/test_serving.py -v
 ```
 
 Per assignment, this worker did not run tests, builds, linters, formatters, package managers, hardware commands, or git operations. The supervisor owns focused validation and the combined F1 gate.

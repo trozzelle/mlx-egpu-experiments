@@ -20,11 +20,11 @@ The alternate geometry fixture was corrected from invalid `workgroup_x=64/global
 ## Supervisor verification
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py -q
 # 18 passed
 
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_kernel_pack_manifest.py -q
 # 133 passed

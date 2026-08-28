@@ -10,6 +10,7 @@ import importlib
 import json
 import struct
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -26,18 +27,13 @@ from native_r9700.qwen_text_adapter import (
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_PYTHON = "${HOME}/.pyenv/versions/3.12.8/bin/python3"
+_PYTHON = sys.executable
 _QWEN_MANIFEST = _REPO_ROOT / "docs" / "upstream-reference-manifest.yaml"
 _FROZEN_MODEL_FINGERPRINT = (
     "4304f20a69213c8f0620ab7388163dd58b324278679d94c5915f279438d1b371"
 )
 _FROZEN_BASE_MODEL_REVISION = "unavailable_in_pinned_conversion_metadata"
 _FROZEN_MODEL_REVISION = "3e6447f082e89cc7f0bc6e5441afd38dfce760ff"
-CANONICAL_SNAPSHOT = (
-    "${HOME}/Development/ml/models/hub/"
-    "models--mlx-community--Qwen3.8-27B-4bit/snapshots/"
-    "3e6447f082e89cc7f0bc6e5441afd38dfce760ff"
-)
 QWEN_BINDER_HEADER = Path("native_r9700/qwen_weight_binder.h")
 QWEN_BINDER_SOURCE = Path("native_r9700/qwen_weight_binder.cpp")
 NATIVE_INCLUDE_DIR = Path("native_r9700")
@@ -1098,8 +1094,11 @@ def load_selected_adapter():
 
 
 def test_selected_snapshot_path_is_the_canonical_qwen_text_source() -> None:
-    """The adapter is pinned to the reviewed local Qwen snapshot, not a fallback."""
-    assert CANONICAL_QWEN_TEXT_SNAPSHOT == CANONICAL_SNAPSHOT
+    """The adapter is pinned by repository identity and immutable revision."""
+    snapshot = Path(CANONICAL_QWEN_TEXT_SNAPSHOT)
+    assert snapshot.name == _FROZEN_MODEL_REVISION
+    assert snapshot.parent.name == "snapshots"
+    assert snapshot.parent.parent.name == "models--mlx-community--Qwen3.8-27B-4bit"
 
 
 def test_adapter_reads_qwen_geometry_from_nested_text_config() -> None:

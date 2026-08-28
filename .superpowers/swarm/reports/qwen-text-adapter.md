@@ -38,5 +38,5 @@ boundaries.
 Per task constraint, no commands were run. The existing selector remains:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_qwen_text_adapter.py -q
+${PY} -m pytest tests/native_r9700/test_qwen_text_adapter.py -q
 ```

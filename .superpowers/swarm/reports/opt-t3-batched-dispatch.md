@@ -29,7 +29,7 @@ Private member of `ResidentHsaSession`; declared in the private section of `nati
 # Full runner build
 # Expected: exit 0
 
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 $PY -m pytest tests/test_native_amdev_transfer_contract.py -q
 $PY -m pytest tests/native_r9700/test_layer0_executor_contract.py -q
 ```

@@ -17,7 +17,7 @@
 Focused supervisor command (not run by this worker):
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -v
+${PY} -m pytest tests/native_r9700/test_serving.py -v
 ```
 
 Per assignment, no tests, builds, linters, formatters, package commands, or production commands were run here.

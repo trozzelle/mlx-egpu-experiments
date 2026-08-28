@@ -26,7 +26,7 @@ Observed `logs/f1-persistent-worker/process-smoke/result.json`:
 ## Acceptance gate
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_vram_layout.py \
   tests/native_r9700/test_dynamic_page_table_contract.py \
   tests/native_r9700/test_resident_memory_contract.py \

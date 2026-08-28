@@ -1,9 +1,9 @@
 # P1 task set 2 cold lifecycle implementation
 
 **Owner:** `P1ColdLifecycle`  
-**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
-**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
-**Evidence checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)  
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `<former-tinygpu-worktree>` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `<repo-root>/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `<repo-root>/tinygpu/build/`.
+**Evidence checkout:** `<repo-root>` (`feature/r9700-products-wave-a`)
 **Scope:** task-set-2 cold lifecycle, structured capabilities/health boundary, source/package cutover, and the first common conformance client.  
 **Validation status:** no build, test, formatter, linter, package-manager, install, signing, or hardware command was run by this agent.
 
@@ -105,7 +105,7 @@ The baseline `NewUserClient` analyzer finding is addressed using the DriverKit o
 Supervisor should run the frozen host coordinator contract from the TinyGPU installer directory:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   TinyGPUDriverExtension/TGPUColdLifecycle.cpp \
   Conformance/tests/test_tgpu_cold_lifecycle.cpp \
@@ -119,20 +119,20 @@ The selected toolchain/build/install gate and fixed target are:
 ```sh
 xcode-select -p
 xcrun --sdk driverkit --show-sdk-version
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TGPUConformanceClient -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
+  CONFIGURATION_BUILD_DIR=<repo-root>/tinygpu/build/Debug
 ./install_nosip.sh
 ```
 
 The direct cold command is:
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+<repo-root>/tinygpu/build/Debug/tgpu-conformance-client \
   cold-lifecycle --service org.tinygrad.tinygpu.driver2 \
   --pci-id 1002:7551 --architecture gfx1201 \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/cold-lifecycle.log
+  --log <repo-root>/logs/p1-tinygpu-owner/cold-lifecycle.log
 ```
 
 The supervisor must inspect the bounded log and verify fresh DEXT attach, all six ordered stages, `abi_major: 1`, `abi_minor: 0`, exact PCI/architecture identity, ready health, and `exit_status: 0`. A missing SDK, DEXT, entitlement, firmware input, or physical R9700 is a blocked prerequisite, never a pass and never a reason to use the historical proxy.

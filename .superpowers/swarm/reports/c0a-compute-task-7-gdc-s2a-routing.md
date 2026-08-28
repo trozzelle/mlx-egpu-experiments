@@ -1,9 +1,9 @@
 contract_name: gdc_s2a_doorbell_routing
 
 source_refs:
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:37-38 clears `strap_no_soft_reset_dev0_f2` on non-NBIO 7.9 hardware and enables `regRCC_DEV0_EPF0_RCC_DOORBELL_APER_EN`.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:42-48 builds/writes `regGDC_S2A0_S2A_DOORBELL_ENTRY_{port}_CTRL` on gfx12 using enable, AWID, `awaddr_31_28_value`, range offset, and range size fields.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:271-273 programs gfx12 compute routes for port 0 AWID `0x3` and port 3 AWID `0x6`, both with `awaddr_31_28_value=0x3`.
+  - <tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:37-38 clears `strap_no_soft_reset_dev0_f2` on non-NBIO 7.9 hardware and enables `regRCC_DEV0_EPF0_RCC_DOORBELL_APER_EN`.
+  - <tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:42-48 builds/writes `regGDC_S2A0_S2A_DOORBELL_ENTRY_{port}_CTRL` on gfx12 using enable, AWID, `awaddr_31_28_value`, range offset, and range size fields.
+  - <tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:271-273 programs gfx12 compute routes for port 0 AWID `0x3` and port 3 AWID `0x6`, both with `awaddr_31_28_value=0x3`.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:548-552 defines `encode_s2a_doorbell_entry(awid, awaddr_31_28, range_offset=0, range_size=0)` as enable bit plus AWID, optional range fields, and `awaddr_31_28 << 28`.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:2734-2737 names the native NBIF route registers: BAR2 aperture enable, GDC S2A entry 0, GDC S2A entry 3, and EPF2 strap2.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:3686-3714 clears the EPF2 no-soft-reset strap, enables the BAR2 doorbell aperture, writes entry 0 with `encode_s2a_doorbell_entry(0x3U, 0x3U)`, and writes entry 3 with `encode_s2a_doorbell_entry(0x6U, 0x3U)`.

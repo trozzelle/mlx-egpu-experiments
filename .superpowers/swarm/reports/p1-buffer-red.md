@@ -2,14 +2,14 @@
 
 **Status:** RED contract written; not executed by this agent  
 **Owner:** P1 task set 3 buffer/VA and per-client ownership  
-**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
-**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
-**Evidence boundary:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `<former-tinygpu-worktree>` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `<repo-root>/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `<repo-root>/tinygpu/build/`.
+**Evidence boundary:** `<repo-root>` (`feature/r9700-products-wave-a`)
 
 ## Changed files
 
-- `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner/extra/usbgpu/tbgpu/installer/Conformance/tests/tgpu_resource_table_contract.cpp`
-- `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/.superpowers/swarm/reports/p1-buffer-red.md`
+- `<former-tinygpu-worktree>/extra/usbgpu/tbgpu/installer/Conformance/tests/tgpu_resource_table_contract.cpp`
+- `<repo-root>/.superpowers/swarm/reports/p1-buffer-red.md`
 
 No DriverKit, user-client, runtime, packaging, conformance-client, or existing `tests/native_r9700/` production/test file was changed. The named native R9700 tests do not exercise the TinyGPU user-client boundary, so this contract is placed in the existing TinyGPU conformance-test location requested by the task packet.
 
@@ -80,7 +80,7 @@ The test derives status values independently from the frozen TGPU ABI v1.0 (`OK=
 Run from the TinyGPU installer directory after the task-set-2 client source remains untouched:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TinyGPUResourceTable.cpp \

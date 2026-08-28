@@ -57,7 +57,7 @@
 Executor did not run validation per task constraints. Supervisor should run the focused no-hardware pytest exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree> && ${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Supervisor should then run the exact `--kernel-proof` hardware command from `docs/tasks/native-r9700-producer/validation-commands.md` lines 144-152:
@@ -84,7 +84,7 @@ Because the shared fixed-VM setup helper was touched while preserving `--transfe
 Initial focused no-hardware pytest before review:
 
 ```text
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 pytest: 17 passed in 16.60s
 ```
 
@@ -131,7 +131,7 @@ Minor fixes:
 Focused no-hardware pytest:
 
 ```text
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 pytest: 17 passed in 16.62s
 ```
 

@@ -7,8 +7,8 @@ Status: **Done**.
 Producer-unavailable fallback smoke:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.serving \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.serving \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --producer-model /tmp/native-r9700-missing-producer-model \
   --fixtures-dir tests/native_r9700/fixtures \
@@ -26,8 +26,8 @@ Output: `C2 serving status=pass prompts=1`.
 Full fixture-suite integration/report:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.serving \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.serving \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --max-new-tokens 4 \

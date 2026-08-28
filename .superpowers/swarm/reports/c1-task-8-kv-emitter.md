@@ -63,7 +63,7 @@ No pytest, formatter, linter, package-manager, hardware, or git commands were ru
 ## Supervisor validation commands to run
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_kv_cache.py -v
+${PY} -m pytest tests/native_r9700/test_kv_cache.py -v
 ```
 
 After C1-10 log-boundary fix, supervisor observed this command exiting `0`

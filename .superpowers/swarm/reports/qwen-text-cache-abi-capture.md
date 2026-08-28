@@ -3,7 +3,7 @@
 ## Target
 
 ```text
-${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
+<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
 ```
 
 Text-only. No Qwen3VL processor, image token, or video token entered the run.
@@ -11,7 +11,7 @@ Text-only. No Qwen3VL processor, image token, or video token entered the run.
 ## Command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 logs/qwen_cache_capture.py
+${PY} logs/qwen_cache_capture.py
 ```
 
 The probe loaded the selected local snapshot through installed `mlx-lm 0.31.3`, used

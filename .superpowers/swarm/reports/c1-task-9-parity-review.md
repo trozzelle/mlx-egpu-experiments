@@ -28,12 +28,12 @@ Evidence cited by reviewer:
 ## Supervisor verification after fixes
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_parity.py -v
+${PY} -m pytest tests/native_r9700/test_parity.py -v
 # pytest: 16 passed in 0.08s
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.parity --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --r-source both --max-new-tokens 4 --artifacts-dir logs/c1-parity --json logs/c1-parity/result.json --log logs/c1-parity/run.log --report docs/path-a-validation-results.md
+${PY} -m native_r9700.parity --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --r-source both --max-new-tokens 4 --artifacts-dir logs/c1-parity --json logs/c1-parity/result.json --log logs/c1-parity/run.log --report docs/path-a-validation-results.md
 # C1 parity gate_result=pass prompts=3
 ```
 
@@ -42,12 +42,12 @@ Blocked CLI smoke with missing model: returncode 2; JSON gate_result blocked; re
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 # pytest: 100 passed, 2 warnings in 9.46s
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
+${PY} -m pytest tests -v
 # pytest: 140 passed, 2 warnings in 42.61s
 ```
 

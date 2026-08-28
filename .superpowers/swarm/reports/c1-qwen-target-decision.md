@@ -12,7 +12,7 @@ C1 remains the Llama-3.2-1B-Instruct fp16 parity gate. This is not a silent omis
 
 Local candidate:
 
-`${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff`
+`<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff`
 
 Directory contents include `config.json`, `README.md`, `model.safetensors.index.json`, tokenizer/processor config files, chat template, and three safetensors shards.
 
@@ -78,7 +78,7 @@ No production code change was needed: `native_r9700.config.load_config_from_json
 Focused Qwen loader command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_loader.py -v
+${PY} -m pytest tests/native_r9700/test_loader.py -v
 ```
 
 Result before review: `20 passed in 0.14s`; reviewer independently reran the same focused command and reported 20 tests passed.
@@ -86,9 +86,9 @@ Result before review: `20 passed in 0.14s`; reviewer independently reran the sam
 Goal-wide verification after Qwen closure update:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.parity --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --r-source both --max-new-tokens 4 --artifacts-dir logs/c1-parity --json logs/c1-parity/result.json --log logs/c1-parity/run.log --report docs/path-a-validation-results.md
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --max-new-tokens 4 --threshold-tokens 128 --producer-timeout-s 300 --artifacts-dir logs/c2-serving --json logs/c2-serving/result.json --log logs/c2-serving/run.log --report docs/path-a-validation-results.md
+${PY} -m pytest tests -v
+${PY} -m native_r9700.parity --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --r-source both --max-new-tokens 4 --artifacts-dir logs/c1-parity --json logs/c1-parity/result.json --log logs/c1-parity/run.log --report docs/path-a-validation-results.md
+${PY} -m native_r9700.serving --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --max-new-tokens 4 --threshold-tokens 128 --producer-timeout-s 300 --artifacts-dir logs/c2-serving --json logs/c2-serving/result.json --log logs/c2-serving/run.log --report docs/path-a-validation-results.md
 ```
 
 Results: full test suite `160 passed, 2 warnings in 42.97s`; C1 parity printed `C1 parity gate_result=pass prompts=3`; C2 serving printed `C2 serving status=pass prompts=3`.

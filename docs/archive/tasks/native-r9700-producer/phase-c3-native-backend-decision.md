@@ -184,7 +184,7 @@ Non-goals: no full backend platform, no larger model, no removal of imported-cac
 ### Validation
 
 - Use exact C3 prototype command recorded in `validation-commands.md` by task set 2/4.
-- Existing guard if Python tests are touched: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v`.
+- Existing guard if Python tests are touched: `${PY} -m pytest tests -v`.
 
 ## Task set 5: Prototype comparison and report
 
