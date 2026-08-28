@@ -28,7 +28,7 @@ Implementation:
   `kC1Fp16ToFp32KernelText` unnoticed.
 
 RED evidence:
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_proof_wraps_supplied_bridge_and_logs_fp16_to_fp32_cast -q` initially failed because `RuntimeSession::primitive_proof` rejected `fp16_to_fp32_cast` as unsupported.
+- `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_proof_wraps_supplied_bridge_and_logs_fp16_to_fp32_cast -q` initially failed because `RuntimeSession::primitive_proof` rejected `fp16_to_fp32_cast` as unsupported.
 
 Verification:
 - `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -o build/native-r9700-runtime/native_r9700_primitive_bridge` -> exit 0.
@@ -50,10 +50,10 @@ Verification:
   - exit 0
   - log: `logs/c1-runner-primitive-proof-fp32_add_scalar-2026-08-19T12:27:20Z.log`
   - key markers: `primitive_backend: hardware`, `kernel_blob_load_status: pass`, `kernarg_write_status: pass`, `kernel_launch_status: pass`, `sdma_h2d_status: pass`, `sdma_d2h_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `mismatch_count: 0`, `primitive_proof_wrapper_status: pass`, `wrapper_exit_status: 0`.
-- Review-fix digest regression: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_kernel_sha_matches_embedded_text -q` -> 1 passed in 0.03s.
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q` -> 19 passed in 18.90s.
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> 138 passed, 2 warnings in 23.35s.
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -q` -> 178 passed, 2 warnings in 57.04s.
+- Review-fix digest regression: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_kernel_sha_matches_embedded_text -q` -> 1 passed in 0.03s.
+- `${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q` -> 19 passed in 18.90s.
+- `${PY} -m pytest tests/native_r9700 -q` -> 138 passed, 2 warnings in 23.35s.
+- `${PY} -m pytest tests -q` -> 178 passed, 2 warnings in 57.04s.
 - `git diff --check native_r9700/runtime.h native_r9700/runtime.cpp native_r9700/runner.cpp native_r9700/c1_primitive_bridge.cpp tests/native_r9700/test_runtime_contract.py docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/reports/c1r-task-6-fp16-cast.md .superpowers/swarm/reports/c1r-task-6-review.md` -> exit 0.
 - Review gates: `agent://C1R6Review` returned one P2 finding; fix landed. `agent://C1R6ReReview` approved with no findings.
 

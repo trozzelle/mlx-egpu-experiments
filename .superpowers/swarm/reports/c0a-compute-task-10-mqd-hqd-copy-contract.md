@@ -11,7 +11,7 @@ red_expected_line: hqd_copy_expect_cp_hqd_pq_control: 0x1000050c
 
 Supervisor RED command:
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_mqd_encoding_self_test_reports_hqd_contract -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_mqd_encoding_self_test_reports_hqd_contract -v
 ```
 
 Supervisor RED result: failed as expected before implementation.

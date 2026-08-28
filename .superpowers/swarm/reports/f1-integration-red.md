@@ -51,7 +51,7 @@ Before task-set-4 cutover, the worker module lacks the public service loop/dispa
 The supervisor owns RED/GREEN execution and should run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_native_worker_evidence.py \
   tests/native_r9700/test_serving.py \
   tests/native_r9700/test_kv_cache.py \

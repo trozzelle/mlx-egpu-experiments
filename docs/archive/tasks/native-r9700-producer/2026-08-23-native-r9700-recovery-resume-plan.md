@@ -6,12 +6,12 @@
 
 **Architecture:** Phase 0 recovers stock AMDev discovery (current blocker). Phase 1 re-proves the native C0 queue control. Phase 2 re-baselines the bounded numerical traces. Phase 3 repairs RMSNorm with a source-grounded hypothesis and a hardware-free failing contract first. Phases 4–7 run the numerical recurrence and acceptance gates that were blocked on RMSNorm.
 
-**Tech Stack:** macOS TinyGPU.app / `APLRemotePCIDevice` / `PCIIface`; pinned Python `${HOME}/.pyenv/versions/3.12.8/bin/python3`; `xcrun --sdk macosx clang++ -std=c++17`; pytest (hardware-free) for contracts.
+**Tech Stack:** macOS TinyGPU.app / `APLRemotePCIDevice` / `PCIIface`; pinned Python `${PY}`; `xcrun --sdk macosx clang++ -std=c++17`; pytest (hardware-free) for contracts.
 
 ## Global Constraints
 
-- Interpreter: `${HOME}/.pyenv/versions/3.12.8/bin/python3` (`$PY`). Never `python3` from `PATH`.
-- Worktree: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`; branch `feature/native-r9700-producer`.
+- Interpreter: `${PY}` (`$PY`). Never `python3` from `PATH`.
+- Worktree: `<former-native-r9700-worktree>`; branch `feature/native-r9700-producer`.
 - Native product math stays tinygrad-free. Tinygrad allowed only for device reset/bootstrap/control.
 - CPU/NumPy is oracle-only; never feed CPU-generated model/KV values into an accepted native artifact.
 - Preserve S-1 prompt-cache semantics: cache holds prefix tokens; mlx-lm receives the final prompt token.
@@ -48,7 +48,7 @@ Interpretation: PCI config, BAR mapping, and MMIO register reads all work; the P
 - [ ] **Step 0.1: Run the non-destructive bridge reset**
 
 ```sh
-PYTHONPATH=${HOME}/Development/ml/tools/tinygrad \
+PYTHONPATH=<tinygrad-checkout> \
   $PY -c "from tinygrad.runtime.support.system import APLRemotePCIDevice; APLRemotePCIDevice('AMD','usb4').reset(); print('tinygpu_reset: pass')"
 ```
 
@@ -57,7 +57,7 @@ Expected: `tinygpu_reset: pass`, exit 0.
 - [ ] **Step 0.2: Re-run discovery-only AMDev full boot**
 
 ```sh
-PYTHONPATH=${HOME}/Development/ml/tools/tinygrad \
+PYTHONPATH=<tinygrad-checkout> \
   $PY -c "from tinygrad.runtime.support.am.amdev import AMDev; from tinygrad.runtime.support.system import APLRemotePCIDevice; pci=APLRemotePCIDevice('AMD','usb4'); am=AMDev(pci); am.fini(); pci.sock.close(); print('tinygpu_amdev_full_boot: pass')"
 ```
 

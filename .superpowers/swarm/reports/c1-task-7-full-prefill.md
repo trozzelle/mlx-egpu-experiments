@@ -43,14 +43,14 @@ Qwen3.8-27B remains explicitly unsupported/deferred for this C1 Llama ladder. Th
 Focused GREEN validation:
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py -v
+cd <former-native-r9700-worktree> && ${PY} -m pytest tests/native_r9700/test_prefill.py -v
 ```
 
 Optional direct CLI parity smoke:
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.prefill \
-  --model ${HOME}/Development/ml/tools/egpu/.worktrees/tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
+cd <former-native-r9700-worktree> && ${PY} -m native_r9700.prefill \
+  --model <tinygrad-kv-worker-worktree>/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --prompt-name prompt-0 \
   --out /tmp/native-r9700-prefill.npz \
@@ -60,7 +60,7 @@ cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}
 Request-token C2 handoff smoke:
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.prefill \
+cd <former-native-r9700-worktree> && ${PY} -m native_r9700.prefill \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --token-ids-json '[128000, 791, 6864, 315, 9822, 374]' \
   --out logs/c1-prefill-tokenids-prompt0.npz \
@@ -76,9 +76,9 @@ Expected prompt-0 probe bounds for supervisor validation: layer 0 and layer 15 `
 Syntax/import checks:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m py_compile native_r9700/prefill.py
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "import native_r9700.prefill as p; print(p.prefill_prompt_prefix.__name__); print(issubclass(p.PrefillError, ValueError))"
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.prefill --help >/tmp/native_r9700_prefill_help.txt && wc -l /tmp/native_r9700_prefill_help.txt
+${PY} -m py_compile native_r9700/prefill.py
+${PY} -c "import native_r9700.prefill as p; print(p.prefill_prompt_prefix.__name__); print(issubclass(p.PrefillError, ValueError))"
+${PY} -m native_r9700.prefill --help >/tmp/native_r9700_prefill_help.txt && wc -l /tmp/native_r9700_prefill_help.txt
 ```
 
 Observed outputs: py_compile had no output, import printed `prefill_prompt_prefix` and `True`, and help output was 15 lines.
@@ -90,7 +90,7 @@ CLI error-log smoke with a missing model wrote `exit_status: 1` as expected.
 Direct model-backed CLI parity smoke was run with the same model path used by `tests/native_r9700/test_prefill.py`:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.prefill --model ${HOME}/Development/ml/tools/egpu/.worktrees/tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --prompt-name prompt-0 --out /tmp/native-r9700-prefill.npz --log /tmp/native-r9700-prefill.log
+${PY} -m native_r9700.prefill --model <tinygrad-kv-worker-worktree>/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --prompt-name prompt-0 --out /tmp/native-r9700-prefill.npz --log /tmp/native-r9700-prefill.log
 ```
 
 Observed output:
@@ -104,7 +104,7 @@ layer=15 n_prefix=5 K max=0.0078125 K mean=0.00086438999 V max=0.00390625 V mean
 NPZ shape smoke:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "import numpy as np; z=np.load('/tmp/native-r9700-prefill.npz'); print(len(z.files), z['layer0_K'].shape, z['layer15_V'].dtype, int(z['n_prefix']), int(z['num_layers']))"
+${PY} -c "import numpy as np; z=np.load('/tmp/native-r9700-prefill.npz'); print(len(z.files), z['layer0_K'].shape, z['layer15_V'].dtype, int(z['n_prefix']), int(z['num_layers']))"
 ```
 
 Observed output:

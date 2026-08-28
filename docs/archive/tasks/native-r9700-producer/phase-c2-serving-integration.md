@@ -20,7 +20,7 @@ Make the native producer usable from real mlx-lm serving through the imported-ca
 - Phase C1 complete: native producer parity gate passed and reviewed.
 - Stable native producer invocation contract from C1 handoff.
 - Exact C1 parity command and report section available.
-- mlx-lm consumer environment available via `${HOME}/.pyenv/versions/3.12.8/bin/python3`.
+- mlx-lm consumer environment available via `${PY}`.
 - Any non-local transport requires security review before use.
 
 ## Orchestration map
@@ -118,7 +118,7 @@ Non-goals: no changes to mlx-lm internals unless explicitly chosen; no oMLX seam
 ### Validation
 
 - Use exact C2 wrapper test command recorded in `validation-commands.md`.
-- If Python tests are touched: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v`.
+- If Python tests are touched: `${PY} -m pytest tests -v`.
 
 ## Task set 3: Fallback and error-state tests
 
@@ -152,7 +152,7 @@ Non-goals: no producer implementation changes unless a wrapper bug proves a cont
 ### Validation
 
 - Use exact fallback/error test command recorded in `validation-commands.md`.
-- If Python tests are touched: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v`.
+- If Python tests are touched: `${PY} -m pytest tests -v`.
 
 ## Task set 4: mlx-lm integration run and report append
 

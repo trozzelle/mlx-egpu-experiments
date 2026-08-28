@@ -7,7 +7,7 @@ Implemented `layer0_attention_scores_softmax_context_head6_tokens0_5_cols384_448
 Pre-implementation focused RED command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head6_tokens0_5_cols384_448_chain tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head6_embedded_operands_use_kernel_layouts -q
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head6_tokens0_5_cols384_448_chain tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head6_embedded_operands_use_kernel_layouts -q
 ```
 
 Result before implementation: exited `1` with `3 failed in 5.17s`; failures showed missing `additional_trace_slices`/fixture arrays for head6, missing wrapper support for `layer0_attention_scores_softmax_context_head6_tokens0_5_cols384_448_chain` (`wrapper_exit_status: 2`), and absent embedded head6 Q/K/V bridge operands.
@@ -42,10 +42,10 @@ Result before implementation: exited `1` with `3 failed in 5.17s`; failures show
 - The all-fixture regeneration also left the shared cols384:448 MLP down fixture NPZs present in the worktree; this report does not claim that MLP chain's implementation, only preserves the concurrent wave's generated fixture outputs.
 
 ## Focused verification run
-Run from `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`:
+Run from `<former-native-r9700-worktree>`:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head6_tokens0_5_cols384_448_chain tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head6_embedded_operands_use_kernel_layouts -q
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head6_tokens0_5_cols384_448_chain tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head6_embedded_operands_use_kernel_layouts -q
 ```
 
 Result after implementation: exited `0` with `3 passed in 4.65s`.
@@ -57,13 +57,13 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -fsyntax-only native_r9700/c
 Result after implementation: exited `0` with no compiler diagnostics.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests -q
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests -q
 ```
 
 Result after implementation: exited `0` with `1 passed in 0.05s`.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head5_tokens0_5_cols320_384_chain -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head5_tokens0_5_cols320_384_chain -q
 ```
 
 Result after implementation: exited `0` with `1 passed in 4.75s`; this guards the layer-trace fixture SHA update shared by existing bounded attention chains.
@@ -71,7 +71,7 @@ Result after implementation: exited `0` with `1 passed in 4.75s`; this guards th
 ## Suggested supervisor commands
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head6_tokens0_5_cols384_448_chain tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head6_embedded_operands_use_kernel_layouts -q
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_attention_scores_softmax_context_head6_tokens0_5_cols384_448_chain tests/native_r9700/test_runtime_contract.py::test_layer0_attention_head6_embedded_operands_use_kernel_layouts -q
 ```
 
 Optional bridge build/proof after supervisor-approved hardware access:
@@ -83,10 +83,10 @@ build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_at
 
 ## Supervisor verification
 
-- Combined focused gate: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -k 'schema_json_matches_disk_digests or mlp_down_proj_full_inner or layer_trace_fixtures_schema_shape_dtype' -q && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_cols384_448_embedded_operands_use_kernel_layouts or mlp_down_full_inner_to_cols384_448_chain or head6_embedded_operands_use_kernel_layouts or head6_tokens0_5_cols384_448_chain' -q && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_primitive_bridge && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner` exited `0` with `16 passed, 52 deselected` and `4 passed, 105 deselected`.
+- Combined focused gate: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -k 'schema_json_matches_disk_digests or mlp_down_proj_full_inner or layer_trace_fixtures_schema_shape_dtype' -q && ${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_cols384_448_embedded_operands_use_kernel_layouts or mlp_down_full_inner_to_cols384_448_chain or head6_embedded_operands_use_kernel_layouts or head6_tokens0_5_cols384_448_chain' -q && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_primitive_bridge && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner` exited `0` with `16 passed, 52 deselected` and `4 passed, 105 deselected`.
 - Supervisor hardware proof: `build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_attention_scores_softmax_context_head6_tokens0_5_cols384_448_chain` exited `0` with `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `mismatch_count: 0`, `max_abs_diff: 1.4901161193847656e-08`, `max_ulp_diff: 1`, `byte_mismatch_count: 23`, and log `logs/c1-runner-primitive-chain-proof-layer0_attention_scores_softmax_context_head6_tokens0_5_cols384_448_chain-2026-08-20T17:53:16Z.log`.
 - Read-only review `C1Wave384Review` returned no Critical/Important/Minor findings and recommended accepting the partial primitive-chain checkpoint.
-- Full native regression after wave384 passed: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` exited `0` with `286 passed, 2 warnings in 464.44s` (`artifact://2890`).
+- Full native regression after wave384 passed: `${PY} -m pytest tests/native_r9700 -q` exited `0` with `286 passed, 2 warnings in 464.44s` (`artifact://2890`).
 
 ## Remaining blockers
 - This does not close `native_prefill_acceptance`, full attention width, full layer0, full-layer, or Qwen execution.

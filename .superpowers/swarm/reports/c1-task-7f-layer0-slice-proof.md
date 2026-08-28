@@ -6,7 +6,7 @@ Add an honest layer0 proof wrapper that composes the currently proven C1R hardwa
 
 ## Work boundary
 
-- Path: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+- Path: `<former-native-r9700-worktree>`
 - Branch: `feature/native-r9700-producer`
 - Boundary type: current feature branch; no fallback worktree.
 
@@ -54,13 +54,13 @@ Add an honest layer0 proof wrapper that composes the currently proven C1R hardwa
 ## Verification
 
 - RED contract before implementation:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_slice_proof_wraps_existing_chains_without_claiming_full_prefill -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_slice_proof_wraps_existing_chains_without_claiming_full_prefill -q`
   - Result before implementation: failed with `error: unknown mode '--layer0-slice-proof'`.
 - Retry RED before implementation:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_slice_proof_retries_one_transient_component_failure -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_slice_proof_retries_one_transient_component_failure -q`
   - Result before retry implementation: failed with `component0_wrapper_status: fail` and no retry.
 - Focused tests:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_slice_proof_wraps_existing_chains_without_claiming_full_prefill tests/native_r9700/test_runtime_contract.py::test_layer0_slice_proof_retries_one_transient_component_failure tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_proj_full_inner_cols0_64_tiled_accum_chain -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_slice_proof_wraps_existing_chains_without_claiming_full_prefill tests/native_r9700/test_runtime_contract.py::test_layer0_slice_proof_retries_one_transient_component_failure tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_proj_full_inner_cols0_64_tiled_accum_chain -q`
   - Result: `3 passed in 19.04s`.
 - Runner compile:
   - Command: `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runner.cpp native_r9700/runtime.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner`

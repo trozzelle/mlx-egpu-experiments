@@ -163,7 +163,7 @@ base+`ioffset=0`, the second work-item aliases the first's slice. Result: exactl
 
 ```bash
 # (a) Focused pytest for the new self-test
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   'tests/test_native_amdev_transfer_contract.py::test_kernel_text_decode_self_test_reports_store_ops' -v
 
 # (b) Build (compile) the probe standalone
@@ -171,7 +171,7 @@ xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o /tmp/native_amdev_transfer_probe
 
 # (c) Full contract suite
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 ```
 
 Executors did not run any of these (per wave constraint); the supervisor validates.

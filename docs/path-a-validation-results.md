@@ -7,7 +7,7 @@ Gate: injected path `P` must equal native baseline `R` token-for-token across th
 ## Result summary
 
 - Gate result: **PASS** (3/3 prompts token-exact).
-- Run log: `${HOME}/Development/ml/tools/egpu/.worktrees/tinygrad-kv-worker-phase0/logs/runs/20260816-191810-659350000_meta-f16-final.log`.
+- Run log: `<tinygrad-kv-worker-worktree>/logs/runs/20260816-191810-659350000_meta-f16-final.log`.
 - Producer weights: `mlx_models/meta-Llama-3.2-1B-Instruct.F16.gguf`.
 - Consumer weights: `mlx_models/meta-Llama-3.2-1B-Instruct`.
 - Source provenance: official fp16 `meta-llama/Llama-3.2-1B-Instruct` weights on both sides (F16 GGUF producer + mlx safetensors consumer).

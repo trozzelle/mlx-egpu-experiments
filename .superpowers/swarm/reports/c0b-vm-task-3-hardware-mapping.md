@@ -50,7 +50,7 @@ Both completed successfully; the final help smoke emitted all existing self-test
 - Focused pytest after supervisor correction of unused GC fallback offsets:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 - Fresh result: `8 passed in 6.54s`.
@@ -64,7 +64,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_tra
 Do not run these in OMP task-agent mode; supervisor owns them:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Hardware validation command remains the Phase 2 supervisor transfer command that writes `logs/c0b-native-amdev-sdma-transfer.log` from `docs/tasks/native-r9700-producer/validation-commands.md` / the C0B ledger.

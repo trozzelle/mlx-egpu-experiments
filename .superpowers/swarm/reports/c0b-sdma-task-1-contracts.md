@@ -13,7 +13,7 @@ Needs review. RED contract added; implementation is absent by design.
 Supervisor should run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected failure: the three new SDMA self-test modes and extended VM control-page output are absent until Task 2.

@@ -45,5 +45,5 @@ No HSA loader/session/runner/generated asset/cache serializer was changed. No ke
 ## Supervisor validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_llama_stage_layout.py tests/native_r9700/test_kernel_catalog.py -q
+${PY} -m pytest tests/native_r9700/test_llama_stage_layout.py tests/native_r9700/test_kernel_catalog.py -q
 ```

@@ -13,7 +13,7 @@
 ## Focused supervisor command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_kernel_pack_manifest.py -v
+${PY} -m pytest tests/native_r9700/test_kernel_pack_manifest.py -v
 ```
 
 The command is intentionally left for the supervisor. The new cases are expected to remain RED against the current Python owner until the corresponding fail-closed checks are implemented.

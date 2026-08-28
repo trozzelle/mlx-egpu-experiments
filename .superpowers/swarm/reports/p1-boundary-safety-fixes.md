@@ -2,10 +2,10 @@
 
 **Status:** Implemented; supervisor verification pending
 
-**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
-**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `<former-tinygpu-worktree>` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `<repo-root>/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `<repo-root>/tinygpu/build/`.
 
-**Evidence worktree:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
+**Evidence worktree:** `<repo-root>` (`feature/r9700-products-wave-a`)
 
 ## Scope and validation honesty
 
@@ -71,7 +71,7 @@ The project uses previously occupied IDs through `A10000010000000000000011`; the
 Run from the TinyGPU installer directory:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUHealthRequestValidator.cpp \
@@ -81,7 +81,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 ```
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUEvidenceLog.cpp \
@@ -91,26 +91,26 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 ```
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcodebuild clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -alltargets -configuration Debug build
 ```
 
 The fixed conformance-target build can also be run explicitly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TGPUConformanceClient -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
+  CONFIGURATION_BUILD_DIR=<repo-root>/tinygpu/build/Debug
 ```
 
 The required preinstall fail-closed smoke is:
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+<repo-root>/tinygpu/build/Debug/tgpu-conformance-client \
   cold-lifecycle --service org.tinygrad.tinygpu.driver2 \
   --pci-id 1002:7551 --architecture gfx1201 \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/cold-lifecycle.log
+  --log <repo-root>/logs/p1-tinygpu-owner/cold-lifecycle.log
 ```
 
 Because approved cold firmware ownership is unavailable, this smoke must remain nonzero and must record the structured health failure, including the private `cold_stage=PspSosTmr` text, in the requested nested log. It must not be reinterpreted as a ready result or replaced with a raw proxy command.

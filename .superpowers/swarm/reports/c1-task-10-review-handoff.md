@@ -4,7 +4,7 @@ Status: C1 review/handoff approved after re-review and fresh verification.
 
 ## Shared work boundary
 
-- Path: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+- Path: `<former-native-r9700-worktree>`
 - Branch: `feature/native-r9700-producer`
 - C1 target: Llama-3.2-1B-Instruct via MLX safetensors directory `../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct`
 - Qwen3.8-27B: explicitly unsupported/deferred for C1; local candidate is Qwen3.5/VLM-style hybrid-attention schema and needs separate C2/C3 design.
@@ -14,8 +14,8 @@ Status: C1 review/handoff approved after re-review and fresh verification.
 Final parity command:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.parity \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.parity \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --r-source both \
@@ -29,12 +29,12 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.parity \
 Producer cache emission path C2 should call through request token ids, not fixture names:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.prefill \
+${PY} -m native_r9700.prefill \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --token-ids-json '[<token-id-0>, <token-id-1>, ...]' \
   --out <prefix-kv.npz> \
   --log <prefill.log>
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.kv_cache \
+${PY} -m native_r9700.kv_cache \
   --prefill-npz <prefix-kv.npz> \
   --out <prompt-cache.safetensors> \
   --log <kv-cache.log>
@@ -88,29 +88,29 @@ Failure contract:
 ## Fresh supervisor verification after final re-review
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_kv_cache.py tests/native_r9700/test_parity.py -v
+${PY} -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_kv_cache.py tests/native_r9700/test_parity.py -v
 # pytest: 37 passed, 2 warnings in 3.95s
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.prefill --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --token-ids-json '[128000, 791, 6864, 315, 9822, 374]' --out logs/c1-prefill-tokenids-prompt0.npz --log logs/c1-prefill-tokenids-prompt0.log && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.kv_cache --prefill-npz logs/c1-prefill-tokenids-prompt0.npz --out logs/c1-tokenids-prompt0-cache.safetensors --log logs/c1-tokenids-kv-cache-prompt0.log && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "from mlx_lm.models.cache import load_prompt_cache; c,m=load_prompt_cache('logs/c1-tokenids-prompt0-cache.safetensors', return_metadata=True); print(len(c), c[0].offset, c[15].offset, m)"
+${PY} -m native_r9700.prefill --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --token-ids-json '[128000, 791, 6864, 315, 9822, 374]' --out logs/c1-prefill-tokenids-prompt0.npz --log logs/c1-prefill-tokenids-prompt0.log && ${PY} -m native_r9700.kv_cache --prefill-npz logs/c1-prefill-tokenids-prompt0.npz --out logs/c1-tokenids-prompt0-cache.safetensors --log logs/c1-tokenids-kv-cache-prompt0.log && ${PY} -c "from mlx_lm.models.cache import load_prompt_cache; c,m=load_prompt_cache('logs/c1-tokenids-prompt0-cache.safetensors', return_metadata=True); print(len(c), c[0].offset, c[15].offset, m)"
 # prefill n_prefix=5 num_layers=16 output=logs/c1-prefill-tokenids-prompt0.npz
 # wrote prompt cache logs/c1-tokenids-prompt0-cache.safetensors (n_prefix=5, num_layers=16)
 # 16 5 5 {'n_kv_heads': '8', 'offset': '5', 'num_layers': '16', 'head_dim': '64'}
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.parity --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --r-source both --max-new-tokens 4 --artifacts-dir logs/c1-parity --json logs/c1-parity/result.json --log logs/c1-parity/run.log --report docs/path-a-validation-results.md
+${PY} -m native_r9700.parity --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --r-source both --max-new-tokens 4 --artifacts-dir logs/c1-parity --json logs/c1-parity/result.json --log logs/c1-parity/run.log --report docs/path-a-validation-results.md
 # C1 parity gate_result=pass prompts=3
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 # pytest: 103 passed, 2 warnings in 9.73s
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
+${PY} -m pytest tests -v
 # pytest: 143 passed, 2 warnings in 42.62s
 ```
 

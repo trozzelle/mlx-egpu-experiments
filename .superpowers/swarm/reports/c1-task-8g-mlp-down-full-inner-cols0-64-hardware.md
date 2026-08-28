@@ -49,7 +49,7 @@ Key markers:
 Host contract verification:
 
 ```text
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_mlp_down_full_inner_to_cols0_64_chain -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_mlp_down_full_inner_to_cols0_64_chain -q
 ```
 
 Result: `1 passed in 9.74s`.

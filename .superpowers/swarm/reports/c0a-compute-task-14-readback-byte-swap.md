@@ -83,7 +83,7 @@ Not in scope here: dispatch dims alone (`kDispatchGlobalSizeX`) without fixing t
 ## 5. Verification evidence
 
 - Wave 1 review: `.superpowers/swarm/reports/c0a-compute-task-14-wave1-review.md` — verdict **accepted**, 0 Critical/Important/Minor, `ready_for_wave2: true`, diff vs `c263e11` purely additive (no kernel-behavior change).
-- Full contract suite: `23 passed` (`${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q`).
+- Full contract suite: `23 passed` (`${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q`).
 - Build: `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe` — exit 0.
 - `git diff --check` — clean.
 - Hardware: `logs/c0m-native-amdev-readback-byte-swap.log` (this report) — UNCHANGED-SIGNATURE vs `c0l`, classifier `swap_and_partial 0x0f/0x0f/0x0f`.

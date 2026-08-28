@@ -12,13 +12,13 @@ The native probe (`experiments/native-r9700-runtime/native_amdev_transfer_probe.
 
 **Scope decision — components of `_config_mec()`:**
 - **IN SCOPE (this plan):** `regCP_MEC_RS64_CNTL` (10500) pipe-reset/active/halt writes. These are pure bitfield writes with source-grounded encodings (regs.py gc_12_0_0 line 6060), require no firmware values, and mirror tinygrad exactly.
-- **OUT OF SCOPE (blocked, documented):** `regCP_MEC_RS64_PRGRM_CNTR_START`/`_HI` and PFP/ME `PRGRM_CNTR_START` programming requires `fw.ucode_start[eng] >> 2` from the `gc_12_0_1_{pfp,me,mec}.bin` firmware headers (`struct_gfx_firmware_header_v2_0.ucode_start_addr_lo/hi`, am.py:2883-2884). These binaries are **not cached** anywhere on this host (`~/development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/amdgpu/` does not exist), and C0C (Linux ROCm reference) is recorded Blocked. Without the `ucode_start` values there is no source-grounded correct program-counter value to program 武. Writing a guessed value risks corrupting the resident MC firmware image direction. This component is left untouched so the diagnostic stays a single variable.
+- **OUT OF SCOPE (blocked, documented):** `regCP_MEC_RS64_PRGRM_CNTR_START`/`_HI` and PFP/ME `PRGRM_CNTR_START` programming requires `fw.ucode_start[eng] >> 2` from the `gc_12_0_1_{pfp,me,mec}.bin` firmware headers (`struct_gfx_firmware_header_v2_0.ucode_start_addr_lo/hi`, am.py:2883-2884). These binaries were not present in `<tinygrad-checkout>/tinygrad/runtime/autogen/am/amdgpu/`, and C0C (Linux ROCm reference) is recorded Blocked. Without the `ucode_start` values, setting start PCs would require guessing firmware offsets, which is forbidden.
 
 **Tech Stack:** C++17 native probe `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`; Python pytest contract tests `tests/test_native_amdev_transfer_contract.py`; TinyGPU.app/APLRemotePCIDevice/PCIIface on macOS; AMD gfx1201 register definitions from local tinygrad autogen.
 
 ## Global Constraints
 
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Current checkpoint: `d603f7b` (C0A21 T4, reviewed blocker).
 - Kept change: `encode_hqd_pq_control_direct_pm4()` drops `kUnordDispatch` (bit 28), carried in `30d573b`.
 - Do NOT change BAR2 index/value, GDC/S2A route values, CP MEC doorbell ranges, PM4 packet sequence, scheduler behavior, retry loops, AQL behavior, Linux HIP fallback, or C1/C2/C3 work under this plan.
@@ -149,10 +149,10 @@ Add `mec_rs64_cntl_write_status`, `mec_rs64_cntl_readback`, `mec_rs64_active_sta
 - [ ] **Step 5: Rebuild and run focused pytest**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 mkdir -p build/native-r9700-runtime
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 ```
 
 Expected: build exit `0`; pytest `20 passed` (or the updated focused count).
@@ -174,7 +174,7 @@ git commit -m "feat: replay MEC RS64 pipe activation into regCP_MEC_RS64_CNTL (C
 - [ ] **Step 1: Run the hardware kernel proof**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 log=logs/c0l-native-amdev-mec-rs64-pipe-activation.log
 build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof > "$log" 2>&1
 status=$?
@@ -200,8 +200,8 @@ Dispatch `reviewer` to confirm the report cites source/log lines, the classifica
 - [ ] **Step 5: Final verification and checkpoint**
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 git diff --check
 ```
 

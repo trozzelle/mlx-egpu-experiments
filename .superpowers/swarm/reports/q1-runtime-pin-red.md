@@ -68,7 +68,7 @@ The current ambient-unverified generator has no executed-runtime verifier/root b
 ## Focused validation command (not run)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_ref_fixtures.py -k \
   'oracle_runtime or generation_verifies_runtime_before_model_oracle_reads' -v
 ```

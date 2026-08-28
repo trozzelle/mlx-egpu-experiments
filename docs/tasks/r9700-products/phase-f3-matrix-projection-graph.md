@@ -113,7 +113,7 @@ Image uses the F2 WMMA family and declared packing; gate/up outputs and tails pa
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_llama_gate_up_wmma_asset.py \
   tests/native_r9700/test_llama_gate_up_projection_asset.py -v
 ```
@@ -145,7 +145,7 @@ Full/tail shapes pass the named policy; source/image metadata is concrete; no pr
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_llama_down_wmma_asset.py \
   tests/native_r9700/test_llama_omlp_hsa_assets.py -v
 ```
@@ -177,7 +177,7 @@ Output slices map exactly to declared Q/K/V order; RoPE/KV consumers require no 
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_llama_qkv_wmma_asset.py \
   tests/native_r9700/test_llama_kv_projection_asset.py \
   tests/native_r9700/test_llama_rope_kv_asset.py -v
@@ -210,7 +210,7 @@ O output passes the named policy; residual behavior, if present, is independentl
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_llama_o_wmma_asset.py \
   tests/native_r9700/test_llama_attention_hsa_assets.py -v
 ```
@@ -248,7 +248,7 @@ Selected graph uses only model-compatible family/packing records; each family ha
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_model_weight_binder_contract.py \
   tests/native_r9700/test_llama_stage_layout.py \
   tests/native_r9700/test_layer0_executor_contract.py \
@@ -288,7 +288,7 @@ Run B4 control then B16/B32/B64/B128 through the accepted graph, record cold/war
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_block_prefill_runtime_contract.py \
   tests/native_r9700/test_gpu_stage_profile_contract.py \
   tests/native_r9700/test_benchmark.py \
@@ -300,7 +300,7 @@ Supervisor runs the exact F3 block-ladder/warm command recorded by task set 1.
 ## Phase validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 ```
 
 Phase completion additionally requires all standalone hardware commands, B0 C1R/C2R, warm benchmark comparison, final review, and `git diff --check`.

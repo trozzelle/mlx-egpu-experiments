@@ -3,7 +3,7 @@
 ## Scope
 File: `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`
 Branch: `feature/native-r9700-producer` (base 1273bc2, Tasks 1-2 present)
-Worktree: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+Worktree: `<former-native-r9700-worktree>`
 
 ## Change
 Rewrote `write_compute_ring_words` to write the PM4 dispatch into the sysmem
@@ -93,7 +93,7 @@ no readback).
 ## Supervisor verification commands (not run here)
 ```bash
 # Build
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 ./configure.sh && ninja -C build -j8 native_amdev_transfer_probe
 
 # Focused pytest (compute ring backing)

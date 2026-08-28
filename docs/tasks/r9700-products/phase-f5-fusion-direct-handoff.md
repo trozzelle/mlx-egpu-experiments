@@ -180,7 +180,7 @@ Adapter fails closed on every lifetime/bounds/identity error, preserves canonica
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_direct_kv_adapter.py \
   tests/native_r9700/test_service_protocol.py \
   tests/native_r9700/test_model_service.py -v
@@ -219,7 +219,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_direct_kv_adapter.py \
   tests/native_r9700/test_serving.py \
   tests/native_r9700/test_kv_cache.py \
@@ -231,7 +231,7 @@ Supervisor runs the exact direct-adapter smoke/warm command recorded by task set
 ## Phase validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 ```
 
 Phase completion requires B0 C1R/C2R, selected fusion evidence or Dropped decision, G2 decision, final review, and `git diff --check`.

@@ -42,8 +42,8 @@ The first implementation assumed generated SDMA 4.4.2 `regSDMA_GFX_*` queue regi
 Focused pytest:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Result: `11 passed in 9.94s`.

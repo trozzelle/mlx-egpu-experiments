@@ -45,8 +45,8 @@ The unresolved base-model revision remains an explicit promotion blocker. Q1 fix
 The supervisor reran this command after the source-pin provenance and full-shard verification corrections:
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
-QWEN_MODEL=${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
+QWEN_MODEL=<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff
 
 "$PY" -m native_r9700.ref_fixtures \
   --generate-qwen \

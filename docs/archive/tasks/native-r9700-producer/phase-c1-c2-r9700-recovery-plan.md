@@ -248,7 +248,7 @@ Do not record fake exact commands before implementation supplies them. Until C1R
 Known final gate shape after implementation:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 ```
 
 Additional final hardware gates must be added by the implementing task sets and must include:

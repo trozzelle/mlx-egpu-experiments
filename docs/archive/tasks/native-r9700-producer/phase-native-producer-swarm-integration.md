@@ -109,7 +109,7 @@ All integrated assets are manifest-bound, load fail-closed, and are reachable th
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_hsa_code_image_generator.py \
   tests/native_r9700/test_hsa_code_image_loader.py -q
 ```
@@ -140,8 +140,8 @@ Hardware claims have fresh logs with `1002:7551`, `gfx1201`, and `exit_status: 0
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/native_r9700 -q
 ```
 
 The supervisor runs only the model command relevant to the completed wave.

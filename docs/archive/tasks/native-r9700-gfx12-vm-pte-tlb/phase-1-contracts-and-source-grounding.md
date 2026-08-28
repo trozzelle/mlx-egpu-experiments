@@ -8,11 +8,11 @@
   - `docs/archive/tasks/native-r9700-producer/phase-c0b-native-amdev-sdma-transfer.md`
   - `docs/archive/tasks/native-r9700-producer/macos-tinygpu-abi-notes.md`
 - Source code anchors:
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/amdev.py` lines 120-143 and 199-205
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/memory.py` lines 115-216
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/am.py` lines 4114-4144
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/soc_12.py` line 7
-  - `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py` lines 70-172
+  - `<tinygrad-checkout>/tinygrad/runtime/support/am/amdev.py` lines 120-143 and 199-205
+  - `<tinygrad-checkout>/tinygrad/runtime/support/memory.py` lines 115-216
+  - `<tinygrad-checkout>/tinygrad/runtime/autogen/am/am.py` lines 4114-4144
+  - `<tinygrad-checkout>/tinygrad/runtime/autogen/am/soc_12.py` line 7
+  - `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py` lines 70-172
 
 ## Goal
 
@@ -21,7 +21,7 @@ Add test-first, deterministic contracts for the gfx12 VM mapping prerequisite. T
 ## Dependencies
 
 - C0B-5 remains Blocked with reviewed `failure_stage: vm_mapping` evidence.
-- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Existing no-hardware pytest suite compiles `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`.
 
 ## Orchestration map
@@ -82,7 +82,7 @@ Non-goals: no C++ implementation, no hardware command, no TinyGPU.app server lau
 Supervisor runs:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected RED: failure for the three new self-tests or help assertions because implementation is absent.
@@ -128,7 +128,7 @@ Non-goals: no hardware VM writes, no MMIO register programming, no SDMA queue se
 Supervisor runs:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected GREEN: all no-hardware tests pass.

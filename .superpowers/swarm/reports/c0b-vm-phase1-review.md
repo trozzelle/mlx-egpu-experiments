@@ -28,8 +28,8 @@ The reviewer assessed the Phase 1 tests, C++ VM self-tests, reports, and ledgers
 
 ## Supervisor verification evidence
 
-- RED: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `1`; existing four self-tests passed; new VM self-tests failed as unknown and help lacked new entries.
-- GREEN: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` reported `8 passed in 4.87s`.
+- RED: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `1`; existing four self-tests passed; new VM self-tests failed as unknown and help lacked new entries.
+- GREEN: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` reported `8 passed in 4.87s`.
 
 ## Quality bar
 

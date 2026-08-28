@@ -235,7 +235,7 @@ All invalid/stale/cross-client/range/permission operations fail without device c
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_device_memory_contract.py \
   tests/native_r9700/test_dynamic_page_table_contract.py \
   tests/native_r9700/test_vram_allocator.py \
@@ -271,7 +271,7 @@ Valid B0-style dispatches remain exact; malformed/cross-client/stale submissions
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/test_native_amdev_transfer_contract.py \
   tests/native_r9700/test_pm4_timeline_contract.py \
   tests/native_r9700/test_gpu_timestamp_pm4_contract.py \
@@ -290,7 +290,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 ### Target
 
 - TinyGPU driver/user-client reset, queue teardown, device recovery, and client close orchestration in the in-repository `tinygpu/` source tree.
-- Extend (do not recreate) the fixed conformance client source `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/Conformance/tgpu_conformance_client.cpp` with its exact `device-recovery` subcommand; the common target/binary and earlier subcommands are owned by tasks 2–4.
+- Extend (do not recreate) the fixed conformance client source `<repo-root>/tinygpu/Conformance/tgpu_conformance_client.cpp` with its exact `device-recovery` subcommand; the common target/binary and earlier subcommands are owned by tasks 2–4.
 - Extend `test_runtime_lifecycle.py`, `test_sdma_ring_contract.py`, `test_hardware_lock_contract.py`, and local protocol tests.
 - Produce `.superpowers/swarm/reports/p1-recovery.md`.
 - Non-goals: implementing task-set-3/4 resource hooks a second time, changing the fixed ABI/package/cold-client contract, hidden automatic retry of inference, multi-client scheduler, P2 HAL reset policy, or any legacy proxy path.
@@ -306,7 +306,7 @@ Timeout/fault/client death leads to explicit state and bounded ordered cleanup; 
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_runtime_lifecycle.py \
   tests/native_r9700/test_sdma_ring_contract.py \
   tests/native_r9700/test_hardware_lock_contract.py \
@@ -348,7 +348,7 @@ Supervisor runs exact `SDK/build/install preflight and local install`, `P1 cold 
 ## Phase validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/test_native_amdev_transfer_contract.py \
   tests/native_r9700/test_runtime_lifecycle.py \
   tests/native_r9700/test_runtime_protocol.py \

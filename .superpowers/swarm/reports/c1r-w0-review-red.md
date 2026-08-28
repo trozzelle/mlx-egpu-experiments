@@ -21,11 +21,11 @@ No validation command was run by this executor; the supervisor owns RED/GREEN ob
 RED before the review fixes:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'legacy_primitive_diagnostic_rejects_injected_native_prefill_acceptance or native_prefill_proof_rejects_equal_output_and_log_paths or native_prefill_proof_reports_output_cleanup_failure'
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'legacy_primitive_diagnostic_rejects_injected_native_prefill_acceptance or native_prefill_proof_rejects_equal_output_and_log_paths or native_prefill_proof_reports_output_cleanup_failure'
 ```
 
 GREEN after the review fixes (including the already-green direct no-injection guard):
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'legacy_primitive_diagnostic_reports_legacy_proof_unavailable_without_bridge or legacy_primitive_diagnostic_rejects_injected_native_prefill_acceptance or native_prefill_proof_rejects_equal_output_and_log_paths or native_prefill_proof_reports_output_cleanup_failure'
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'legacy_primitive_diagnostic_reports_legacy_proof_unavailable_without_bridge or legacy_primitive_diagnostic_rejects_injected_native_prefill_acceptance or native_prefill_proof_rejects_equal_output_and_log_paths or native_prefill_proof_reports_output_cleanup_failure'
 ```

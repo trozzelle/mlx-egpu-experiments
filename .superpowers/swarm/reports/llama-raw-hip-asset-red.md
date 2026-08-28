@@ -28,7 +28,7 @@ properties. `validate_source_profile` must reject a source profile that introduc
 ## Supervisor RED command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_raw_hip_asset_generator.py -q
+${PY} -m pytest tests/native_r9700/test_raw_hip_asset_generator.py -q
 ```
 
 ## Intended current RED

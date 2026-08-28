@@ -6,7 +6,7 @@ Add a full-width layer0 MLP activation CPU oracle across all 8192 intermediate c
 
 ## Work boundary
 
-- Path: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+- Path: `<former-native-r9700-worktree>`
 - Branch: `feature/native-r9700-producer`
 - Boundary type: current feature branch.
 
@@ -33,19 +33,19 @@ Commit the full MLP activation oracle as one NPZ. Raw payload is 393 KiB and com
 ## Verification
 
 - RED before implementation:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_activation_full_inner_fixture_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_activation_full_inner_fixture_matches_silu_multiply_oracle -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_activation_full_inner_fixture_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_activation_full_inner_fixture_matches_silu_multiply_oracle -q`
   - Result: failed with missing schema key and missing fixture file.
 - Regeneration:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct`
+  - Command: `${PY} -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct`
   - Result: wrote 16 fixture files including `layer_trace_mlp_activation_full_inner_fixtures.npz`.
 - New fixture digest/size:
   - SHA256: `c4ac8b5c351d57097cc0fb6f68539f1aa2996591c13e27064f0a146b5e2d6ad9`
   - Size: `230375` bytes.
 - Focused green:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_activation_full_inner_fixture_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_activation_full_inner_fixture_matches_silu_multiply_oracle tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_activation_cols0_64_fixture_matches_silu_multiply_oracle tests/native_r9700/test_ref_fixtures.py::test_all_fixture_files_small_enough tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_activation_full_inner_fixture_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_activation_full_inner_fixture_matches_silu_multiply_oracle tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_activation_cols0_64_fixture_matches_silu_multiply_oracle tests/native_r9700/test_ref_fixtures.py::test_all_fixture_files_small_enough tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests -q`
   - Result: `5 passed in 0.16s`.
 - Full fixture suite:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -q`
   - Result: `46 passed in 0.10s`.
 - Renamed full-hidden seam re-verification after `FullLayerAcceptanceScout`:
   - Compile exited `0` with no output.

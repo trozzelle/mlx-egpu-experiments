@@ -89,14 +89,14 @@ No commands are run by this reviewer. The reviewer validates by reading the scop
 Run exactly after each fix:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 If a fix changes hardware behavior, rerun exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0d-native-amdev-doorbell-delivery.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 
@@ -136,8 +136,8 @@ Expected result is determined by the fixed finding; update the diagnostic report
 Supervisor runs exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 git diff --check
 ```
 
@@ -146,7 +146,7 @@ Expected: pytest reports all contract tests passing; `git diff --check` prints n
 Supervisor commit command after verification:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git add experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp tests/test_native_amdev_transfer_contract.py .superpowers/swarm/progress.md .superpowers/swarm/gx1202-compute-dispatch-supervisor.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/reports/c0a-compute-task-6-doorbell-delivery.md .superpowers/swarm/reports/c0a-compute-task-6-doorbell-review.md docs/archive/tasks/native-r9700-producer/phase-c0a-macos-egpu-runtime-focus.md docs/tasks/native-r9700-producer/validation-commands.md
 git commit -m "Add MEC doorbell delivery diagnostics"
 ```

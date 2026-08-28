@@ -36,7 +36,7 @@ contract and intentionally is not part of this source-only gate.
 ## Supervisor validation command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_llama_k_projection_source.py -q
+${PY} -m pytest tests/native_r9700/test_llama_k_projection_source.py -q
 ```
 
 This command was intentionally not run in this source-only lane.

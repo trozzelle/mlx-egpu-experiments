@@ -40,13 +40,13 @@ Review fix
 - Review gate `agent://C1R6oReview` found Q still reused K full-shape metadata. Fixed bridge/runtime/tests/docs to report Q shape `1x32x5x64` and full element count `10240`; hardware proof rerun at `2026-08-19T18:41:49Z` passed with corrected markers.
 
 Regression proof after C1R-6o
-- Focused Q fixture/wrapper/help/dispatch tests: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_q_rope_pair_slice_fixture_matches_split_half_oracle tests/native_r9700/test_runtime_contract.py::test_q_rope_uses_rope_dispatch_packet tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_proof_wraps_supplied_bridge_and_logs_fp16_rope_split_half_layer0_q_pairs8 -q` exited `0` with `6 passed in 2.67s`.
+- Focused Q fixture/wrapper/help/dispatch tests: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_q_rope_pair_slice_fixture_matches_split_half_oracle tests/native_r9700/test_runtime_contract.py::test_q_rope_uses_rope_dispatch_packet tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_proof_wraps_supplied_bridge_and_logs_fp16_rope_split_half_layer0_q_pairs8 -q` exited `0` with `6 passed in 2.67s`.
 
 Final verification after review fix
 - Focused Q fixture/wrapper/help/dispatch tests exited `0` with `6 passed in 3.21s`.
 - Corrected Q hardware proof exited `0` and wrote `logs/c1-runner-primitive-proof-fp16_rope_split_half_layer0_q_pairs8-2026-08-19T18:41:49Z.log` with `full_fixture_shape: 1x32x5x64`, `full_element_count: 10240`, and zero mismatches.
-- Native regression `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` exited `0` with `165 passed, 2 warnings`.
-- Full regression `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -q` exited `0` with `205 passed, 2 warnings`.
+- Native regression `${PY} -m pytest tests/native_r9700 -q` exited `0` with `165 passed, 2 warnings`.
+- Full regression `${PY} -m pytest tests -q` exited `0` with `205 passed, 2 warnings`.
 - `git diff --check` exited `0`.
 - Re-review gate `agent://C1R6oReReview` approved with no findings.
 

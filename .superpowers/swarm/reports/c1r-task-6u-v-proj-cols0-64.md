@@ -49,7 +49,7 @@ This does **not** close C1R-6 layer-0 forward acceptance. `native_prefill_accept
 Fixture regeneration:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct
+${PY} -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct
 ```
 
 Observed: `wrote 7 fixture files to tests/native_r9700/fixtures`.
@@ -73,7 +73,7 @@ Observed: exit 0, no compiler output.
 Focused host tests:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_all_fixture_files_small_enough tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer_trace_full_inner_projection_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_k_projection_full_inner_cols0_64_fixture_matches_fp32_matmul_oracle tests/native_r9700/test_ref_fixtures.py::test_layer0_v_projection_full_inner_cols0_64_fixture_matches_fp32_matmul_oracle tests/native_r9700/test_runtime_contract.py::test_layer0_k_cols0_64_weight_tiles_use_dot2_pair_packing tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_proj_full_inner_cols0_64_tiled_accum_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_v_proj_full_inner_cols0_64_tiled_accum_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_rejects_missing_v_cols0_64_last_stage_marker -q
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_all_fixture_files_small_enough tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer_trace_full_inner_projection_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_k_projection_full_inner_cols0_64_fixture_matches_fp32_matmul_oracle tests/native_r9700/test_ref_fixtures.py::test_layer0_v_projection_full_inner_cols0_64_fixture_matches_fp32_matmul_oracle tests/native_r9700/test_runtime_contract.py::test_layer0_k_cols0_64_weight_tiles_use_dot2_pair_packing tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_proj_full_inner_cols0_64_tiled_accum_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_v_proj_full_inner_cols0_64_tiled_accum_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_rejects_missing_v_cols0_64_last_stage_marker -q
 ```
 
 Observed: `10 passed in 6.77s`.
@@ -143,7 +143,7 @@ Observed: both wrappers exited 0; both printed `primitive_chain_proof_wrapper_st
 Full native regression:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q
+${PY} -m pytest tests/native_r9700 -q
 ```
 
 Observed: `185 passed, 2 warnings in 86.64s`.

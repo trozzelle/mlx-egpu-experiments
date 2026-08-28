@@ -12,7 +12,7 @@
 ## Supervisor RED command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_dynamic_page_table_contract.py -q
+${PY} -m pytest tests/native_r9700/test_dynamic_page_table_contract.py -q
 ```
 
 ## Intended RED state

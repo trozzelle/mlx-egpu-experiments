@@ -2,7 +2,7 @@
 
 ## Current state
 
-- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Checkpoint at handoff: `9862430` (`Resolve C0 RS64 context blocker`).
 - Current accepted blocker: `cp_mec_rs64_context_still_multicausal_needs_source_mapping`.
 - Behavior fix authorization: `false`.
@@ -188,7 +188,7 @@ A fresh tinygrad AMD initialization succeeds, but a tinygrad tensor compute smok
 Command attempted from the tinygrad checkout:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c 'from tinygrad import Tensor; x=Tensor([1,2,3,4], device="AMD"); y=(x+1).numpy(); print("tinygrad_compute_result:", y.tolist())'
+${PY} -c 'from tinygrad import Tensor; x=Tensor([1,2,3,4], device="AMD"); y=(x+1).numpy(); print("tinygrad_compute_result:", y.tolist())'
 ```
 
 Observed:

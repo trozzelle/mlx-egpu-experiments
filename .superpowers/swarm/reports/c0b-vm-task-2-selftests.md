@@ -30,11 +30,11 @@ Status: Needs review
 Main must run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ## Supervisor GREEN evidence
-`${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` reported `8 passed in 4.87s` after Main corrected the PDB2 index mask to `0x3ff` and added an internal nonzero-PDB2 guard to the page-table-plan self-test.
+`${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` reported `8 passed in 4.87s` after Main corrected the PDB2 index mask to `0x3ff` and added an internal nonzero-PDB2 guard to the page-table-plan self-test.
 
 ## Guardrails
 

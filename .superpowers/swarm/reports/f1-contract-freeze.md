@@ -463,7 +463,7 @@ The following two sections mirror the already-reconciled F1 command blocks in `d
 
 ```sh
 mkdir -p logs/f1-persistent-worker/process-smoke
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.native_worker \
+${PY} -m native_r9700.native_worker \
   --smoke-load-unload-reload \
   --model mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
@@ -483,7 +483,7 @@ Expected evidence: one public Python service process launches exactly one `nativ
 
 ```sh
 mkdir -p logs/f1-persistent-worker/warm
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.native_worker \
+${PY} -m native_r9700.native_worker \
   --warm-prefill-samples \
   --model mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
@@ -495,7 +495,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.native_worker \
   --json logs/f1-persistent-worker/warm/serving.json \
   --log logs/f1-persistent-worker/warm/worker.log \
   --trace logs/f1-persistent-worker/warm/trace.json
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.benchmark \
+${PY} -m native_r9700.benchmark \
   --model mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --artifacts-dir logs/f1-persistent-worker/warm/artifacts \

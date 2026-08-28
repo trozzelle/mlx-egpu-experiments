@@ -27,8 +27,8 @@ index 91b35f2..a24bb37 100644
 +## Wave 21: C1 attention/RoPE/KV writer planning
 +### Shared context
 +- Goal: unblock and execute C1 task set 6 after Wave 2 by adding the single-layer K/V writer path that later C1 tasks consume.
-+- Constraints: shared work boundary `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`; every executor/reviewer stays in this cwd/branch. The frozen C1 Llama contract remains the parity gate: MLX safetensors dir, no tinygrad in producer path, RoPE from config sidecar, S-1 prefix, fp16 K/V shape `(1,8,N,64)`, and token-exact `P == R` over Phase 0 prompts. Do not edit the frozen C0 probe, `docs/adr/*`, frozen `docs/ROADMAP.md` contract text, or the frozen C1 phase contract text.
-+- Qwen target decision: discovered local candidate `${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff` is tracked as an additional target. The Llama path must not be generalized in a way that weakens the C1 gate. If Qwen proves incompatible with the Llama C1 ladder, record an explicit unsupported/deferred decision with config evidence and a follow-up task boundary instead of faking parity.
++- Constraints: shared work boundary `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`; every executor/reviewer stays in this cwd/branch. The frozen C1 Llama contract remains the parity gate: MLX safetensors dir, no tinygrad in producer path, RoPE from config sidecar, S-1 prefix, fp16 K/V shape `(1,8,N,64)`, and token-exact `P == R` over Phase 0 prompts. Do not edit the frozen C0 probe, `docs/adr/*`, frozen `docs/ROADMAP.md` contract text, or the frozen C1 phase contract text.
++- Qwen target decision: discovered local candidate `<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff` is tracked as an additional target. The Llama path must not be generalized in a way that weakens the C1 gate. If Qwen proves incompatible with the Llama C1 ladder, record an explicit unsupported/deferred decision with config evidence and a follow-up task boundary instead of faking parity.
 +- TDD policy: supervisor observes focused RED tests before production C1 task-set-6 code. OMP executor agents do not run tests, linters, formatters, package managers, hardware commands, or git commands; supervisor verifies after the wave.
 +- Reports: `.superpowers/swarm/reports/c1-task-6-attention-kv.md`, plus scout evidence under agent outputs if needed.
 +
@@ -47,7 +47,7 @@ diff --git a/.superpowers/swarm/progress.md b/.superpowers/swarm/progress.md
 index 800b159..addef5a 100644
 --- a/.superpowers/swarm/progress.md
 +++ b/.superpowers/swarm/progress.md
-@@ -60,7 +60,7 @@ Baseline evidence: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m p
+@@ -60,7 +60,7 @@ Baseline evidence: `${PY} -m p
  | C1-3. CPU MLX reference fixtures | Done | C1RefFixtures (Wave 2, Lane B2) | C1-1, C1-2, C1-4 | `.superpowers/swarm/reports/c1k-task-3-reference-fixtures.md`; `.superpowers/swarm/reports/c1k-wave2-review.md` | Wave 2 done. `native_r9700/ref_fixtures.py` (pure stdlib+numpy, no tinygrad; mlx-lm only as generation oracle), `tests/native_r9700/test_ref_fixtures.py` (7 tests), committed deterministic fixtures under `tests/native_r9700/fixtures/`: prompts.json (prompt-0 S=6, prompt-1 S=222, prompt-2 S=661 token ids), baseline_r_tokens.json (mlx-lm greedy R tokens), kv_state.npz (per-layer K/V (1,8,5,64) fp16, 16 layers, S-1 + final_token_id=374 injection contract), primitives_fixtures.npz (11-key seam schema consumed by Lane A2 bit-exact), fixtures_schema.json. Regenerable byte-for-byte (sha256-identical; supervisor verified). Fixtures small (KV ~160 KB, no weights). Supervisor verified: combined `tests/native_r9700 -q` 57 passed; full `tests -v` 97 passed. Wave 2 reviewer C1Wave2Review -> APPROVE. Wave 2 Minor (recorded, owner C1RefFixtures + evidence `c1k-wave2-review.md`): `rms_eps` stored as fp32 while ground truth uses fp64 1e-5 (probe ref_fixtures.py:146-156) — semantic inconsistency, zero observable impact (bit-exact verified), Info-level schema-exactness note, not actionable; leave stored fp32 (matches what the seam consumer passes) or document the narrowing. | |
  | C1-4. Runtime wrapper and logged execution shell | Done | C1RunnerScaffold (Lane A) / C1RunnerFix / C1RunnerFix2 / C1RunnerReviewer / C1RunnerRereview | C1-1 | `.superpowers/swarm/reports/c1k-task-4-runner-scaffold.md`; `.superpowers/swarm/reports/c1k-task-4-runner-fix.md`; `.superpowers/swarm/reports/c1k-task-4-runner-review-fix.md`; `.superpowers/swarm/reports/c1k-task-4-runner-rereview.md`; report `c1k-task-4-review.md` does NOT exist — reviewer findings in `agent://C1RunnerReviewer` | Files: `native_r9700/runtime.h`, `runtime.cpp`, `runner.cpp`, `tests/native_r9700/test_runtime_contract.py`. API `native_r9700::RuntimeSession` with `initialize/allocate_buffers/copy_input/load_kernel/write_kernargs/dispatch_and_poll/readback_and_compare/cleanup/dry_run`. Reviewer C1RunnerReviewer -> CHANGES_REQUIRED (3 Important + 1 Minor); fix agents (C1RunnerFix, C1RunnerFix2) ported C0 probe encodings byte-faithfully: SDMA linear-copy `[0x000001, byte_count-1U, 0U, src_lo, src_hi, dst_lo, dst_hi]` + fence `[kFenceHeader=0x00030005, fence_va_lo, fence_va_hi, value]` (11 dwords), PM4 compute dispatch 12 packets/59 dwords (`pm4_packet3` first dword `0xc0065800`), removed dead `kSdmaFenceValue` and never-populated RAII members, hardware stubs made honest (deferred to task sets 5-8). Re-review C1RunnerRereview -> APPROVE, 0 findings, 96% confidence. Probe untouched (`git diff --stat experiments/...probe.cpp` empty); `git diff --check` clean. Supervisor verified: `tests/native_r9700 -v` 27 passed; `test_native_amdev_transfer_contract.py -q` 23 passed; `tests -v` 67 passed; build warning-free (exit 0); `--lifecycle-dry-run` exit 0 with sdma_copy_dword_count 11, pm4_dispatch_dword_count 59, sdma_copy_header_hex 00000001, pm4_dispatch_first_dword_hex c0065800, lifecycle_reinit_rejected yes, lifecycle_skip_rejected yes. | |
  | C1-5. Native tensor primitives | Done | C1Primitives (Wave 2, Lane A2) | C1-1, C1-2, C1-3, C1-4 | `.superpowers/swarm/reports/c1k-task-5-primitives.md`; `.superpowers/swarm/reports/c1k-wave2-review.md` | Wave 2 done. `native_r9700/primitives.py`: narrow fp16 host kernels (`cast_fp32_to_fp16`/`cast_fp16_to_fp32` exact widening / round-to-nearest, `matmul` fp16x fp16→fp16 fp32-accumulate single-round, `rms_norm` Llama eps=1e-5 fp32-internal per-row, `silu` fp32-internal), each with loud `UnsupportedDtypeError`/`UnsupportedShapeError` rejection; no tinygrad; no GPU execution claimed (CPU/numpy host reference is substrate-correct — the C++ RuntimeSession performs no tensor math). `tests/native_r9700/test_primitives.py`: 19 focused oracle tests + 4 `TestPrimitiveFixtureSeam` tests reading Lane B2 `primitives_fixtures.npz` (cast/matmul bit-exact, rms/silu within 1-fp16-ulp; pytest.skip when fixtures absent). Observed error bounds all under 1e-3 fp16 probe tolerance (matmul ~1.7e-6, rms ~1.3e-4, silu ~1e-4). Supervisor verified: combined `tests/native_r9700 -q` 57 passed; full `tests -v` 97 passed. Wave 2 reviewer C1Wave2Review -> APPROVE. | |
@@ -69,8 +69,8 @@ index a133045..693136c 100644
  | C1 | full-stack native prefill smoke command | `phase-c1-native-producer-parity.md` task set 7 | C0 substrate SELECTED (macOS TinyGPU/AMDev native, C0A25); C1 command discovery now in scope under a C1 contract-freeze plan; not yet executed |
  | C1 | native KV emitter/load round-trip command | `phase-c1-native-producer-parity.md` task set 8 | C0 substrate SELECTED (macOS TinyGPU/AMDev native, C0A25); C1 command discovery now in scope under a C1 contract-freeze plan; not yet executed |
  | C1 | native producer parity command | `phase-c1-native-producer-parity.md` task set 9 | C0 substrate SELECTED (macOS TinyGPU/AMDev native, C0A25); C1 command discovery now in scope under a C1 contract-freeze plan; not yet executed |
-@@ -386,6 +386,26 @@ cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-produc
- ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
+@@ -386,6 +386,26 @@ cd <repo-root>/.worktrees/native-r9700-produc
+ ${PY} -m pytest tests -v
  ```
  
 +### C1 attention/RoPE/KV writer contract (task set 6)
@@ -83,7 +83,7 @@ index a133045..693136c 100644
 +part of this command.
 +
 +```sh
-+cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_attention_kv.py -v
++cd <former-native-r9700-worktree> && ${PY} -m pytest tests/native_r9700/test_attention_kv.py -v
 +```
 +
 +Expected RED before task set 6 implementation: collection succeeds, then tests
@@ -533,7 +533,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _FIXTURE_DIR = _REPO_ROOT / "tests" / "native_r9700" / "fixtures"
 _PROMPTS_JSON = _FIXTURE_DIR / "prompts.json"
 _KV_FIXTURE_NPZ = _FIXTURE_DIR / "kv_state.npz"
-_PYTHON = "${HOME}/.pyenv/versions/3.12.8/bin/python3"
+_PYTHON = "${PY}"
 _LLAMA_MLX_MODEL_DIR = (
     _REPO_ROOT
     / ".."
@@ -809,13 +809,13 @@ Qwen3.8-27B remains explicitly unsupported/deferred for C1 task set 6. The imple
 ## Exact supervisor commands to run
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_attention_kv.py -v
+${PY} -m pytest tests/native_r9700/test_attention_kv.py -v
 ```
 
 Optional direct CLI parity smoke command:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.attention \
+${PY} -m native_r9700.attention \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --layer 0 \
@@ -826,7 +826,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.attention \
 ## Local smoke performed
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "import numpy as np; import native_r9700.attention as a; scaling={'rope_type':'llama3','factor':32.0,'high_freq_factor':4.0,'low_freq_factor':1.0,'original_max_position_embeddings':8192}; print(a.split_prompt_tokens_for_cache([128000,374])); f=a.llama3_rope_frequencies(64,500000.0,scaling); print(f.shape, f.dtype, float(f[-1])); x=np.array([[[[1.,2.,3.,4.]]]], dtype=np.float32); print(a.apply_rope_split_half(x, np.array([1]), np.array([1.,100.], dtype=np.float32)))"
+${PY} -c "import numpy as np; import native_r9700.attention as a; scaling={'rope_type':'llama3','factor':32.0,'high_freq_factor':4.0,'low_freq_factor':1.0,'original_max_position_embeddings':8192}; print(a.split_prompt_tokens_for_cache([128000,374])); f=a.llama3_rope_frequencies(64,500000.0,scaling); print(f.shape, f.dtype, float(f[-1])); x=np.array([[[[1.,2.,3.,4.]]]], dtype=np.float32); print(a.apply_rope_split_half(x, np.array([1]), np.array([1.,100.], dtype=np.float32)))"
 ```
 
 Observed output:
@@ -840,7 +840,7 @@ Observed output:
 Required tensor shape smoke:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "from safetensors import safe_open; p='../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct/model.safetensors'; names=['model.embed_tokens.weight','model.layers.0.input_layernorm.weight','model.layers.0.self_attn.k_proj.weight','model.layers.0.self_attn.v_proj.weight']; f=safe_open(p, framework='np'); print('\n'.join(f'{n} {f.get_tensor(n).shape} {f.get_tensor(n).dtype}' for n in names))"
+${PY} -c "from safetensors import safe_open; p='../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct/model.safetensors'; names=['model.embed_tokens.weight','model.layers.0.input_layernorm.weight','model.layers.0.self_attn.k_proj.weight','model.layers.0.self_attn.v_proj.weight']; f=safe_open(p, framework='np'); print('\n'.join(f'{n} {f.get_tensor(n).shape} {f.get_tensor(n).dtype}' for n in names))"
 ```
 
 Observed output:
@@ -855,7 +855,7 @@ model.layers.0.self_attn.v_proj.weight (512, 2048) float16
 Post-edit import recheck:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "import native_r9700.attention as a; print(a.split_prompt_tokens_for_cache([1,2]))"
+${PY} -c "import native_r9700.attention as a; print(a.split_prompt_tokens_for_cache([1,2]))"
 ```
 
 Observed output:
@@ -884,7 +884,7 @@ Observed output:
 ## Expected RED command
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_attention_kv.py -v
+cd <former-native-r9700-worktree> && ${PY} -m pytest tests/native_r9700/test_attention_kv.py -v
 ```
 
 Expected RED before production implementation: pytest collection succeeds, then the focused tests fail with a clear missing/unimplemented `native_r9700.attention` API message. The model-backed parity test skips only when the local Llama MLX model or committed `tests/native_r9700/fixtures/kv_state.npz` is absent.
@@ -899,7 +899,7 @@ Expected RED before production implementation: pytest collection succeeds, then 
 - Delta report formatting must include `layer=0`, `n_prefix=5`, `K max`, and `V mean`.
 - Bad Llama-3 `rope_scaling` fails loudly through both frequency generation and model-config driven KV production.
 
-Update: added a CLI/log RED test invoking `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.attention --model <local llama dir> --fixtures-dir tests/native_r9700/fixtures --layer 0 --prompt-name prompt-0 --log <tmp_path>/c1-attention-kv-layer0.log`; after implementation it must exit 0 and write `layer=0`, `n_prefix=5`, `K max`, `K mean`, `V max`, `V mean`, and `exit_status: 0`.
+Update: added a CLI/log RED test invoking `${PY} -m native_r9700.attention --model <local llama dir> --fixtures-dir tests/native_r9700/fixtures --layer 0 --prompt-name prompt-0 --log <tmp_path>/c1-attention-kv-layer0.log`; after implementation it must exit 0 and write `layer=0`, `n_prefix=5`, `K max`, `K mean`, `V max`, `V mean`, and `exit_status: 0`.
 
 Validation was not run, per the task constraint that the supervisor owns RED verification.
 ```

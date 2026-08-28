@@ -41,7 +41,7 @@ It cannot allocate or assume a full-cache VRAM allocation.
 ## Supervisor RED command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_qwen_hybrid_state_spill.py -q
+${PY} -m pytest tests/native_r9700/test_qwen_hybrid_state_spill.py -q
 ```
 
 ## Intended current RED

@@ -18,7 +18,7 @@
 Not run by this worker, per assignment constraint. Run exactly:
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 $PY -m pytest tests/native_r9700/test_llama_stage_oracle.py -q
 ```
 

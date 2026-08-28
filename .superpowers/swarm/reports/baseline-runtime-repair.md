@@ -59,7 +59,7 @@ The supervisor's first focused rerun (`artifact://236`) reported 24 passed and t
 Run this exact no-hardware focused selection from the assigned worktree:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest -q \
+cd <repo-root> && ${PY} -m pytest -q \
   tests/native_r9700/test_amdev_packets.py::test_pm4_dispatch_words_preserve_the_frozen_59_dword_c0a25_stream \
   tests/native_r9700/test_device_memory_contract.py::test_device_memory_rejects_invalid_transitions_without_mutating_accounting \
   tests/native_r9700/test_resident_kernel_dispatch_contract.py::test_resident_dispatch_rejects_a_kernel_without_reviewable_code \
@@ -90,5 +90,5 @@ cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a && ${HOME}
 To record the known non-runtime residual separately, the supervisor may run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest -q tests/native_r9700/test_raw_hip_asset_generator.py::test_fresh_embed_row_source_generates_admitted_raw_code_and_manifest
+cd <repo-root> && ${PY} -m pytest -q tests/native_r9700/test_raw_hip_asset_generator.py::test_fresh_embed_row_source_generates_admitted_raw_code_and_manifest
 ```

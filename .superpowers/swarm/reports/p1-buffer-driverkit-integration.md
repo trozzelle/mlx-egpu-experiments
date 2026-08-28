@@ -4,10 +4,10 @@
 
 **Owner:** `P1TransportFix`
 
-**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
-**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/`.
+**Historical execution/provenance boundary:** This report records source changes executed/reviewed in the former external TinyGPU checkout `<former-tinygpu-worktree>` on branch `feature/r9700-device-owner`; original changed-file paths below retain their former locations as provenance only and never authorize edits.
+**Current source authority and reproduction root:** Active TinyGPU source/build/task authority is `<repo-root>/tinygpu` on branch `feature/r9700-products-wave-a`; current commands below run from this root and write binaries under `<repo-root>/tinygpu/build/`.
 
-**Evidence checkout:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
+**Evidence checkout:** `<repo-root>` (`feature/r9700-products-wave-a`)
 
 ## Changed source and package files
 
@@ -83,12 +83,12 @@ Inference IVars retain the typed `TinyGPUDriver`, a fresh provider, the accepted
 The existing common `TGPUConformanceClient` source now accepts exactly the frozen task-set-3 extension and no task-set-4 commands:
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+<repo-root>/tinygpu/build/Debug/tgpu-conformance-client \
   client-death --service org.tinygrad.tinygpu.driver2 \
   --close-with-live-resources --reopen --replay-handles \
   --expect-status TGPU_STATUS_INVALID_HANDLE \
   --expect-empty-new-namespace \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/client-death.log
+  --log <repo-root>/logs/p1-tinygpu-owner/client-death.log
 ```
 
 The parser requires all listed flags, the exact expected-status spelling, the exact service identity, and a bounded log path. The command uses direct `IOServiceOpen` type 0 and `IOConnectCallStructMethod`; it never invokes `Shared/server.c` or a proxy. It first checks capabilities and ready health. If the service is unavailable, capability-limited, or faulted, it records a bounded failure and exits nonzero instead of substituting another transport.
@@ -100,7 +100,7 @@ For the positive path, a child opens a fresh direct type-0 connection, allocates
 Supervisor should first run the new transport/response contracts from the installer directory:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUFixedTransport.cpp \
@@ -119,7 +119,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 Then run the accepted host contracts:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUBufferRequestValidator.cpp \
@@ -142,13 +142,13 @@ The selected Xcode/DriverKit source gate and unsigned target build are superviso
 ```sh
 xcode-select -p
 xcrun --sdk driverkit --show-sdk-version
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TinyGPUDriver -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
+  CONFIGURATION_BUILD_DIR=<repo-root>/tinygpu/build/Debug
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TGPUConformanceClient -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
+  CONFIGURATION_BUILD_DIR=<repo-root>/tinygpu/build/Debug
 ```
 
 After the unsigned compile gate, supervisor may perform the existing local NoSIP install and then the direct command above. Any missing DriverKit SDK, unavailable DEXT, absent entitlement/profile, missing signed install, unavailable/faulted R9700, missing approved cold firmware state, or failed physical attachment is an explicit blocker. No legacy proxy or fake mapping path is an alternative.

@@ -28,7 +28,7 @@ Wrapper validation now checks the actual hardware contract:
 ## Verification
 
 - Focused RHS/wrapper tests:
-  - `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_post_attention_rmsnorm_sumsq_rhs_uses_transposed_dot2_residual_chunks tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_post_attention_rmsnorm_cols0_64_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_rejects_missing_post_attention_rmsnorm_cols0_64_source_arrays_marker -q`
+  - `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_post_attention_rmsnorm_sumsq_rhs_uses_transposed_dot2_residual_chunks tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_post_attention_rmsnorm_cols0_64_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_rejects_missing_post_attention_rmsnorm_cols0_64_source_arrays_marker -q`
   - Result: `3 passed in 5.12s`.
 - Permanent C++ compile:
   - `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -o build/native-r9700-runtime/c1_primitive_bridge`

@@ -139,7 +139,7 @@ Result: hardware wrapper exited 0 with `primitive_chain_proof_wrapper_status: pa
 Full native regression after review:
 
 ```text
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q
+${PY} -m pytest tests/native_r9700 -q
 ```
 
 Result: `274 passed, 2 warnings in 393.96s`; raw output `artifact://2749`.

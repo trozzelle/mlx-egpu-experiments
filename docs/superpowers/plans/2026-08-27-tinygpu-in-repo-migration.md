@@ -10,12 +10,12 @@
 
 ## Global Constraints
 
-- Work only in `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` on `feature/r9700-products-wave-a`.
-- Source input is the clean local TinyGPU checkpoint `f18261437` at `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner`.
+- Work only in `<repo-root>` on `feature/r9700-products-wave-a`.
+- Source input is the clean local TinyGPU checkpoint `f18261437` at `<former-tinygpu-worktree>`.
 - Import `extra/usbgpu/tbgpu/installer/` only; never import the full Tinygrad checkout, `.git`, build products, caches, or generated Xcode output.
 - Final source root is `tinygpu/`.
 - Preserve the old local TinyGPU worktree and branch.
-- Delete `<account>/tinygrad` only after the in-repository source is verified, committed, and pushed.
+- Delete `<temporary-tinygrad-fork>` only after the in-repository source is verified, committed, and pushed.
 - P1 hardware/import/private-VM/signing/G0 blockers remain unchanged and explicit.
 - No proxy, raw mapping, metadata-only GPU mapping, or pre-warmed acceptance.
 
@@ -36,7 +36,7 @@
 Run:
 
 ```sh
-git -C ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner status --short --branch
+git -C <former-tinygpu-worktree> status --short --branch
 git status --short --branch
 test ! -e tinygpu
 ```
@@ -48,7 +48,7 @@ Expected: source branch clean at `feature/r9700-device-owner`; products branch c
 Run:
 
 ```sh
-git -C ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner \
+git -C <former-tinygpu-worktree> \
   archive --format=tar --prefix=tinygpu/ \
   -o /tmp/r9700-tinygpu-installer.tar \
   f18261437:extra/usbgpu/tbgpu/installer
@@ -206,7 +206,7 @@ Run `cold-lifecycle` and `client-death` from `tinygpu/build/Debug/tgpu-conforman
 - [ ] **Step 4: Run full products suite**
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -q
+${PY} -m pytest tests -q
 ```
 
 Expected: 1,248 tests pass; only the two known SWIG dependency warnings.
@@ -249,7 +249,7 @@ Expected: local branch matches `origin/feature/r9700-products-wave-a`.
 - [ ] **Step 3: Delete accidental GitHub fork**
 
 ```sh
-gh repo delete <account>/tinygrad --yes
+gh repo delete <temporary-tinygrad-fork> --yes
 ```
 
 Expected: fork deletion succeeds. If GitHub requires `delete_repo` authorization, stop remote cleanup and report the exact missing scope; do not remove the only verified remote source before the products push.
@@ -259,7 +259,7 @@ Expected: fork deletion succeeds. If GitHub requires `delete_repo` authorization
 After confirmed fork deletion:
 
 ```sh
-git -C ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner remote remove fork
+git -C <former-tinygpu-worktree> remote remove fork
 ```
 
 Expected: old checkout retains upstream `origin` only. Do not push to it.

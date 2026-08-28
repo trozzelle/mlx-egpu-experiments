@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Native proof code must not import, shell out to, or dynamically depend on tinygrad.
 - Substantial tinygrad-derived C++ must include MIT notice and file/line provenance comments.
 - No libusb/`USBIface` acceptance path; `macos_tinygpu_minimal.cpp` remains a stale negative control unless explicitly labeled as such.
@@ -41,7 +41,7 @@
 
 **Interfaces:**
 - Consumes: native boundary spec `docs/archive/superpowers/specs/2026-08-16-native-amdev-sdma-boundary-design.md`.
-- Produces: pytest command `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v`; expected RED failure before production source exists.
+- Produces: pytest command `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v`; expected RED failure before production source exists.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -124,7 +124,7 @@ def test_log_contract_self_test_lists_required_fields(tmp_path):
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected RED result before Task 2: FAIL with `AssertionError: native transfer probe source missing`.
@@ -157,7 +157,7 @@ The first implementation includes:
 ```cpp
 // Substantial AMD/TinyGPU mechanics in this file are derived from tinygrad
 // under the MIT license. Source provenance is recorded beside each ported
-// section. See ${HOME}/Development/ml/tools/tinygrad/LICENSE.
+// section. See <tinygrad-checkout>/LICENSE.
 ```
 
 Implement:
@@ -173,7 +173,7 @@ Implement:
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected after Task 2: 2 passed.

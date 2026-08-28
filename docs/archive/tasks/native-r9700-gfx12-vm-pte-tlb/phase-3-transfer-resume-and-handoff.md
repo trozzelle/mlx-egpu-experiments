@@ -68,7 +68,7 @@ Non-goals: no compute kernel dispatch, no runtime wrapper, no C0 substrate decis
 Supervisor runs:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Then supervisor runs the hardware command from `validation-commands.md`.
@@ -154,7 +154,7 @@ Non-goals: reviewer does not implement fixes; agents do not run git; no push.
 Supervisor validation set:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ```sh

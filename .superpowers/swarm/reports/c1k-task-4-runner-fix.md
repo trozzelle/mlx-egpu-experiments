@@ -124,7 +124,7 @@ names) are unchanged.
 
 ## Supervisor commands to run (NOT run by this executor)
 
-From `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`:
+From `<former-native-r9700-worktree>`:
 
 ```sh
 # 1) Build the runtime shell (runtime.cpp + runner.cpp)
@@ -134,13 +134,13 @@ xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   -o build/native-r9700-runtime/native_r9700_runner
 
 # 2) Focused no-hardware contract tests (compiles runner, runs --lifecycle-dry-run)
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 
 # 3) C0 regression (must stay green)
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 
 # 4) Lane B loader regression (must still pass)
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_loader.py -q
+${PY} -m pytest tests/native_r9700/test_loader.py -q
 
 # 5) Probe untouched
 git diff --stat experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp

@@ -127,7 +127,7 @@ keep it green.
 
 ## 6. mac-amdgpu — native DriverKit reference driver (behavioral control)
 
-Reference clone: `${HOME}/Development/ml/tools/mac-amdgpu` (cloned 2026-08-23,
+Reference clone: `<tools-root>/mac-amdgpu` (cloned 2026-08-23,
 `https://github.com/lemonade-sdk/mac-amdgpu`, v0.1.48 @ `3bdeed2`).
 
 A third-party native PCIDriverKit driver extension — a **dext**, not a kext, not TinyGPU — that

@@ -7,9 +7,12 @@ import pytest
 
 from native_r9700.qwen_layer_executor import QwenLayerExecutorError, plan_qwen_text_stage
 from native_r9700.qwen_spill import QwenHybridState, QwenStateEntry, QwenStateLeaf
-from native_r9700.qwen_text_adapter import load_qwen_text_adapter
+from native_r9700.qwen_text_adapter import (
+    CANONICAL_QWEN_TEXT_SNAPSHOT,
+    load_qwen_text_adapter,
+)
 
-SNAPSHOT = "${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff"
+SNAPSHOT = CANONICAL_QWEN_TEXT_SNAPSHOT
 MODEL_FINGERPRINT = "4304f20a69213c8f0620ab7388163dd58b324278679d94c5915f279438d1b371"
 COMMITTED_POSITION = 4  # S-1 for the frozen five-token probe.
 LINEAR_SPECS = (

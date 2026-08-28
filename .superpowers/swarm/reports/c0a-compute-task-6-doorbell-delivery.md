@@ -38,10 +38,10 @@
 Source-ground BAR2 doorbell index/value, MEC doorbell range lower/upper, and GDC S2A routing before changing a register.
 
 ## Validation
-- RED focused pytest: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v` exited `1` before C++ registration with expected `subprocess.CalledProcessError` and `failure_text: unknown self-test 'compute-doorbell-delivery'`.
-- GREEN focused pytest: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v` reported `1 passed in 1.22s`.
-- GREEN help pytest: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_help_lists_hardware_modes -v` reported `1 passed in 1.17s`.
-- Full no-hardware pytest after instrumentation: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` reported `18 passed in 20.97s`.
+- RED focused pytest: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v` exited `1` before C++ registration with expected `subprocess.CalledProcessError` and `failure_text: unknown self-test 'compute-doorbell-delivery'`.
+- GREEN focused pytest: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v` reported `1 passed in 1.22s`.
+- GREEN help pytest: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_help_lists_hardware_modes -v` reported `1 passed in 1.17s`.
+- Full no-hardware pytest after instrumentation: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` reported `18 passed in 20.97s`.
 - Hardware command: command above wrote `logs/c0d-native-amdev-doorbell-delivery.log`, emitted `exit_status: 1`, and wrapper emitted `wrapper_exit_status: 1`.
 
 ## Non-goals preserved

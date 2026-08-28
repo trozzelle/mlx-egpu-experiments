@@ -5,13 +5,13 @@ Continue the C1 native producer parity work after the completed Wave 2 (C1 task 
 
 ## Constraints & Preferences
 
-- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`, branch `feature/native-r9700-producer` (current feature branch; shared swarm boundary; NOT `main`; no fallback worktree). Confirm the branch before any edit/dispatch.
+- Work boundary: `<former-native-r9700-worktree>`, branch `feature/native-r9700-producer` (current feature branch; shared swarm boundary; NOT `main`; no fallback worktree). Confirm the branch before any edit/dispatch.
 - Supervisor (main controller) owns verification, ledger, review gates, and checkpoint commits. Subagents (task/reviewer/fix) NEVER run git, tests, builds, linters, package managers, or hardware commands.
-- Push to `origin https://github.com/<account>/mlx-egpu-experiments` remains the USER's responsibility — do not push.
+- Push to `origin <products-remote>` remains the USER's responsibility — do not push.
 - Do NOT touch the frozen C0 probe `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp` — it is the byte-stable reference. Refactor = create NEW files under `native_r9700/`, never edit the probe.
 - Do NOT modify `docs/adr/*`, `docs/ROADMAP.md` frozen contract text, or `phase-c1-native-producer-parity.md` frozen contract content.
 - C1 contract is FROZEN ("the frozen contract"): macOS TinyGPU.app/APLRemotePCIDevice/PCIIface native AMDev substrate; source root `native_r9700/`, test root `tests/native_r9700/`; 24-byte kernarg layout `{output_va@0, input_va@8, scalar_va@16, scalar:u32@24}`; KV interchange = mlx-lm prompt-cache `.safetensors` (per-layer `KVCache`, empty `meta_state`, global `offset`, fp16, `(1,8,N,64)`); `P == R` token-exact gate over Phase 0 suite; no tinygrad dependency in producer path; RoPE from MLX config sidecar; `S-1` + final-token injection.
-- Python: `${HOME}/.pyenv/versions/3.12.8/bin/python3`. C++ build: `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra`.
+- Python: `${PY}`. C++ build: `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra`.
 - Every GPU/native run writes a reviewable local log under `logs/` (git-ignored; do not commit).
 - Model weights dir: `.worktrees/tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct` (relative to the worktree; `mlx_models/` is gitignored).
 

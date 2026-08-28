@@ -46,7 +46,7 @@ None.
 
 ## Supervisor validation already run
 
-- Focused pytest: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `11 passed in 9.94s`.
+- Focused pytest: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `11 passed in 9.94s`.
 - Hardware transfer proof from `docs/tasks/native-r9700-producer/validation-commands.md` -> `logs/c0b-native-amdev-sdma-transfer.log` at `2026-08-17T13:31:58Z`, exit `0`, wrapper exit `0`.
 
 ## Remaining supervisor command

@@ -32,7 +32,7 @@ Status: implemented and approved after supervisor validation/re-review.
 Focused GREEN after review fixes:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_parity.py -v
+cd <former-native-r9700-worktree> && ${PY} -m pytest tests/native_r9700/test_parity.py -v
 ```
 
 Observed: exits `0` with **16 passed**.
@@ -40,8 +40,8 @@ Observed: exits `0` with **16 passed**.
 Final all-prompt C1 parity gate:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.parity \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.parity \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --r-source both \

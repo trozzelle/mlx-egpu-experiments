@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Use `${HOME}/.pyenv/versions/3.12.8/bin/python3` for Python commands.
+- Use `${PY}` for Python commands.
 - First accepted model: `../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct`.
 - C1 acceptance requires `producer_kind=r9700_native`, no production tinygrad import/call, R9700/eGPU model-forward tensor math, existing `S-1` KV cache artifact, and `P == R` across the Phase 0 prompt suite.
 - CPU reference (`producer_kind=cpu_reference`) stays useful only as oracle/reference evidence.
@@ -92,7 +92,7 @@ Implement only the orchestration shell: build runner argv, run it with `subproce
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_runtime_contract.py -q
+${PY} -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_runtime_contract.py -q
 ```
 
 Expected: pass, with `r9700_native` fail-closed behavior covered.
@@ -134,7 +134,7 @@ Build runner and execute the new layer0 proof. Acceptance for this task is not C
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q
 ```
 
 Expected: pass.
@@ -176,7 +176,7 @@ Use prompt-0 (`S=6`) first because it already has compact oracle fixtures and ac
 Run the produced NPZ through:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.kv_cache --prefill-npz <native-prefill.npz> --out <native-prompt-cache.safetensors> --log <kv-cache.log>
+${PY} -m native_r9700.kv_cache --prefill-npz <native-prefill.npz> --out <native-prompt-cache.safetensors> --log <kv-cache.log>
 ```
 
 Expected: cache loads with 32 tensors, `offset=S-1`, 16 layers, `(1, 8, S-1, 64)` K/V.
@@ -287,7 +287,7 @@ Run the benchmark only after C2 native route is accepted. Expected: every native
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q
+${PY} -m pytest tests/native_r9700 -q
 git diff --check
 ```
 

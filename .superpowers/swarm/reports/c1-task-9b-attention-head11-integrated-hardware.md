@@ -45,7 +45,7 @@ NATIVE_R9700_C1_PRIMITIVE_BRIDGE=/tmp/native_r9700_primitive_bridge_head11_compi
 ```
 
 ## Supervisor verification
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k 'layer0_attention_head11_embedded_operands_use_kernel_layouts or layer0_attention_scores_softmax_context_head11_tokens0_5_cols704_768_chain' -q`
+- `${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k 'layer0_attention_head11_embedded_operands_use_kernel_layouts or layer0_attention_scores_softmax_context_head11_tokens0_5_cols704_768_chain' -q`
   - Result: exit 0; `2 passed, 126 deselected in 7.17s`.
 - `build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_attention_scores_softmax_context_head11_tokens0_5_cols704_768_chain`
   - Result: real hardware primitive-chain proof exited 0 with `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `max_abs_diff=3.7252902984619141e-09`, `max_ulp_diff=4`, `mismatch_count=0`, `byte_mismatch_count=37`, and log `logs/c1-runner-primitive-chain-proof-layer0_attention_scores_softmax_context_head11_tokens0_5_cols704_768_chain-2026-08-20T20:45:54Z.log`.

@@ -18,4 +18,4 @@
 - The first resident K/V projection dispatch still needs parameterized embedding/weight upload and hardware kernel launch using those model/prompt-derived buffers. Current counters remain `kernel_count: 0` and `transfer_bytes: 0`, so the path remains blocked/open.
 
 ## Supervisor commands
-- Per assignment constraint, I did not run validation commands. Minimal suggested supervisor check: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q`
+- Per assignment constraint, I did not run validation commands. Minimal suggested supervisor check: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q`

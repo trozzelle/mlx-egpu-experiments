@@ -8,12 +8,12 @@ No validation command, test, build, formatter, linter, package-manager, install/
 
 ## Changed files
 
-- Historical execution/provenance boundary: TinyGPU source changes were executed/reviewed in former external checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; changed-file paths below are provenance only.
+- Historical execution/provenance boundary: TinyGPU source changes were executed/reviewed in former external checkout `<former-tinygpu-worktree>` on branch `feature/r9700-device-owner`; changed-file paths below are provenance only.
   - `extra/usbgpu/tbgpu/installer/Conformance/tests/tgpu_resource_table_contract.cpp`
   - `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_framebuffer_contract.cpp`
   - `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_health_request_contract.cpp`
   - `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_evidence_log_contract.cpp`
-- Current source authority and reproduction root: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands run from `tinygpu/`.
+- Current source authority and reproduction root: `<repo-root>/tinygpu` on branch `feature/r9700-products-wave-a`; current commands run from `tinygpu/`.
 - Current orchestration/evidence file: products checkout `feature/r9700-products-wave-a` — `.superpowers/swarm/reports/p1-review-fixes-red.md`.
 
 Only the four conformance test files and this report were edited. No production header/source, Xcode/project/package/app file, or existing Python test was changed.
@@ -97,7 +97,7 @@ Run from the products worktree's `tinygpu/` directory, not the repository root.
 ### Token replay contract
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TinyGPUResourceTable.cpp \
@@ -115,7 +115,7 @@ FAIL: epoch-one token remains invalid in epoch-two namespace (observed=0 expecte
 ### Framebuffer decoder contract
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUFramebufferDecoder.cpp \
@@ -129,7 +129,7 @@ Historical expected result (former checkout, recorded before the 2026-08-27 migr
 ### Inference health validator contract
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUHealthRequestValidator.cpp \
@@ -143,7 +143,7 @@ Historical expected result (former checkout, recorded before the 2026-08-27 migr
 ### Evidence-log contract
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUEvidenceLog.cpp \

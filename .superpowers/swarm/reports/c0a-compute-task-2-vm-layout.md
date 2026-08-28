@@ -44,11 +44,11 @@ The printed lines derive from the added constants/helpers and are intended to ma
 Executor did not run validation per task constraints. Supervisor should run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree> && ${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ## Supervisor GREEN result
-`${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `0`: `16 passed in 14.89s`.
+`${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` exited `0`: `16 passed in 14.89s`.
 
 Supervisor adjustment after source inspection: `encode_hqd_eop_control` now derives the expected `0x0000000a` from `am_compute::kEopSize` directly with `log2_floor_u32(kEopSize) - 2U`, avoiding an unclear byte/dword divisor while preserving the verified contract.
 

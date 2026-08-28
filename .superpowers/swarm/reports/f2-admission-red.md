@@ -11,7 +11,7 @@
 Run this exact hardware-free command from the repository root after the tool/admission implementation is present:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_wmma_layout_proof.py -v
 ```
 
@@ -151,7 +151,7 @@ network, or git operations were run in this follow-up RED lane.
 
 ## Supervisor validation
 
-- Focused command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_wmma_layout_proof.py -q`
+- Focused command: `${PY} -m pytest tests/native_r9700/test_wmma_layout_proof.py -q`
 - Result: **34 passed**.
 - The offline CLI, bounded NPZ handling, trusted source/resource/ISA records, inverse mapping, typed canonical identity, and fail-closed mutations are implemented.
 - Remaining hard blocker: the repository lacks the pinned rocWMMA/AITER checkouts, selected linear WMMA image, and real ISA/resource/physical-layout reports required to replace the synthetic admission inputs. Task set 3 therefore cannot promote, and task sets 4–6/G0 remain blocked.

@@ -11,7 +11,7 @@ Instrument the existing `--kernel-proof` path with read-only pre-ring, post-ring
 ## Dependencies
 - Phase 1 complete: `--self-test compute-doorbell-delivery` exists and passes.
 - Current `--kernel-proof` already reaches `kernel_blob_load_status: pass`, `kernarg_write_status: pass`, `sdma_h2d_status: pass`, `compute_ring_setup_status: pass`, and `compute_hqd_active_status: pass` before timing out.
-- The hardware run must stay on the TinyGPU.app/APLRemotePCIDevice/PCIIface path in `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`.
+- The hardware run must stay on the TinyGPU.app/APLRemotePCIDevice/PCIIface path in `<former-native-r9700-worktree>`.
 
 ## Orchestration map
 - Sequential blockers: Task set 1 instrumentation must land and pass no-hardware tests before Task set 2 runs hardware and writes the report.
@@ -70,7 +70,7 @@ Agents update only their row and append evidence/notes as work completes.
 
 ### Task set 1 agent notes
 - DoorbellSnapshots implemented the native probe instrumentation only: five `compute_doorbell_probe_*` log fields, structured queue debug snapshots, timeout classification, and compatibility `read_compute_queue_debug(...)` formatting.
-- Supervisor validation still required: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v`.
+- Supervisor validation still required: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v`.
 - Hardware diagnostic command/report remains deferred to Task set 2; no hardware command was run by this agent.
 
 
@@ -78,8 +78,8 @@ Agents update only their row and append evidence/notes as work completes.
 Run exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected result after Phase 1 adds one test: all tests pass, normally `18 passed` unless another concurrent task added tests.
@@ -100,7 +100,7 @@ Expected result after Phase 1 adds one test: all tests pass, normally `18 passed
 1. Supervisor runs this exact hardware command:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0d-native-amdev-doorbell-delivery.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 

@@ -24,7 +24,7 @@ A valid build requires all direct named bindings and exactly one launch for each
 ## Supervisor RED command (do not run in this task)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_llama_stage_layout.py -q
+${PY} -m pytest tests/native_r9700/test_llama_stage_layout.py -q
 ```
 
 ## Intended initial RED state

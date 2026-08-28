@@ -55,7 +55,7 @@ The tests deliberately import production modules through test-local `_require_*`
 ## Supervisor verification command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_service_protocol.py \
   tests/native_r9700/test_model_service.py \
   tests/native_r9700/test_native_resource_client.py -v

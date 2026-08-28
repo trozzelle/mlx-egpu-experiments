@@ -4,7 +4,7 @@
 - Parent plan: `docs/archive/superpowers/plans/2026-08-17-c0-doorbell-blocker-resolution.md` Task 6F.
 - Selected from Phase 7 proof: `.superpowers/swarm/reports/c0a-compute-task-10-mqd-hqd-copy-proof.md`.
 - Phase 7 review: `.superpowers/swarm/reports/c0a-compute-task-10-review.md` accepted `mqd_hqd_copy_fix`, found CPU pass tokens absent, and set `next_lane: cp_mec_visibility_diagnostic`.
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 
 ## Selected lane
 - `selected_lane: cp_mec_visibility_diagnostic`

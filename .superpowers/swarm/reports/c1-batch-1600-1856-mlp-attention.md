@@ -1,7 +1,7 @@
 # C1 batch 1600:1856 MLP + attention primitive chains
 
 ## Scope
-- Worktree: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`.
+- Worktree: `<former-native-r9700-worktree>`.
 - Branch: `feature/native-r9700-producer`.
 - Added/finished MLP down full-inner bands: cols1600:1664, cols1664:1728, cols1728:1792, cols1792:1856.
 - Added/finished integrated attention scores->softmax->context chains: head25 cols1600:1664 kv_head6, head26 cols1664:1728 kv_head6, head27 cols1728:1792 kv_head6, head28 cols1792:1856 kv_head7.
@@ -21,34 +21,34 @@
 
 ## Verification
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m py_compile native_r9700/ref_fixtures.py tests/native_r9700/test_runtime_contract.py
+${PY} -m py_compile native_r9700/ref_fixtures.py tests/native_r9700/test_runtime_contract.py
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/c1_primitive_bridge_batch1600_check
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner
 ```
 Result: all exited `0` with no compiler output.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'future_attention_scores_softmax_context_chain or batch_1344_1600_new_chains or 1600 or 1664 or 1728 or 1792 or 1856 or head25 or head26 or head27 or head28'
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'future_attention_scores_softmax_context_chain or batch_1344_1600_new_chains or 1600 or 1664 or 1728 or 1792 or 1856 or head25 or head26 or head27 or head28'
 ```
 Result: `18 passed, 152 deselected in 143.99s`.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'primitive_proof_wraps_supplied_bridge or layer0_k_tile_chain or 1664_1728'
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'primitive_proof_wraps_supplied_bridge or layer0_k_tile_chain or 1664_1728'
 ```
 Result: `11 passed, 159 deselected in 95.91s`.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'q_proj_full_inner_cols0_64 or o_proj_full_inner_cols0_64 or mlp_gate_proj_full_inner_cols0_64 or mlp_up_proj_full_inner_cols0_64 or batch_1600_1856_new_chains or 1664_1728'
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -q -k 'q_proj_full_inner_cols0_64 or o_proj_full_inner_cols0_64 or mlp_gate_proj_full_inner_cols0_64 or mlp_up_proj_full_inner_cols0_64 or batch_1600_1856_new_chains or 1664_1728'
 ```
 Result: `3 passed, 167 deselected in 59.32s`.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_batch_1600_1856_new_chains -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_batch_1600_1856_new_chains -q
 ```
 Result after review/test-generator fix: `1 passed in 42.41s`.
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q
+${PY} -m pytest tests/native_r9700 -q
 ```
 Result after review/test-generator fix: `397 passed, 2 warnings in 1234.67s` (`artifact://4195`).
 

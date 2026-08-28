@@ -19,10 +19,19 @@ import tempfile
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
-CANONICAL_QWEN_TEXT_SNAPSHOT = (
-    "${HOME}/Development/ml/models/hub/"
-    "models--mlx-community--Qwen3.8-27B-4bit/snapshots/"
-    "3e6447f082e89cc7f0bc6e5441afd38dfce760ff"
+_QWEN_MODEL_REVISION = "3e6447f082e89cc7f0bc6e5441afd38dfce760ff"
+_DEFAULT_HF_HOME = Path(
+    os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface")
+)
+CANONICAL_QWEN_TEXT_SNAPSHOT = os.environ.get(
+    "QWEN_TEXT_MODEL_DIR",
+    str(
+        _DEFAULT_HF_HOME
+        / "hub"
+        / "models--mlx-community--Qwen3.8-27B-4bit"
+        / "snapshots"
+        / _QWEN_MODEL_REVISION
+    ),
 )
 
 _EXPECTED_TOP_LEVEL_MODEL_TYPE = "qwen3_5"

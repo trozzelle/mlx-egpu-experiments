@@ -64,7 +64,7 @@ fixture_file_sha256
 Focused runtime-pin command (not run in this lane):
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_ref_fixtures.py -k \
   'oracle_runtime or generation_verifies_runtime_before_model_oracle_reads' -v
 ```
@@ -73,7 +73,7 @@ Pinned-runtime fixture regeneration (supervisor-owned; command shape):
 
 ```sh
 PYTHONPATH=build/q1-oracle-runtime:$PYTHONPATH \
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures \
+${PY} -m native_r9700.ref_fixtures \
   --generate-qwen \
   --runtime-root build/q1-oracle-runtime \
   --model <qwen-model-dir> \

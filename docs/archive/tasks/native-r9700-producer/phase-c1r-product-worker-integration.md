@@ -50,7 +50,7 @@ The active runner has one small native-prefill command contract. Missing model/i
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_lifecycle.py tests/native_r9700/test_runtime_protocol.py -q
+${PY} -m pytest tests/native_r9700/test_runtime_lifecycle.py tests/native_r9700/test_runtime_protocol.py -q
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime_contract.cpp native_r9700/amdev_packets.cpp native_r9700/amdev_session.cpp native_r9700/device_memory.cpp native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner
 ```
 
@@ -81,7 +81,7 @@ A layer-0 log demonstrates real token/model input, GPU-resident intermediate dat
 
 ### Validation
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_kernel_catalog.py tests/native_r9700/test_layer0_executor_contract.py -q
+${PY} -m pytest tests/native_r9700/test_kernel_catalog.py tests/native_r9700/test_layer0_executor_contract.py -q
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime_contract.cpp native_r9700/amdev_packets.cpp native_r9700/amdev_session.cpp native_r9700/device_memory.cpp native_r9700/kernel_catalog.cpp native_r9700/llama_layer_executor.cpp native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner
 ```
 

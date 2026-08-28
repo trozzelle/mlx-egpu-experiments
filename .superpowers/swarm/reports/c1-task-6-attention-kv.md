@@ -26,13 +26,13 @@ Qwen3.8-27B remains explicitly unsupported/deferred for C1 task set 6. The imple
 ## Exact supervisor commands to run
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_attention_kv.py -v
+${PY} -m pytest tests/native_r9700/test_attention_kv.py -v
 ```
 
 Optional direct CLI parity smoke command:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.attention \
+${PY} -m native_r9700.attention \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures \
   --layer 0 \
@@ -43,7 +43,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.attention \
 ## Local smoke performed
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "import numpy as np; import native_r9700.attention as a; scaling={'rope_type':'llama3','factor':32.0,'high_freq_factor':4.0,'low_freq_factor':1.0,'original_max_position_embeddings':8192}; print(a.split_prompt_tokens_for_cache([128000,374])); f=a.llama3_rope_frequencies(64,500000.0,scaling); print(f.shape, f.dtype, float(f[-1])); x=np.array([[[[1.,2.,3.,4.]]]], dtype=np.float32); print(a.apply_rope_split_half(x, np.array([1]), np.array([1.,100.], dtype=np.float32)))"
+${PY} -c "import numpy as np; import native_r9700.attention as a; scaling={'rope_type':'llama3','factor':32.0,'high_freq_factor':4.0,'low_freq_factor':1.0,'original_max_position_embeddings':8192}; print(a.split_prompt_tokens_for_cache([128000,374])); f=a.llama3_rope_frequencies(64,500000.0,scaling); print(f.shape, f.dtype, float(f[-1])); x=np.array([[[[1.,2.,3.,4.]]]], dtype=np.float32); print(a.apply_rope_split_half(x, np.array([1]), np.array([1.,100.], dtype=np.float32)))"
 ```
 
 Observed output:
@@ -57,7 +57,7 @@ Observed output:
 Required tensor shape smoke:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "from safetensors import safe_open; p='../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct/model.safetensors'; names=['model.embed_tokens.weight','model.layers.0.input_layernorm.weight','model.layers.0.self_attn.k_proj.weight','model.layers.0.self_attn.v_proj.weight']; f=safe_open(p, framework='np'); print('\n'.join(f'{n} {f.get_tensor(n).shape} {f.get_tensor(n).dtype}' for n in names))"
+${PY} -c "from safetensors import safe_open; p='../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct/model.safetensors'; names=['model.embed_tokens.weight','model.layers.0.input_layernorm.weight','model.layers.0.self_attn.k_proj.weight','model.layers.0.self_attn.v_proj.weight']; f=safe_open(p, framework='np'); print('\n'.join(f'{n} {f.get_tensor(n).shape} {f.get_tensor(n).dtype}' for n in names))"
 ```
 
 Observed output:
@@ -72,7 +72,7 @@ model.layers.0.self_attn.v_proj.weight (512, 2048) float16
 Post-edit import recheck:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "import native_r9700.attention as a; print(a.split_prompt_tokens_for_cache([1,2]))"
+${PY} -c "import native_r9700.attention as a; print(a.split_prompt_tokens_for_cache([1,2]))"
 ```
 
 Observed output:

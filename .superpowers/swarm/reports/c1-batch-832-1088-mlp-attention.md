@@ -1,7 +1,7 @@
 # C1 batch 832:1088 - MLP down full-inner and attention context
 
 ## Scope
-Implemented bounded primitive-chain support in `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-c1-batch-832` for:
+Implemented bounded primitive-chain support in `<repo-root>/.worktrees/native-r9700-c1-batch-832` for:
 
 - MLP down full-inner output cols `832:896`, `896:960`, `960:1024`, `1024:1088`.
 - Integrated attention scores->softmax->context query heads 13, 14, 15, 16 with context cols `832:896`, `896:960`, `960:1024`, `1024:1088`.
@@ -39,7 +39,7 @@ Both missing chains failed with `unsupported primitive chain` before implementat
 Command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -k "mlp_down_proj_full_inner or future_head" -q
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -k "mlp_down_proj_full_inner or future_head" -q
 ```
 
 Result:
@@ -51,7 +51,7 @@ Result:
 Command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k "future_mlp_down or future_attention or future_heads_embedded or future_cols_embedded or help_lists" -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k "future_mlp_down or future_attention or future_heads_embedded or future_cols_embedded or help_lists" -q
 ```
 
 Result:
@@ -92,7 +92,7 @@ Result: exit 0, no compiler output.
 ## Supervisor verification
 
 - Integrated batch branch `feature/native-r9700-c1-batch-832` into `feature/native-r9700-producer`.
-- Focused marker contracts after supervisor hardware repair: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_future_mlp_down_full_inner_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_future_attention_scores_softmax_context_chain -q` -> `8 passed in 86.22s`.
+- Focused marker contracts after supervisor hardware repair: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_future_mlp_down_full_inner_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_future_attention_scores_softmax_context_chain -q` -> `8 passed in 86.22s`.
 - Supervisor repaired chain-specific observed markers only: cols832:896 needed tolerance `fp32_abs<=2.5e-4_or_ulp<=64`; MLP cols896:1088 and attention head13:16 needed observed max/ULP/byte mismatch markers; attention head13:16 fixture SHA now matches bridge output `daeef467fdace8c0dcd80328a7ec9203fef55ce0999d422c63c478a54292b05f`.
 - Real hardware proofs after repair all exited `0` with `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, and `failure_stage: none`:
   - `layer0_mlp_down_proj_full_inner_to_cols832_896_tiled_accum_chain`: `max_abs_diff=0.000225067138671875`, `max_ulp_diff=311808`, `mismatch_count=0`, `byte_mismatch_count=460`, log `logs/c1-runner-primitive-chain-proof-layer0_mlp_down_proj_full_inner_to_cols832_896_tiled_accum_chain-2026-08-20T22:51:47Z.log`.
@@ -104,7 +104,7 @@ Result: exit 0, no compiler output.
   - `layer0_attention_scores_softmax_context_head15_tokens0_5_cols960_1024_chain`: `max_abs_diff=4.6566128730773926e-10`, `max_ulp_diff=1`, `mismatch_count=0`, `byte_mismatch_count=3`, log `logs/c1-runner-primitive-chain-proof-layer0_attention_scores_softmax_context_head15_tokens0_5_cols960_1024_chain-2026-08-20T22:54:06Z.log`.
   - `layer0_attention_scores_softmax_context_head16_tokens0_5_cols1024_1088_chain`: `max_abs_diff=4.6566128730773926e-10`, `max_ulp_diff=4`, `mismatch_count=0`, `byte_mismatch_count=7`, log `logs/c1-runner-primitive-chain-proof-layer0_attention_scores_softmax_context_head16_tokens0_5_cols1024_1088_chain-2026-08-20T22:54:20Z.log`.
 - Review gate: `C1Batch832Review` found no Critical/Important/Minor findings and recommended accepting the checkpoint.
-- Full native regression after batch832: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> `351 passed, 2 warnings in 914.25s`.
+- Full native regression after batch832: `${PY} -m pytest tests/native_r9700 -q` -> `351 passed, 2 warnings in 914.25s`.
 
 ## Remaining blockers / open acceptance
 

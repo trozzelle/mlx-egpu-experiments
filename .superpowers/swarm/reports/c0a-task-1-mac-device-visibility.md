@@ -14,8 +14,8 @@
 ## Corrected discovery command
 
 ```sh
-JITBEAM=2 DEV=AMD PYTHONPATH=${HOME}/Development/ml/tools/tinygrad \
-  ${HOME}/.pyenv/versions/3.12.8/bin/python3 -c "from tinygrad.runtime.support.system import System; from tinygrad import Device; devs=System.list_devices(0x1002, ((0xffff,(0x74a1,0x744c,0x7480,0x7550,0x7551,0x7590,0x75a0)),), None); print('amd_pci_devices', devs); d=Device['AMD']; print('iface', type(d.iface).__name__); print('arch', d.arch); print('pcibus', getattr(d.iface.pci_dev, 'pcibus', None)); print('pci_dev_class', type(d.iface.pci_dev).__name__)"
+JITBEAM=2 DEV=AMD PYTHONPATH=<tinygrad-checkout> \
+  ${PY} -c "from tinygrad.runtime.support.system import System; from tinygrad import Device; devs=System.list_devices(0x1002, ((0xffff,(0x74a1,0x744c,0x7480,0x7550,0x7551,0x7590,0x75a0)),), None); print('amd_pci_devices', devs); d=Device['AMD']; print('iface', type(d.iface).__name__); print('arch', d.arch); print('pcibus', getattr(d.iface.pci_dev, 'pcibus', None)); print('pci_dev_class', type(d.iface.pci_dev).__name__)"
 ```
 
 ## Corrected evidence

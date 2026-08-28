@@ -6,7 +6,7 @@
 - **Status:** Needs review.
 - **Owner:** `P3Contract`.
 - **Report:** `.superpowers/swarm/reports/p3-contract-freeze.md`.
-- **Worktree boundary:** `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a`.
+- **Worktree boundary:** `<repo-root>`.
 - **Verification policy:** no tests, compilers, formatters, package managers, git commands, or hardware commands were run for this report. The commands in [Active validation ledger insertion](#active-validation-ledger-insertion) are ready for supervisor execution.
 - **Non-goals honored:** no C++/Python implementation, asset migration, runtime YAML parser, F2 WMMA implementation, or shared validation-ledger edit.
 
@@ -535,7 +535,7 @@ The following sections are ready to insert under the shared ledger. They are com
 ### P3 schema
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 mkdir -p build/native-r9700-runtime
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   native_r9700/amdev_packets.cpp native_r9700/runtime_contract.cpp \
@@ -567,7 +567,7 @@ Expected observations:
 ### P3 malformed-pack rejection (focused observation)
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 "$PY" -m pytest tests/native_r9700/test_kernel_pack_manifest.py -v
 ```
 
@@ -576,7 +576,7 @@ Expected: every malformed record exits through offline validation with a named r
 ### P3 scalar migration
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 "$PY" -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_kernel_pack_manifest.py \
@@ -624,7 +624,7 @@ The F2 G0 publication command is copied verbatim below. P3 adds no CLI defaults,
       test -s .superpowers/swarm/reports/g0-wmma-conformance.md || status=$?
     fi
     if [ "$status" -eq 0 ]; then
-      ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+      ${PY} -m pytest \
         tests/native_r9700/test_wmma_lane_map_asset.py \
         tests/native_r9700/test_linear_wmma_f16_asset.py \
         tests/native_r9700/test_hsa_code_image_generator.py \

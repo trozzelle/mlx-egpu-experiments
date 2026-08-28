@@ -23,7 +23,7 @@ The mutation dispatcher writes an otherwise valid request-bound strict NPZ and r
 ## Focused supervisor command (not run by this worker)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -k 'digest_mismatch_before_load_or_session or semantically_invalid_evidence or declared_zero_prefix' -v
+${PY} -m pytest tests/native_r9700/test_serving.py -k 'digest_mismatch_before_load_or_session or semantically_invalid_evidence or declared_zero_prefix' -v
 ```
 
 Per the swarm boundary, this worker did not run tests, builds, linters, formatters, package managers, hardware commands, or git operations.

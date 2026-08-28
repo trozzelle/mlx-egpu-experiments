@@ -8,9 +8,9 @@ No validation command, test, build, formatter, linter, package-manager, Xcode, i
 
 ## Changed files
 
-- Historical execution/provenance boundary: TinyGPU source changes were executed/reviewed in former external checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; the changed-file path below is provenance only.
+- Historical execution/provenance boundary: TinyGPU source changes were executed/reviewed in former external checkout `<former-tinygpu-worktree>` on branch `feature/r9700-device-owner`; the changed-file path below is provenance only.
   - `extra/usbgpu/tbgpu/installer/Conformance/tests/test_tgpu_cold_lifecycle.cpp`
-- Current source authority and reproduction root: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`; current commands run from `tinygpu/`.
+- Current source authority and reproduction root: `<repo-root>/tinygpu` on branch `feature/r9700-products-wave-a`; current commands run from `tinygpu/`.
 - Current orchestration/evidence file: products checkout `feature/r9700-products-wave-a` — `.superpowers/swarm/reports/p1-cold-red.md`.
 
 No production file, project file, entitlement, installer, common client, ledger, supervisor plan, F1 artifact, F2/P3/Q1 artifact, or shared conformance test was edited.
@@ -52,7 +52,7 @@ The test does not assert fake calls as a substitute for behavior: the observable
 Run from the products worktree's `tinygpu/` directory, not the repository root:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   TinyGPUDriverExtension/TGPUColdLifecycle.cpp \
   Conformance/tests/test_tgpu_cold_lifecycle.cpp \

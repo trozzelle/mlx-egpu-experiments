@@ -12,7 +12,7 @@
 ## Focused supervisor command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_kernel_pack_manifest.py -v
+${PY} -m pytest tests/native_r9700/test_kernel_pack_manifest.py -v
 ```
 
 ## Implemented contracts

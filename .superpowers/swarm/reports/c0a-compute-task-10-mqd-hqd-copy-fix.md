@@ -15,7 +15,7 @@
 - Did not run tests, linters, formatters, package managers, git commands, compiles, project-wide suites, or hardware commands.
 
 ## Supervisor validation commands to run
-From `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`:
+From `<former-native-r9700-worktree>`:
 
 ```bash
 python -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_mqd_encoding_self_test_reports_hqd_contract -q

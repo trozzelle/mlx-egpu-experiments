@@ -30,8 +30,8 @@ The MIT notice applies to the TinyGPU-derived code under `tinygpu/`; this reposi
 Use the pinned interpreter:
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
-$PY -m pytest tests -q
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
+"$PY" -m pytest tests -q
 ```
 
 TinyGPU host contracts and unsigned Xcode builds run from `tinygpu/`. Exact commands and current blockers are maintained in:

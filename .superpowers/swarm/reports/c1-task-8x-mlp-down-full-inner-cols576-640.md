@@ -10,7 +10,7 @@ Acceptance remains `hardware_primitive_chain_only_partial` with `native_prefill_
 ## RED evidence
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_cols576_640_embedded_operands_use_kernel_layouts or mlp_down_full_inner_to_cols576_640_chain or help_lists_dry_run_kernel_proof_and_transfer_proof_modes' -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_cols576_640_embedded_operands_use_kernel_layouts or mlp_down_full_inner_to_cols576_640_chain or help_lists_dry_run_kernel_proof_and_transfer_proof_modes' -q
 ```
 
 Pre-bridge result: exited `1` with `1 failed, 2 passed, 118 deselected in 17.26s`; failure showed missing embedded bridge operand symbol `kC1MlpDownProjFullInnerToCols576_640ModelWeightChunkBytes`.
@@ -50,7 +50,7 @@ Fixture generation using the default model path also exited `1` because the defa
 Fixture generation:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures --generate --model ${HOME}/Development/ml/tools/egpu/.worktrees/tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct
+${PY} -m native_r9700.ref_fixtures --generate --model <tinygrad-kv-worker-worktree>/mlx_models/meta-Llama-3.2-1B-Instruct
 ```
 
 Result: exited `0`; wrote `66` fixture files including the cols576:640 final and chunk NPZs.
@@ -58,7 +58,7 @@ Result: exited `0`; wrote `66` fixture files including the cols576:640 final and
 Focused fixture/schema tests:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -k 'schema_json_matches_disk_digests or mlp_down_proj_full_inner or layer_trace_fixtures_schema_shape_dtype' -q
+${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -k 'schema_json_matches_disk_digests or mlp_down_proj_full_inner or layer_trace_fixtures_schema_shape_dtype' -q
 ```
 
 Result: `22 passed, 52 deselected in 0.12s`.
@@ -66,7 +66,7 @@ Result: `22 passed, 52 deselected in 0.12s`.
 Focused runtime/bridge contract tests:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_cols576_640_embedded_operands_use_kernel_layouts or mlp_down_full_inner_to_cols576_640_chain or help_lists_dry_run_kernel_proof_and_transfer_proof_modes' -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_cols576_640_embedded_operands_use_kernel_layouts or mlp_down_full_inner_to_cols576_640_chain or help_lists_dry_run_kernel_proof_and_transfer_proof_modes' -q
 ```
 
 Result: `3 passed, 118 deselected in 18.14s`.
@@ -104,7 +104,7 @@ NATIVE_R9700_C1_PRIMITIVE_BRIDGE=/tmp/native_r9700_c1_bridge_mlp576_check \
 ## Supervisor verification
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_full_inner_to_cols576_640_chain or mlp_down_cols576_640_embedded_operands_use_kernel_layouts' -q && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_primitive_bridge && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner && build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_mlp_down_proj_full_inner_to_cols576_640_tiled_accum_chain
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py -k 'mlp_down_full_inner_to_cols576_640_chain or mlp_down_cols576_640_embedded_operands_use_kernel_layouts' -q && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_primitive_bridge && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner && build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_mlp_down_proj_full_inner_to_cols576_640_tiled_accum_chain
 ```
 
 Result: focused runtime contract `2 passed, 119 deselected in 13.82s`; real hardware primitive-chain proof exited `0` with `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `tolerance: fp32_abs<=2e-4_or_ulp<=64`, `max_abs_diff: 0.00012874603271484375`, `max_ulp_diff: 5868`, `mismatch_count: 0`, `byte_mismatch_count: 462`, and log `logs/c1-runner-primitive-chain-proof-layer0_mlp_down_proj_full_inner_to_cols576_640_tiled_accum_chain-2026-08-20T19:31:57Z.log`.

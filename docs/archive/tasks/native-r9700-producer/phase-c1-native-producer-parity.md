@@ -23,7 +23,7 @@ Implement a tinygrad-free Native R9700 producer for the first parity model (Llam
 - Phase C0 complete with selected runtime substrate or explicit split plan.
 - Phase C0 validation commands and log format recorded.
 - Official Meta Llama 3.2 1B fp16 producer/consumer weight paths available locally or a documented replacement model decision.
-- Existing Python validation environment: `${HOME}/.pyenv/versions/3.12.8/bin/python3`.
+- Existing Python validation environment: `${PY}`.
 - `logs/` and model files remain uncommitted.
 
 ## Orchestration map
@@ -163,7 +163,7 @@ Non-goals: no GPU kernels, no generated large fixture blobs, no prompt set expan
 ### Validation
 
 - Use the exact reference-fixture command recorded in `validation-commands.md`.
-- Existing regression guard: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v` must still pass if Python test files are touched.
+- Existing regression guard: `${PY} -m pytest tests -v` must still pass if Python test files are touched.
 
 ## Task set 4: Runtime wrapper and logged execution shell
 
@@ -235,7 +235,7 @@ Non-goals: no whole model run, no serving wrapper, no approximate/quantized path
 ### Validation
 
 - Use exact primitive test commands recorded in `validation-commands.md` by task set 1 or this task.
-- If Python test files are touched: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v`.
+- If Python test files are touched: `${PY} -m pytest tests -v`.
 
 ## Task set 6: Attention/RoPE/KV writer path
 
@@ -341,7 +341,7 @@ Non-goals: no new prompt-cache format, no DwarfStar KV/session format, no oMLX p
 
 - Use exact KV emitter test command recorded in `validation-commands.md`.
 - Existing no-GPU regression command when Python exporter/harness code is touched:
-  `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v`
+  `${PY} -m pytest tests -v`
 
 ## Task set 9: Parity harness and report writer
 
@@ -382,7 +382,7 @@ Non-goals: no C2 serving wrapper, no semantic-equivalence pass, no direct native
 
 - Use exact C1 parity command recorded in `validation-commands.md`.
 - The existing Phase A guard remains:
-  `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v`
+  `${PY} -m pytest tests -v`
 
 ## Task set 10: C1 review and handoff
 

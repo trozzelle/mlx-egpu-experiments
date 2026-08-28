@@ -67,7 +67,7 @@ Llama stays the first acceptance branch:
 
 Qwen is a separate model/cache adapter over the shared core:
 
-- Model snapshot: `${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff`.
+- Model snapshot: `<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff`.
 - Text-only input uses Qwen tokenizer semantics and explicitly rejects image/video tokens for this phase.
 - Nested `text_config`; 64 layers; hidden size 5120; intermediate size 17408; 24 query heads; 4 KV heads; head dimension 256; affine 4-bit group size 64.
 - The stage scheduler preserves the 3-linear/1-full hybrid cadence: 48 linear-attention layers and 16 full-attention layers.

@@ -16,7 +16,7 @@
 
 ## Validation
 - Instrumentation agent ran no validation commands per dispatch policy.
-- Supervisor ran `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` after the review fix: `19 passed in 25.17s`.
+- Supervisor ran `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` after the review fix: `19 passed in 25.17s`.
 
 ## Review fix
 - Fixed Important review finding from `.superpowers/swarm/reports/c0a-compute-task-9-consumption-instrumentation-review.md`: dynamic `CP_HQD_PQ_DOORBELL_CONTROL` status bits are excluded from MQD/HQD mismatch counting while still logged and decoded for classification.

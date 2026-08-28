@@ -26,5 +26,5 @@ argument: group size is the fixed Qwen affine4 contract of 64.
 ## Supervisor command
 
 ```sh
- ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest -q tests/native_r9700/test_qwen_affine4_source.py
+ ${PY} -m pytest -q tests/native_r9700/test_qwen_affine4_source.py
 ```

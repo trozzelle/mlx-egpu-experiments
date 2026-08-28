@@ -130,7 +130,7 @@ Later service/adapter phases cannot weaken cache acceptance or silently retry th
 Historical focused contract:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_serving.py -v
 ```
 

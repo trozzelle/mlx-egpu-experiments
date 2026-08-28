@@ -6,7 +6,7 @@ Add a fail-closed runtime/runner command for the full layer0 post-layer hidden o
 
 ## Work boundary
 
-- Path: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+- Path: `<former-native-r9700-worktree>`
 - Branch: `feature/native-r9700-producer`
 - Boundary type: current feature branch.
 
@@ -38,13 +38,13 @@ Keep `--layer0-slice-proof` and `--layer0-full-hidden-proof` separate. The slice
 ## Verification
 
 - RED before implementation:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_full_hidden_proof_reports_blocked_until_full_width_dataflow_exists -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_full_hidden_proof_reports_blocked_until_full_width_dataflow_exists -q`
   - Result: failed first with unknown mode before implementation; renamed to `--layer0-full-hidden-proof` after scout review to avoid overclaiming full prefill.
 - Compile:
   - Command: `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runner.cpp native_r9700/runtime.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner`
   - Result: exited `0`; no output.
 - Focused tests:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_full_hidden_proof_reports_blocked_until_full_width_dataflow_exists tests/native_r9700/test_runtime_contract.py::test_layer0_slice_proof_wraps_existing_chains_without_claiming_full_prefill -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_layer0_full_hidden_proof_reports_blocked_until_full_width_dataflow_exists tests/native_r9700/test_runtime_contract.py::test_layer0_slice_proof_wraps_existing_chains_without_claiming_full_prefill -q`
   - Result: `2 passed in 10.29s`.
 - Direct command:
   - Command: `build/native-r9700-runtime/native_r9700_runner --layer0-full-hidden-proof`

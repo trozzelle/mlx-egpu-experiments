@@ -9,7 +9,7 @@
 ## Command added
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_kv_cache.py -v
+${PY} -m pytest tests/native_r9700/test_kv_cache.py -v
 ```
 
 ## Expected RED reason
@@ -24,7 +24,7 @@ Expected RED before production implementation: pytest collection succeeds, then 
 - mlx-lm round-trip checks use `mlx_lm.models.cache.load_prompt_cache(..., return_metadata=True)` when available; only that round-trip part skips if mlx-lm is unavailable, while safetensors header checks remain active.
 - `prefill_result_from_npz` must consume committed fixture-style NPZ files with `layer{i}_K`/`layer{i}_V` arrays, including `tests/native_r9700/fixtures/kv_state.npz` when present.
 - Failure tests require `ValueError` and no final output file for fp32 K/V, wrong head-count shape, wrong layer count, wrong layer order, `n_prefix` mismatch, and invalid output path.
-- CLI must run as `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.kv_cache --prefill-npz <tmp.npz> --out <tmp.safetensors> --log <tmp.log>`, exit 0, write a valid safetensors header, and log `prefill_npz`, `output`, `n_prefix: 5`, `num_layers: 16`, and `exit_status: 0`.
+- CLI must run as `${PY} -m native_r9700.kv_cache --prefill-npz <tmp.npz> --out <tmp.safetensors> --log <tmp.log>`, exit 0, write a valid safetensors header, and log `prefill_npz`, `output`, `n_prefix: 5`, `num_layers: 16`, and `exit_status: 0`.
 - Production `native_r9700.kv_cache`, parity harness/decode, C2 integration, Qwen support, and C++ runtime remain non-goals for this RED gate.
 
 Validation was not run, per the task constraint that the supervisor owns RED/GREEN validation.

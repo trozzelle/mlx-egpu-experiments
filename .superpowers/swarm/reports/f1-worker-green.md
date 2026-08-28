@@ -13,7 +13,7 @@ The public loop does not create child processes, use `subprocess.run`, consult r
 ## Supervisor focused command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_native_worker_evidence.py \
   tests/native_r9700/test_serving.py \
   tests/native_r9700/test_kv_cache.py \

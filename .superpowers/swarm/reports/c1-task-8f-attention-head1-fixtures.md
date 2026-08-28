@@ -6,7 +6,7 @@ Add the next attention-width CPU oracle fixture slice: layer0 head1, tokens0:5, 
 
 ## Work boundary
 
-- Path: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+- Path: `<former-native-r9700-worktree>`
 - Branch: `feature/native-r9700-producer`
 
 ## Implemented by agent `AttentionHead1Fixture`
@@ -36,24 +36,24 @@ Keep head1 as CPU oracle/fixture contract. Hardware bridge coverage still needs 
 
 Agent RED evidence:
 
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -q -k 'head1 or schema_shape_dtype'`
+- `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -q -k 'head1 or schema_shape_dtype'`
 - Initial result: failed with 5 expected missing-key/schema failures for the new head1 fixture keys.
 
 Agent generation:
 
 - Default generation failed because this worktree has no local `mlx_models/`; default path was treated as a Hugging Face repo.
 - Successful regeneration used:
-  - `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures`
+  - `${PY} -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures`
   - Result: wrote 21 fixture files.
 
 Agent focused tests:
 
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -q -k 'head1 or schema_shape_dtype'` -> `15 passed, 37 deselected`
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -q` -> `52 passed`
+- `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -q -k 'head1 or schema_shape_dtype'` -> `15 passed, 37 deselected`
+- `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -q` -> `52 passed`
 
 Supervisor verification:
 
-- Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -q`
+- Command: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -q`
 - Result: `52 passed in 0.10s`.
 
 ## Remaining blocker

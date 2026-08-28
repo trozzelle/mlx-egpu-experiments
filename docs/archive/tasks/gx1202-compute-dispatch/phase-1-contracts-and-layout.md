@@ -10,7 +10,7 @@
 Make the C0A compute-dispatch contract executable without hardware: add RED tests for compute VM layout, gfx1201 register provenance, MQD/HQD encoding, and PM4 dispatch sequence; then add the minimal C++ constants, encoders, self-tests, and CLI wiring that turn those tests GREEN while leaving the hardware path unchanged.
 
 ## Dependencies
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Depends on current C0A-5 blocker evidence: `--kernel-proof` reaches TinyGPU.app/APLRemotePCIDevice/PCIIface discovery, VM/MMHUB/TLB, and SDMA substrate, then fails closed at `failure_stage: compute_ring_setup`.
 - Later phases depend on `am_compute` constants, deterministic encoding helpers, and self-test names from this phase.
 
@@ -57,8 +57,8 @@ Agents update only their row and append evidence/notes as work completes.
 Executor records this exact supervisor command; executor does not run it in OMP task mode:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected supervisor result for this task set: nonzero pytest exit because the four new self-tests are not yet implemented.
@@ -91,8 +91,8 @@ Expected supervisor result for this task set: nonzero pytest exit because the fo
 Executor records this exact supervisor command; executor does not run it in OMP task mode:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected supervisor result after Task sets 1-2: all no-hardware tests pass; source plan expected count changes from `12 passed` to `16 passed`.
@@ -101,8 +101,8 @@ Expected supervisor result after Task sets 1-2: all no-hardware tests pass; sour
 Supervisor runs after both task sets:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 No hardware command is required for this phase because the hardware path must remain unchanged.

@@ -116,7 +116,7 @@ git diff --check docs/tasks/r9700-products/phase-f4-tiled-attention-context.md \
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_llama_flash_attention_asset.py \
   tests/native_r9700/test_hsa_code_image_generator.py \
   tests/native_r9700/test_hsa_code_image_loader.py -v
@@ -152,7 +152,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_attention_kv.py \
   tests/native_r9700/test_llama_stage_oracle.py \
   tests/native_r9700/test_chunked_prefill_contract.py \
@@ -191,7 +191,7 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_llama_attention_hsa_assets.py \
   tests/native_r9700/test_layer0_executor_contract.py \
   tests/native_r9700/test_native_hsa_prefill_contract.py \
@@ -230,7 +230,7 @@ Each context gate independently passes numerical, exact-token, recurrence, memor
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_long_context_parity.py \
   tests/native_r9700/test_chunked_prefill_contract.py \
   tests/native_r9700/test_benchmark.py -v
@@ -271,7 +271,7 @@ git diff --check .superpowers/swarm/reports/f4-final-review.md \
 ## Phase validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 ```
 
 Phase completion also requires all task-set-1 hardware commands, B0 C1R/C2R, accepted context-gate report, final review, and `git diff --check`.

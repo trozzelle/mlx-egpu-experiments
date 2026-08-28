@@ -4,11 +4,11 @@ source_refs:
   - docs/archive/tasks/amdev-doorbell-delivery/phase-5-doorbell-source-gap-resolution.md:73-101 defines Task set 2, requires source-only reporting, raw route decode, Tinygrad/Linux programming equivalence, BAR2 `0x18` coverage semantics, and exactly one `source_consistency` classification.
   - docs/archive/superpowers/plans/2026-08-17-doorbell-source-gap-resolution.md:20-25 asks whether ports 0/3 cover the BAR2 MEC doorbell write at byte offset `0x18`; lines 126-155 require separating `programming_matches_linux` from `coverage_semantics`.
   - .superpowers/swarm/reports/c0a-compute-task-7-gdc-s2a-routing.md:33-42 previously classified GDC/S2A routing as a gap because native/Tinygrad route values matched but no source established `range_offset=0`, `range_size=0` coverage semantics for BAR2 offset `0x18`.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:37-38 clears `strap_no_soft_reset_dev0_f2` on non-NBIO-7.9 hardware and enables `regRCC_DEV0_EPF0_RCC_DOORBELL_APER_EN`.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:42-48 defines `doorbell_enable(...)` with default `offset=0`, `size=0`, encodes enable/AWID/range-size/awaddr/range-offset fields, and writes the selected GDC/S2A register on gfx12.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:271-273 programs gfx12 compute doorbells on S2A port 0 with AWID `0x3` and port 3 with AWID `0x6`, both with `awaddr_31_28_value=0x3` and default offset/size.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/regs.py:9114 defines entry 0 bit fields: enable bit 0, AWID bits 1-5, range offset bits 7-16, range size bits 17-24, and `awaddr_31_28_value` bits 28-31.
-  - ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/regs.py:9117 defines the same field layout for entry 3.
+  - <tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:37-38 clears `strap_no_soft_reset_dev0_f2` on non-NBIO-7.9 hardware and enables `regRCC_DEV0_EPF0_RCC_DOORBELL_APER_EN`.
+  - <tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:42-48 defines `doorbell_enable(...)` with default `offset=0`, `size=0`, encodes enable/AWID/range-size/awaddr/range-offset fields, and writes the selected GDC/S2A register on gfx12.
+  - <tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:271-273 programs gfx12 compute doorbells on S2A port 0 with AWID `0x3` and port 3 with AWID `0x6`, both with `awaddr_31_28_value=0x3` and default offset/size.
+  - <tinygrad-checkout>/tinygrad/runtime/autogen/am/regs.py:9114 defines entry 0 bit fields: enable bit 0, AWID bits 1-5, range offset bits 7-16, range size bits 17-24, and `awaddr_31_28_value` bits 28-31.
+  - <tinygrad-checkout>/tinygrad/runtime/autogen/am/regs.py:9117 defines the same field layout for entry 3.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:548-552 defines native `encode_s2a_doorbell_entry(awid, awaddr_31_28, range_offset=0, range_size=0)` as enable bit, AWID, range offset, range size, and `awaddr_31_28 << 28`.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:2734-2737 names the native BAR2 aperture, entry 0, entry 3, and EPF2 strap registers.
   - experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp:3686-3716 clears the EPF2 strap bit, enables BAR2 aperture, and writes entry 0 with `encode_s2a_doorbell_entry(0x3U, 0x3U)` and entry 3 with `encode_s2a_doorbell_entry(0x6U, 0x3U)`.
@@ -41,14 +41,14 @@ native_route_values_decoded:
 
 tinygrad_route_values:
   - port: 0
-    call_site: ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:272
+    call_site: <tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:272
     awid: 0x3
     awaddr_31_28_value: 0x3
     range_offset_argument: default 0 from line 42
     range_size_argument: default 0 from line 42
     raw_by_tinygrad_field_encoding: 0x30000007
   - port: 3
-    call_site: ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py:273
+    call_site: <tinygrad-checkout>/tinygrad/runtime/support/am/ip.py:273
     awid: 0x6
     awaddr_31_28_value: 0x3
     range_offset_argument: default 0 from line 42

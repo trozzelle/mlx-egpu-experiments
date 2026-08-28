@@ -21,7 +21,7 @@ This is RED before the C++ implementation because the Python contract now requir
 
 ## Supervisor RED command
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v
 ```
 
 No validation commands were run by this agent.

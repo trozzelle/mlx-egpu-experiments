@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Current checkpoint before this plan: `afa8df9 Resolve doorbell source gaps`.
 - Known untracked file `docs.zip` remains untouched.
 - Current hardware symptom: `compute_doorbell_probe_status: submitted`, `doorbell_hit=0`, `hqd_pq_rptr=0x00000000`, `cp_stat=0x00000000`, `failure_stage: kernel_timeline_timeout`, `wrapper_exit_status: 1`.
@@ -107,7 +107,7 @@ Proceed to HQD/PQ diagnostic-only work. Do not change route/range/BAR2 from this
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git diff --check .superpowers/swarm/reports/c0a-compute-task-9-source-gap-exit.md docs/archive/tasks/amdev-doorbell-delivery/phase-6-doorbell-blocker-resolution.md .superpowers/swarm/progress.md .superpowers/swarm/gx1202-compute-dispatch-supervisor.md
 ```
 
@@ -181,8 +181,8 @@ assert "--self-test compute-doorbell-consumption" in completed.stdout
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
 ```
 
 Expected: fails because `compute-doorbell-consumption` is unknown or output is missing.
@@ -353,8 +353,8 @@ Add `run_compute_doorbell_consumption_self_test()` that prints exactly the tuple
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: all tests pass. The current expected count after Task 2 is 19 tests if exactly one new test was added.
@@ -380,7 +380,7 @@ Create `.superpowers/swarm/reports/c0a-compute-task-9-consumption-instrumentatio
 Run exactly:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0e-native-amdev-doorbell-consumption.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 
@@ -485,7 +485,7 @@ For each mismatch from Task 4, add an expected self-test line to `EXPECTED_COMPU
 Run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_mqd_encoding_self_test_reports_hqd_contract -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_mqd_encoding_self_test_reports_hqd_contract -v
 ```
 
 Expected: fails until the C++ self-test exposes or corrects the exact value.
@@ -504,7 +504,7 @@ Forbidden edits: route values, BAR2 index, CP MEC range, PM4 packet sequence, re
 Run full focused pytest:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Then rerun the Task 4 hardware command. Acceptance: `mqd_hqd_mismatch_count=0` and either CPU comparison passes or Task 5 selects a new non-MQD lane from the new evidence.
@@ -731,8 +731,8 @@ Run the existing transfer proof command from current validation docs if source c
 Run:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: all tests pass.
@@ -752,19 +752,19 @@ Dispatch final reviewer with the pass proof report, changed source/tests, and le
 Run before any completion claim:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git diff --check
 ```
 
 Hardware proof command for diagnostic/fix waves:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0e-native-amdev-doorbell-consumption.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 

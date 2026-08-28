@@ -74,7 +74,7 @@ decision and writing the required design/ADR update.
 Final verification command:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v && git diff --check docs/archive/tasks/native-r9700-producer/phase-c3-native-backend-decision.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/reports/c3-task-1-evidence.md .superpowers/swarm/reports/c3-task-2-seam-decision.md .superpowers/swarm/reports/c3-task-6-final-handoff.md
+${PY} -m pytest tests/native_r9700 -v && git diff --check docs/archive/tasks/native-r9700-producer/phase-c3-native-backend-decision.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/reports/c3-task-1-evidence.md .superpowers/swarm/reports/c3-task-2-seam-decision.md .superpowers/swarm/reports/c3-task-6-final-handoff.md
 ```
 
 Result: `pytest: 119 passed, 2 warnings in 10.93s`; command exited 0, so `git diff --check` also passed with no output.

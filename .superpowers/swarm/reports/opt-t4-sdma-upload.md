@@ -80,5 +80,5 @@ After `prepared = false;`:
 Full runner build, then:
 
 ```
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3; $PY -m pytest tests/test_native_amdev_transfer_contract.py -q
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"; $PY -m pytest tests/test_native_amdev_transfer_contract.py -q
 ```

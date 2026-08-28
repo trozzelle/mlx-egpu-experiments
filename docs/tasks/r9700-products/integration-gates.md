@@ -148,7 +148,7 @@ G2 pass authorizes optional direct mode while file prompt cache remains compatib
 Supervisor runs exact F5 direct smoke/warm commands recorded by F5 task set 3 plus:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_direct_kv_adapter.py \
   tests/native_r9700/test_serving.py \
   tests/native_r9700/test_kv_cache.py \

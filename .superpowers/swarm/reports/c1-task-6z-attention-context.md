@@ -18,6 +18,6 @@ Reason: it advances from score tiles into `probs @ V` without inventing a native
 ## Verification
 - Focused context host tests before review fixes: `4 passed in 4.27s`.
 - Focused review-fix tests: `3 passed in 6.10s`.
-- Full native regression: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> `203 passed, 2 warnings in 128.88s`; `git diff --check ...` exited 0 with no output.
+- Full native regression: `${PY} -m pytest tests/native_r9700 -q` -> `203 passed, 2 warnings in 128.88s`; `git diff --check ...` exited 0 with no output.
 - Real wrapper hardware proof: exit `0`, log `logs/c1-runner-primitive-chain-proof-layer0_attention_context_head0_tokens0_5_cols0_64_weighted_sum_chain-2026-08-19T23:01:20Z.log`.
 - Hardware markers: `primitive_chain_proof_wrapper_status: pass`, `cpu_comparison_status: pass`, `host_device_transfer_status: pass`, `mismatch_count: 0`, `max_abs_diff: 2.9802322387695312e-08`, `max_ulp_diff: 2`, `byte_mismatch_count: 23`, `wrapper_exit_status: 0`, `exit_status: 0`.

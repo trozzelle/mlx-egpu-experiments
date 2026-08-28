@@ -6,7 +6,7 @@ Add runtime/runner wrapper recognition for the future hardware primitive chain `
 
 ## Work boundary
 
-- Path: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+- Path: `<former-native-r9700-worktree>`
 - Branch: `feature/native-r9700-producer`
 - Boundary type: current feature branch.
 
@@ -34,7 +34,7 @@ Use `acceptance_scope: hardware_primitive_chain_only_partial`. The chain is full
 ## Verification
 
 - RED before implementation:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_mlp_down_full_inner_to_cols0_64_chain -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_mlp_down_full_inner_to_cols0_64_chain -q`
   - Result: failed with unsupported primitive chain and wrapper exit status `2`.
 - Compile:
   - Command: `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runner.cpp native_r9700/runtime.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner`
@@ -42,7 +42,7 @@ Use `acceptance_scope: hardware_primitive_chain_only_partial`. The chain is full
 - Debug/fix:
   - First implementation recognized the branch but common source-fixture selection still expected compact `layer_trace_fixtures.npz`; fixed selector to use `kLayer0MlpDownProjFullInnerToCols064SourceFixture` and matching SHA.
 - Focused green:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_mlp_down_full_inner_to_cols0_64_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_mlp_down_proj_inner_cols0_64_to_cols0_64_tiled_accum_chain -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_mlp_down_full_inner_to_cols0_64_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_mlp_down_proj_inner_cols0_64_to_cols0_64_tiled_accum_chain -q`
   - Result: `2 passed in 13.01s`.
 
 ## Remaining blocker

@@ -37,7 +37,7 @@ The hardware path intentionally stops at VM mapping. The supervisor smoke observ
 
 ## Supervisor evidence
 
-- Focused pytest after review fixes: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `4 passed in 2.26s`.
+- Focused pytest after review fixes: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `4 passed in 2.26s`.
 - VM/sysmem smoke: `xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --transfer-proof` wrote `logs/c0b-native-amdev-vm-sysmem-smoke.log` and exited `1` with wrapper exit `1`, `pci_id: 1002:7551`, `transfer_byte_count: 32`, fixed staging/VRAM/readback GPU VA roles, MAP_SYSMEM_FD page lists for staging/readback, `host_device_transfer_status: fail`, `failure_stage: vm_mapping`, and no transfer success claim.
 - `git diff --check ...` over the C0B-4 source/test/docs/report set -> no output.
 
@@ -53,11 +53,11 @@ The hardware path intentionally stops at VM mapping. The supervisor smoke observ
 Focused no-hardware contract:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree> && ${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Focused hardware VM/sysmem smoke, to capture `failure_stage: vm_mapping` or the next precise blocker:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o /tmp/native_amdev_transfer_probe_c0b4 && /tmp/native_amdev_transfer_probe_c0b4 --transfer-proof | tee logs/c0b-native-amdev-vm-sysmem-smoke.log
+cd <former-native-r9700-worktree> && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o /tmp/native_amdev_transfer_probe_c0b4 && /tmp/native_amdev_transfer_probe_c0b4 --transfer-proof | tee logs/c0b-native-amdev-vm-sysmem-smoke.log
 ```

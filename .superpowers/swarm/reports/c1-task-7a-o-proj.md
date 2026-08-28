@@ -12,8 +12,8 @@ This is a hardware primitive-chain proof only. `native_prefill_acceptance` remai
 1. Fixture RED, before fixture/support implementation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+cd <former-native-r9700-worktree>
+${PY} -m pytest \
   tests/native_r9700/test_ref_fixtures.py::test_layer_trace_o_full_inner_projection_fixtures_schema_shape_dtype \
   tests/native_r9700/test_ref_fixtures.py::test_layer0_o_projection_full_inner_cols0_64_fixture_matches_fp32_matmul_oracle \
   -q
@@ -25,8 +25,8 @@ Observed RED: exit `1`, `2 failed`, both from missing
 2. Runtime RED, before chain support implementation:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+cd <former-native-r9700-worktree>
+${PY} -m pytest \
   tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_o_proj_full_inner_cols0_64_tiled_accum_chain \
   -q
 ```
@@ -56,7 +56,7 @@ Fixture hashes:
 Fixture generation:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures \
+${PY} -m native_r9700.ref_fixtures \
   --generate \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --fixtures-dir tests/native_r9700/fixtures
@@ -67,7 +67,7 @@ Result: exit `0`; wrote 9 fixture files.
 Focused fixture/runtime regression, including existing integrated attention chain:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_ref_fixtures.py::test_layer_trace_o_full_inner_projection_fixtures_schema_shape_dtype \
   tests/native_r9700/test_ref_fixtures.py::test_layer0_o_projection_full_inner_cols0_64_fixture_matches_fp32_matmul_oracle \
   tests/native_r9700/test_runtime_contract.py::test_layer0_o_cols0_64_activation_tiles_use_attention_context_chunks \
@@ -100,7 +100,7 @@ mkdir -p build/native-r9700-runtime && \
   xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
     native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 \
     -o build/native-r9700-runtime/native_r9700_runner && \
-  ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+  ${PY} -m pytest \
     tests/native_r9700/test_runtime_contract.py -q \
     -k 'layer0_o_proj_full_inner_cols0_64 or scores_softmax_context or attention_probs_head0_tokens0_5_softmax or attention_context_head0_tokens0_5_cols0_64'
 ```
@@ -162,7 +162,7 @@ Reviewer `C1R7OPostFixReview` found a valid regression: the first PTB repair mad
 Verification after fix:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 mkdir -p build/native-r9700-runtime && \
   xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
     native_r9700/c1_primitive_bridge.cpp \
@@ -170,7 +170,7 @@ mkdir -p build/native-r9700-runtime && \
   xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
     native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 \
     -o build/native-r9700-runtime/native_r9700_runner && \
-  ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+  ${PY} -m pytest \
     tests/native_r9700/test_runtime_contract.py -q \
     -k 'layer0_o_proj_full_inner_cols0_64 or attention_context_head0_tokens0_5_cols0_64' && \
   NATIVE_R9700_C1_PRIMITIVE_BRIDGE=build/native-r9700-runtime/c1_primitive_bridge \

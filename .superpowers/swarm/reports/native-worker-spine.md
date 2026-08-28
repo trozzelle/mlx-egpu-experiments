@@ -23,7 +23,7 @@
 No tests, linters, formatters, package-manager commands, hardware commands, project-wide suites, or git commands were run, per Wave 32 executor constraints.
 
 ## Exact supervisor command to run
-`${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_runtime_contract.py -q`
+`${PY} -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_runtime_contract.py -q`
 
 ## Risks / follow-ups
 - Default runner path is `native_r9700/runner`; until a real `--native-prefill-proof` runner binary/mode exists, `r9700_native` remains fail-closed with `native_prefill_acceptance: open`.

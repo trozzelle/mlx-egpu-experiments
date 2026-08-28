@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Use `${HOME}/.pyenv/versions/3.12.8/bin/python3` for every Python command.
+- Use `${PY}` for every Python command.
 - Hardware target is AMD Radeon AI PRO R9700, PCI ID `1002:7551`, architecture `gfx1201`.
 - Serialize every hardware command through the existing hardware lock; never kill the live TinyGPU server.
 - `producer_kind=r9700_native` remains hardware-backed and fail-closed. CPU/NumPy is oracle evidence only.
@@ -50,9 +50,9 @@ logs/compute-side-opt/
 Use these shell variables in every hardware task:
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 SOCK=${TMPDIR}/tinygpu.sock
-MODEL=${HOME}/Development/ml/tools/egpu/.worktrees/tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct
+MODEL=<tinygrad-kv-worker-worktree>/mlx_models/meta-Llama-3.2-1B-Instruct
 RUNNER=$PWD/build/native-r9700-runtime/native_r9700_runner
 export APL_REMOTE_SOCK=$SOCK
 export NATIVE_R9700_PREFILL_RUNNER=$RUNNER
@@ -1412,7 +1412,7 @@ SCHEMA=$($PY -c "import json; p='native_r9700/kernels/llama-attention-score-hsa-
 $PY experiments/native-r9700-runtime/generate_hsa_code_image.py \
   --source native_r9700/kernels/llama_causal_attention_score_f16.cpp \
   --target gfx1201 --schema "$SCHEMA" \
-  --tinygrad-root ${HOME}/Development/ml/tools/tinygrad \
+  --tinygrad-root <tinygrad-checkout> \
   --out-dir /tmp/llama-attention-score-precompute
 ```
 

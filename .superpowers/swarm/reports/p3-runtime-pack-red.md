@@ -37,7 +37,7 @@
 ## Focused supervisor command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_hsa_code_image_loader.py -v
 ```

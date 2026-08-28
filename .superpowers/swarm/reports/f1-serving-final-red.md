@@ -34,7 +34,7 @@ The sibling F1 worker RED lane owns the complementary `build_registry` pack/reso
 ## Focused supervisor command (not run by this worker)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -v
+${PY} -m pytest tests/native_r9700/test_serving.py -v
 ```
 
 Per the swarm boundary, this worker did not run tests, builds, linters, formatters, package managers, hardware commands, or git operations.

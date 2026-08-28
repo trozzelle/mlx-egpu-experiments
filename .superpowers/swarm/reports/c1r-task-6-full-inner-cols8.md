@@ -16,7 +16,7 @@ Verification observed by supervisor:
 - Build command exited `0`:
   `mkdir -p build/native-r9700-runtime logs && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/c1_primitive_bridge.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_primitive_bridge && xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o build/native-r9700-runtime/native_r9700_runner`.
 - Focused contract command exited `0` with `3 passed in 2.66s`:
-  `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_kernel_sha_matches_embedded_text tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_proj_full_inner_cols8_accum_chain -q`.
+  `${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_runtime_contract.py::test_primitive_kernel_sha_matches_embedded_text tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_proj_full_inner_cols8_accum_chain -q`.
 - Hardware wrapper proof exited `0`:
   `build/native-r9700-runtime/native_r9700_runner --primitive-chain-proof layer0_k_proj_full_inner_cols8_accum_chain`.
 - Hardware log: `logs/c1-runner-primitive-chain-proof-layer0_k_proj_full_inner_cols8_accum_chain-2026-08-19T17:17:17Z.log`.

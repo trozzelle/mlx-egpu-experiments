@@ -33,6 +33,6 @@ The committed package identity, CPU-reference labels, fixture bytes, and optiona
 ## Supervisor focused command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_parity.py -v
 ```

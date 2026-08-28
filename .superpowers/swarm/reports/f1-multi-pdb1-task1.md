@@ -16,7 +16,7 @@ Implemented the bounded large-BAR resident GPU virtual window and focused public
 ## Supervisor node command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_vram_layout.py -k 'large_bar or small_bar' -q
+${PY} -m pytest tests/native_r9700/test_vram_layout.py -k 'large_bar or small_bar' -q
 ```
 
 Per assignment, no tests, builds, git commands, or formatters were run by this node.

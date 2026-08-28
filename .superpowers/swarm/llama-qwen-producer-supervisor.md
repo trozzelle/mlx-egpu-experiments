@@ -5,7 +5,7 @@
 - Master plan: `docs/archive/superpowers/plans/2026-08-22-llama-qwen-native-producer-delivery.md`.
 - Execution packets: `docs/archive/tasks/native-r9700-producer/phase-c1r-native-llama-delivery.md`, `phase-qwen3-8-native-text-delivery.md`, and `phase-native-producer-swarm-integration.md`.
 - Durable ledger: `.superpowers/swarm/progress.md`.
-- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer` (current feature branch; every executor stays in this checkout).
+- Work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer` (current feature branch; every executor stays in this checkout).
 - Preserved evidence: standalone C0 kernel proof, lower-BAR resident VRAM smoke, and real Llama safetensors embedding HSA smoke pass on `1002:7551` / `gfx1201`.
 
 ## Orchestration map
@@ -94,7 +94,7 @@
 
 ### Shared context
 
-- Work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on `feature/native-r9700-producer`.
+- Work boundary: `<former-native-r9700-worktree>` on `feature/native-r9700-producer`.
 - Source plans: `2026-08-23-llama-numerical-debug-plan.md`, `phase-llama-numerical-trace.md`, `phase-llama-numerical-remediation.md`.
 - Native two-token prefill is structurally accepted but prompt-0 C1R decodes zero tokens and reports NaN K/V comparisons. No native parity/cache acceptance is claimed.
 - Oracle and native trace JSON schema: `token_index`, `layer_index`, `stage`, `buffer`, `shape`, `dtype`, `byte_count`, `sha256`, `finite_count`, optional `raw_path`; native adds `kernarg_hex`, image digest, GPU VA, scalars.

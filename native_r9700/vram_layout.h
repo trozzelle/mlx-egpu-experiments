@@ -28,9 +28,10 @@ struct VramLayout {
 
 // Derives source-backed large- and small-BAR physical VRAM ownership geometry
 // from RCC_CONFIG_MEMSIZE and the mapped BAR0 aperture.
-// MIT source provenance: tinygrad (MIT License),
-// ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/amdev.py:202-205,279-320
-// and ${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/memory.py:175-184.
+// MIT source provenance: tinygrad revision
+// d851aca9ae1faf4210cc0da4508bead7da57d7ee,
+// tinygrad/runtime/support/am/amdev.py:202-205,279-320 and
+// tinygrad/runtime/support/memory.py:175-184.
 bool derive_vram_layout(uint32_t rcc_config_memsize, uint64_t bar0_bytes,
                         VramLayout* layout, std::string* error_text);
 

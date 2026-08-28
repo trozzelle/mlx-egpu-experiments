@@ -117,7 +117,7 @@ Inventory is complete/model-bound/reproducible; binder yields metadata/raw windo
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_text_adapter.py \
   tests/native_r9700/test_qwen_affine4_source.py \
   tests/native_r9700/test_model_weight_binder_contract.py -v
@@ -155,7 +155,7 @@ Every state component has explicit ownership/update/position semantics and deter
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_hybrid_state_spill.py \
   tests/native_r9700/test_qwen_layer_executor.py \
   tests/native_r9700/test_qwen_layer_executor_contract.py -v
@@ -192,7 +192,7 @@ Fixtures regenerate deterministically, contain the exact model/inventory identit
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_ref_fixtures.py \
   tests/native_r9700/test_fixture_catalog.py \
   tests/native_r9700/test_qwen_parity.py -v
@@ -254,7 +254,7 @@ Q1 is deterministic, model-bound, explicitly non-native, complete enough for F6 
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_text_adapter.py \
   tests/native_r9700/test_qwen_hybrid_state_spill.py \
   tests/native_r9700/test_qwen_layer_executor.py \
@@ -292,7 +292,7 @@ Supervisor runs exact `Q1 package review` command/check from task set 1.
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_text_adapter.py \
   tests/native_r9700/test_qwen_hybrid_state_spill.py \
   tests/native_r9700/test_qwen_layer_executor.py \
@@ -308,7 +308,7 @@ git diff --check docs/upstream-reference-manifest.yaml \
 ## Phase validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_text_adapter.py \
   tests/native_r9700/test_qwen_hybrid_state_spill.py \
   tests/native_r9700/test_qwen_layer_executor.py \

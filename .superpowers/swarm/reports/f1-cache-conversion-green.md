@@ -13,11 +13,11 @@
 ## Focused supervisor commands
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_model_service.py \
   -k test_prefill_accepts_only_a_bound_s_minus_one_prompt_cache -v
 
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kv_cache.py \
   -k 'emit_prompt_cache or prefill_result_from_npz' -v
 ```

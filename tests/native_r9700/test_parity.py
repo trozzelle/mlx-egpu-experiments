@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -22,7 +23,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _FIXTURE_DIR = _REPO_ROOT / "tests" / "native_r9700" / "fixtures"
-_PYTHON = "${HOME}/.pyenv/versions/3.12.8/bin/python3"
+_PYTHON = sys.executable
 _LLAMA_MLX_MODEL_DIR = (
     _REPO_ROOT
     / ".."

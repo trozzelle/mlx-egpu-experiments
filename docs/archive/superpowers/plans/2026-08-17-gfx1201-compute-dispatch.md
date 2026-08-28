@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Native proof code must not import, shell out to, dynamically load, or require tinygrad at runtime.
 - Tinygrad source is provenance only. Any copied/ported structure or formula must carry exact source file/line comments and preserve the MIT license note already present in the native probe.
 - No guessed GC/MEC/HQD/PM4 register offsets, bitfields, firmware assumptions, doorbell values, queue sizes, or code-object descriptor fields. Each constant must cite a local tinygrad source line or generated AMD header line.
@@ -216,8 +216,8 @@ In `test_help_lists_hardware_modes`, add:
 Supervisor runs:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: pytest exits nonzero because the four new self-tests are not yet implemented.
@@ -233,7 +233,7 @@ Create `.superpowers/swarm/reports/c0a-compute-task-1-contracts.md`:
 - `tests/test_native_amdev_transfer_contract.py`
 
 ## RED command
-`${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v`
+`${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v`
 
 ## Expected RED
 The probe does not yet implement `compute-vm-layout`, `gfx-ring-registers`, `compute-mqd-encoding`, or `pm4-dispatch-sequence` self-tests.
@@ -341,8 +341,8 @@ In the `--self-test` chain, add exact name dispatches to the four new functions.
 Supervisor runs:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: all no-hardware tests pass. The previous count was `12 passed`; after Task 1/2 it should be `16 passed`.
@@ -473,7 +473,7 @@ Map topology failure to `failure_stage: multi_xcc_aql_required`; map GC programm
 Supervisor runs focused pytest first. Then run hardware command:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0-macos-egpu-minimal-runtime.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 
@@ -877,8 +877,8 @@ If pass achieved, set C0A-5 `Done` with evidence tokens and unblock C0A-6. If st
 Supervisor runs:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 git diff --check
 ```
 

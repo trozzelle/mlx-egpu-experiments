@@ -10,7 +10,7 @@ Produce one request-scoped oracle artifact and one matching R9700 stage-readback
 
 ## Dependencies
 - Dedicated staging PTB runtime smoke pass.
-- Current shared boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`, branch `feature/native-r9700-producer`.
+- Current shared boundary: `<former-native-r9700-worktree>`, branch `feature/native-r9700-producer`.
 
 ## Orchestration map
 - Sequential blocker: shared JSON schema below; no hardware tracing before the oracle schema/test exists.
@@ -46,7 +46,7 @@ Produce one request-scoped oracle artifact and one matching R9700 stage-readback
 
 ### Validation
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 $PY -m pytest tests/native_r9700/test_llama_stage_oracle.py -q
 ```
 
@@ -70,7 +70,7 @@ $PY -m pytest tests/native_r9700/test_llama_stage_oracle.py -q
 
 ### Validation
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 $PY -m pytest tests/native_r9700/test_layer0_executor_contract.py tests/native_r9700/test_runtime_vram_contract.py -q
 ```
 
@@ -93,7 +93,7 @@ $PY -m pytest tests/native_r9700/test_layer0_executor_contract.py tests/native_r
 
 ### Validation
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 $PY -m pytest tests/native_r9700/test_llama_stage_trace_compare.py -q
 ```
 

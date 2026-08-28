@@ -100,8 +100,8 @@ construction (documented source).
 Loader validation (reads only config + headers; needs the model dir):
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.loader \
+cd <former-native-r9700-worktree>
+${PY} -m native_r9700.loader \
   --model mlx_models/meta-Llama-3.2-1B-Instruct
 ```
 
@@ -115,8 +115,8 @@ MLX safetensors dir lives.
 Focused loader tests (no model weights required):
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/native_r9700 -v
 ```
 
 Regression guards the supervisor already runs (unchanged by this work):

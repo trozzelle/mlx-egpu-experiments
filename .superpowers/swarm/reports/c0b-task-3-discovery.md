@@ -32,7 +32,7 @@ Done. Implemented and verified the native TinyGPU.app discovery-smoke path; revi
 Focused no-hardware contract:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Discovery smoke build/run/log command:
@@ -43,7 +43,7 @@ Discovery smoke build/run/log command:
 
 ## Supervisor evidence
 
-- Focused pytest after review fixes: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `3 passed in 1.59s`.
+- Focused pytest after review fixes: `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `3 passed in 1.59s`.
 - First hardware run exposed the root cause: RemoteCmd `PROBE` on the local TinyGPU.app UNIX socket returned status `1` with no error payload. The tinygrad reference selects `APLRemotePCIDevice` through IOKit before socket use, then uses direct `CFG_READ`/`MAP_BAR` on dev id `0`; the native smoke now follows that path.
 - Discovery command after review fixes wrote `logs/c0b-discovery-smoke.log` and exited `0`: `pci_id: 1002:7551`, `config_vendor_id: 0x1002`, `config_device_id: 0x7551`, BAR0 `268435456`, BAR2 `2097152`, BAR5 `524288`, `vram_size_bytes: 34208743424`, `host_device_transfer_status: not_run`, `failure_stage: none`, `exit_status: 0`.
 - `arch` remains `not_discovered` with `arch_discovery_status: skipped_small_bar_requires_indirect_vram_read`; task set 4 owns sysmem/VM work needed for the indirect VRAM read path.

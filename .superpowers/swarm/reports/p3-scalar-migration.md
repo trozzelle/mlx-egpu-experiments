@@ -91,7 +91,7 @@ Both boundaries satisfy `runtime_substrate: TinyGPU.app/APLRemotePCIDevice/PCIIf
 ## Focused supervisor gate
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_kernel_pack_contract.py \
   tests/native_r9700/test_kernel_assets.py \
   tests/native_r9700/test_kernel_catalog.py \

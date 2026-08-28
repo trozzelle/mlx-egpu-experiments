@@ -46,7 +46,7 @@ sections). Everything else in `tests/native_r9700` passes.
 Plan: `docs/archive/tasks/native-r9700-producer/phase-qwen3-8-native-text-delivery.md`.
 Model snapshot (canonical): `CANONICAL_QWEN_TEXT_SNAPSHOT` in
 `native_r9700/qwen_text_adapter.py` =
-`${HOME}/Development/ml/models/hub/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff`.
+`<model-hub>/models--mlx-community--Qwen3.8-27B-4bit/snapshots/3e6447f082e89cc7f0bc6e5441afd38dfce760ff`.
 
 Geometry: 64 layers, hidden 5120, intermediate 17408, 24 attention heads, 4 KV
 heads, affine-4bit group 64. Hybrid cache = 64 runtime-ordered entries:
@@ -105,7 +105,7 @@ All are wave32 (`kernel_code_properties & 0x400`).
 ## Commands (pinned)
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 $PY -m pytest tests/native_r9700/test_qwen_*.py -q          # 31 passed
 $PY -m pytest tests/native_r9700 -q                          # 2 pre-existing failures
 # full runner build:

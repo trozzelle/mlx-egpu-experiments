@@ -54,7 +54,7 @@ Observed: exit 0, no compiler output.
 Focused host tests:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_ref_fixtures.py::test_all_fixture_files_small_enough \
   tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests \
   tests/native_r9700/test_ref_fixtures.py::test_layer_trace_fixtures_schema_sha256_matches_disk \
@@ -125,7 +125,7 @@ exit_status: 0
 Focused post-review help/K tests:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_ref_fixtures.py::test_layer0_k_projection_full_inner_cols0_64_fixture_matches_fp32_matmul_oracle tests/native_r9700/test_runtime_contract.py::test_layer0_k_cols0_64_weight_tiles_use_dot2_pair_packing tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_proj_full_inner_cols0_64_tiled_accum_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_rejects_missing_k_cols0_64_last_stage_marker -q
+${PY} -m pytest tests/native_r9700/test_runtime_contract.py::test_help_lists_dry_run_kernel_proof_and_transfer_proof_modes tests/native_r9700/test_ref_fixtures.py::test_layer0_k_projection_full_inner_cols0_64_fixture_matches_fp32_matmul_oracle tests/native_r9700/test_runtime_contract.py::test_layer0_k_cols0_64_weight_tiles_use_dot2_pair_packing tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_wraps_supplied_bridge_and_logs_layer0_k_proj_full_inner_cols0_64_tiled_accum_chain tests/native_r9700/test_runtime_contract.py::test_primitive_chain_proof_rejects_missing_k_cols0_64_last_stage_marker -q
 ```
 
 Observed: `5 passed in 5.99s`.
@@ -133,7 +133,7 @@ Observed: `5 passed in 5.99s`.
 Focused native regression after post-review help fix:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q
+${PY} -m pytest tests/native_r9700 -q
 ```
 
 Observed: `181 passed, 2 warnings in 81.22s`.

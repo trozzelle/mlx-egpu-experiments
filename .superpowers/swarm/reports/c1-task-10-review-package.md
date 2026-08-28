@@ -2,7 +2,7 @@
 
 ## Work boundary
 
-- Path: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+- Path: `<former-native-r9700-worktree>`
 - Branch: `feature/native-r9700-producer`
 - Scope: C1 task sets 1-9, Path C report evidence, and task-10 handoff fixes needed before C2.
 
@@ -11,7 +11,7 @@
 C1 is ready for final review because the token gate passed:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.parity --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --r-source both --max-new-tokens 4 --artifacts-dir logs/c1-parity --json logs/c1-parity/result.json --log logs/c1-parity/run.log --report docs/path-a-validation-results.md
+${PY} -m native_r9700.parity --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --r-source both --max-new-tokens 4 --artifacts-dir logs/c1-parity --json logs/c1-parity/result.json --log logs/c1-parity/run.log --report docs/path-a-validation-results.md
 # C1 parity gate_result=pass prompts=3
 ```
 
@@ -32,12 +32,12 @@ C2 callers with live request tokens should not depend on fixture prompt names.
 The stable C1 producer invocation is:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.prefill \
+${PY} -m native_r9700.prefill \
   --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct \
   --token-ids-json '[<token-id-0>, <token-id-1>, ...]' \
   --out <prefix-kv.npz> \
   --log <prefill.log>
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.kv_cache \
+${PY} -m native_r9700.kv_cache \
   --prefill-npz <prefix-kv.npz> \
   --out <prompt-cache.safetensors> \
   --log <kv-cache.log>
@@ -128,24 +128,24 @@ Docs/evidence:
 ## Supervisor verification before final C1 review
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_kv_cache.py -v
+${PY} -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_kv_cache.py -v
 # pytest: 21 passed, 2 warnings in 3.97s
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_parity.py -v
+${PY} -m pytest tests/native_r9700/test_parity.py -v
 # pytest: 16 passed in 0.08s
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.prefill --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --token-ids-json '[128000, 791, 6864, 315, 9822, 374]' --out logs/c1-prefill-tokenids-prompt0.npz --log logs/c1-prefill-tokenids-prompt0.log
+${PY} -m native_r9700.prefill --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --token-ids-json '[128000, 791, 6864, 315, 9822, 374]' --out logs/c1-prefill-tokenids-prompt0.npz --log logs/c1-prefill-tokenids-prompt0.log
 # prefill n_prefix=5 num_layers=16 output=logs/c1-prefill-tokenids-prompt0.npz
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.kv_cache --prefill-npz logs/c1-prefill-tokenids-prompt0.npz --out logs/c1-tokenids-prompt0-cache.safetensors --log logs/c1-tokenids-kv-cache-prompt0.log
+${PY} -m native_r9700.kv_cache --prefill-npz logs/c1-prefill-tokenids-prompt0.npz --out logs/c1-tokenids-prompt0-cache.safetensors --log logs/c1-tokenids-kv-cache-prompt0.log
 # wrote prompt cache logs/c1-tokenids-prompt0-cache.safetensors (n_prefix=5, num_layers=16)
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.parity --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --r-source both --max-new-tokens 4 --artifacts-dir logs/c1-parity --json logs/c1-parity/result.json --log logs/c1-parity/run.log --report docs/path-a-validation-results.md
+${PY} -m native_r9700.parity --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures --r-source both --max-new-tokens 4 --artifacts-dir logs/c1-parity --json logs/c1-parity/result.json --log logs/c1-parity/run.log --report docs/path-a-validation-results.md
 # C1 parity gate_result=pass prompts=3
 ```
 
@@ -154,12 +154,12 @@ Blocked parity CLI smoke with missing model: returncode 2; JSON gate_result bloc
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 # pytest: 103 passed, 2 warnings in 9.73s
 ```
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests -v
+${PY} -m pytest tests -v
 # pytest: 143 passed, 2 warnings in 42.62s
 ```
 

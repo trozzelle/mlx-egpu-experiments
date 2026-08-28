@@ -46,7 +46,7 @@ xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
 Run the focused hardware-free contracts after compilation:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_wmma_lane_map_asset.py \
   tests/native_r9700/test_wmma_lane_map_runner.py -v
 ```

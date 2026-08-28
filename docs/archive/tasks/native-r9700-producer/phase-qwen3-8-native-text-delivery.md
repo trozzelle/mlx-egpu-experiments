@@ -60,7 +60,7 @@ The binder yields metadata and raw byte windows only. The cache bridge can round
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_text_adapter.py \
   tests/native_r9700/test_qwen_hybrid_state_spill.py -q
 ```
@@ -90,7 +90,7 @@ No Qwen source invokes Llama kernels, image preprocessing, MLX model math, NumPy
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_hsa_kernel_assets.py -q
 ```
 
@@ -119,7 +119,7 @@ Each reference stage performs real GPU work with no CPU tensor replacement and p
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_hsa_kernel_assets.py -q
 ```
 
@@ -148,7 +148,7 @@ A short text prompt produces one complete 64-entry hybrid artifact. Image/video/
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_hybrid_state_spill.py \
   tests/native_r9700/test_qwen_hsa_kernel_assets.py -q
 ```
@@ -178,7 +178,7 @@ The Qwen artifact is imported as the original hybrid classes/order and passes fi
 ### Validation
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_qwen_hybrid_state_spill.py \
   tests/native_r9700/test_qwen_hsa_kernel_assets.py \
   tests/native_r9700/test_qwen_text_adapter.py -q

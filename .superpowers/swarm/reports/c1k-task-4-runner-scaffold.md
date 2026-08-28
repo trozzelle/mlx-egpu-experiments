@@ -40,7 +40,7 @@ Log contract: `write_run_log(RuntimeLog, name)` writes a timestamped standardize
 
 ## Supervisor commands to run
 
-From `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`:
+From `<former-native-r9700-worktree>`:
 
 ```sh
 # Build the runtime shell
@@ -55,10 +55,10 @@ log=logs/c1-runner-lifecycle-dry-run.log
 { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -o build/native-r9700-runtime/native_r9700_runner && build/native-r9700-runtime/native_r9700_runner --lifecycle-dry-run"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra native_r9700/runtime.cpp native_r9700/runner.cpp -o build/native-r9700-runtime/native_r9700_runner && build/native-r9700-runtime/native_r9700_runner --lifecycle-dry-run; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"
 
 # Focused runner contract tests (compile + run --lifecycle-dry-run)
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -v
+${PY} -m pytest tests/native_r9700 -v
 
 # C0 regression (must stay 23 passed)
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 
 # Probe untouched check
 git diff --stat experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp   # must be empty

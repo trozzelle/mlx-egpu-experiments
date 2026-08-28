@@ -105,7 +105,7 @@ Gate: all 16 K/V pairs are finite, correct shape `(1, 8, N, 64)`, fp16, and nume
 Use the pinned interpreter:
 
 ```sh
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"
 $PY -m pytest tests/native_r9700/test_layer0_executor_contract.py tests/native_r9700/test_runtime_vram_contract.py -q
 $PY -m pytest tests/test_native_amdev_transfer_contract.py -q
 $PY -m pytest tests/native_r9700 -q

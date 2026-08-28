@@ -122,8 +122,8 @@ Agents update only their row and append evidence/notes as work completes.
 ### Validation
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest 'tests/test_native_amdev_transfer_contract.py::test_kernel_text_decode_self_test_reports_store_ops' -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest 'tests/test_native_amdev_transfer_contract.py::test_kernel_text_decode_self_test_reports_store_ops' -v
 ```
 Expected: PASS. Also compile + run the C++ self-test directly after the build:
 `build/native-r9700-runtime/native_amdev_transfer_probe --self-test kernel-text-decode`.
@@ -181,12 +181,12 @@ Expected: PASS. Also compile + run the C++ self-test directly after the build:
 ### Validation
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe
 build/native-r9700-runtime/native_amdev_transfer_probe --self-test kernel-text-decode
 build/native-r9700-runtime/native_amdev_transfer_probe --self-test kernel-proof-contract
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest 'tests/test_native_amdev_transfer_contract.py::test_kernel_proof_contract_self_test_reports_minimal_u32_shape' -v
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest 'tests/test_native_amdev_transfer_contract.py::test_kernel_text_decode_self_test_reports_store_ops' -v
+${PY} -m pytest 'tests/test_native_amdev_transfer_contract.py::test_kernel_proof_contract_self_test_reports_minimal_u32_shape' -v
+${PY} -m pytest 'tests/test_native_amdev_transfer_contract.py::test_kernel_text_decode_self_test_reports_store_ops' -v
 ```
 Expected: all PASS.
 
@@ -221,11 +221,11 @@ Expected: all PASS.
 ### Validation
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe
 build/native-r9700-runtime/native_amdev_transfer_probe --self-test kernel-text-decode
 build/native-r9700-runtime/native_amdev_transfer_probe --self-test pm4-dispatch-sequence
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 git diff --check
 ```
 
@@ -263,7 +263,7 @@ git diff --check
 ### Validation
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof > logs/c0p-native-amdev-kernel-load-fix.log 2>&1
 ```
 Then inspect the log for the strict acceptance fields above.

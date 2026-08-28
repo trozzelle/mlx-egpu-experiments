@@ -143,14 +143,14 @@ passed by the caller, defaulting to `1U` as the dry-run calls it with `1`).
 ## Commands the SUPERVISOR must run to verify (I did NOT run them)
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 
 # 1. Build the runner (warning-free; catches the SDMA/PM4 port + removed members).
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   native_r9700/runtime.cpp native_r9700/runner.cpp -I native_r9700 -o /tmp/native_r9700_runner
 
 # 2. Focused contract tests (PM4=59, SDMA header 0x000001, PM4 first dword 0xc0065800).
-${HOME}/.pyenv/versions/3.12.8/bin/python3 \
+${PY} \
   -m pytest tests/native_r9700/test_runtime_contract.py -q
 
 # 3. Dry-run smoke (should print the new header-hex fields).

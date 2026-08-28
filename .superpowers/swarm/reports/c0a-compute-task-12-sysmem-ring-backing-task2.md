@@ -65,14 +65,14 @@ None. Both changes match the plan Task 2 Steps 1-2 exactly.
 Build:
 
 ```bash
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe
 ```
 
 Focused pytest:
 
 ```bash
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -q
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -q
 ```
 
 Expected: build exit `0`; pytest `20 passed`.

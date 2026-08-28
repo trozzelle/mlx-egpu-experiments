@@ -6,7 +6,7 @@
 
 ## RED evidence
 Supervisor RED command already failed before this slice:
-`${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v`
+`${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_delivery_self_test_reports_diagnostic_contract -v`
 
 Observed contract failure: self-test output reached `status: pass` before the six required route-readback contract lines.
 
@@ -35,4 +35,4 @@ Register programming values did not change. BAR2 index/value, CP MEC range, GDC/
 No validation commands, tests, linters, formatters, package managers, project-wide suites, git commands, or hardware commands were run by this agent per assignment constraints.
 
 Supervisor GREEN command:
-`${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v`
+`${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v`

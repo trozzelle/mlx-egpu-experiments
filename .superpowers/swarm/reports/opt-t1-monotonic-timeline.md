@@ -63,5 +63,5 @@ references it as the historical value). It compiles cleanly under the test's
 ## Supervisor verification command (do NOT run)
 
 ```
-PY=${HOME}/.pyenv/versions/3.12.8/bin/python3; $PY -m pytest tests/native_r9700/test_pm4_timeline_contract.py -q
+PY="${PY:?set PY to the pinned Python 3.12.8 interpreter}"; $PY -m pytest tests/native_r9700/test_pm4_timeline_contract.py -q
 ```

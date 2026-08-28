@@ -32,10 +32,10 @@ Done. Supervisor verified the focused pytest passes and reviewer accepted the Re
 
 ## Supervisor command
 
-Run from `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`:
+Run from `<former-native-r9700-worktree>`:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ## Expected result after task set 2
@@ -46,6 +46,6 @@ ${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_tra
 
 ## Supervisor verification
 
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `2 passed in 0.68s`.
+- `${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v` -> `2 passed in 0.68s`.
 - Forbidden runtime path check found only tinygrad provenance/license comments; no `libusb`, `USBIface`, hardware socket, or shell-out path is implemented.
 - `C0BRemoteCmdReviewer` verdict: accept; no Critical, Important, or Minor findings.

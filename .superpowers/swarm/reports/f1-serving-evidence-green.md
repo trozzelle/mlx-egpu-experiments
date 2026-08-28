@@ -37,5 +37,5 @@ Persistent `Prefill` invokes this validator before cache metadata validation or 
 ## Focused supervisor command (not run here)
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_serving.py -k 'digest_mismatch_before_load_or_session or semantically_invalid_evidence or declared_zero_prefix' -v
+${PY} -m pytest tests/native_r9700/test_serving.py -k 'digest_mismatch_before_load_or_session or semantically_invalid_evidence or declared_zero_prefix' -v
 ```

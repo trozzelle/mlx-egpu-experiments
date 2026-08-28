@@ -2,14 +2,14 @@
 
 ## Scope and ownership
 
-- In-repository source tree: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` (`feature/r9700-products-wave-a`)
-- Evidence checkout: `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a` (`feature/r9700-products-wave-a`)
+- In-repository source tree: `<repo-root>/tinygpu` (`feature/r9700-products-wave-a`)
+- Evidence checkout: `<repo-root>` (`feature/r9700-products-wave-a`)
 - Findings resolved: P1-COLD-001 through P1-COLD-004.
 - No user-client, resource-table, package, app, client, ledger, task-packet, or validation-document changes were made.
 - The only project-file exception was the explicitly authorized source integration: one `TGPUFramebufferDecoder.cpp` file reference/build-file entry and one TinyGPUDriver target Sources entry in `TinyGPUDriverExtension.xcodeproj/project.pbxproj`.
 - Supervisor project parse/build checks found the initial decoder PBXBuildFile identifier (`...0D`) collided with the existing `Conformance` PBXGroup, then the replacements (`...0E` and `...0F`) collided with existing `Debug` and `Release` `XCBuildConfiguration` objects. The final decoder file reference is `...10` and its PBXBuildFile/Sources identifier is `...11`; no configuration identifier was changed.
-- Historical execution/provenance boundary: the cold boundary files were addressed in former checkout `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-tinygpu-device-owner` on branch `feature/r9700-device-owner`; this execution path is provenance only.
-- Current source authority and reproduction root: active implementation and reproduction use `${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu` on branch `feature/r9700-products-wave-a`.
+- Historical execution/provenance boundary: the cold boundary files were addressed in former checkout `<former-tinygpu-worktree>` on branch `feature/r9700-device-owner`; this execution path is provenance only.
+- Current source authority and reproduction root: active implementation and reproduction use `<repo-root>/tinygpu` on branch `feature/r9700-products-wave-a`.
 
 ## Implemented safety behavior
 
@@ -42,7 +42,7 @@ Cold-stage failure text is bounded by the existing `TGPU_MAX_FAULT_TEXT_BYTES` s
 This lane ran no validation command, test, build, formatter, linter, package-manager, install/signing, or hardware command. The supervisor may run the following later from the TinyGPU installer directory:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
   -I TinyGPUDriverExtension \
   TinyGPUDriverExtension/TGPUFramebufferDecoder.cpp \
@@ -52,7 +52,7 @@ xcrun --sdk macosx clang++ -std=c++17 -Wall -Wextra -Werror \
 ```
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
   TinyGPUDriverExtension/TGPUColdLifecycle.cpp \
   Conformance/tests/test_tgpu_cold_lifecycle.cpp \
@@ -64,19 +64,19 @@ xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra \
 ```sh
 xcode-select -p
 xcrun --sdk driverkit --show-sdk-version
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu
+cd <repo-root>/tinygpu
 xcodebuild -project TinyGPUDriverExtension.xcodeproj \
   -target TGPUConformanceClient -configuration Debug \
-  CONFIGURATION_BUILD_DIR=${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug
+  CONFIGURATION_BUILD_DIR=<repo-root>/tinygpu/build/Debug
 ```
 
 The supervisor's direct cold smoke remains the following recorded command, but it must not be interpreted as a readiness assertion until the external firmware prerequisite exists:
 
 ```sh
-${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/tinygpu/build/Debug/tgpu-conformance-client \
+<repo-root>/tinygpu/build/Debug/tgpu-conformance-client \
   cold-lifecycle --service org.tinygrad.tinygpu.driver2 \
   --pci-id 1002:7551 --architecture gfx1201 \
-  --log ${HOME}/Development/ml/tools/egpu/.worktrees/r9700-products-wave-a/logs/p1-tinygpu-owner/cold-lifecycle.log
+  --log <repo-root>/logs/p1-tinygpu-owner/cold-lifecycle.log
 ```
 
 ## Remaining external blocker

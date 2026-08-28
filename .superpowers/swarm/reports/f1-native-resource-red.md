@@ -87,7 +87,7 @@ Run the exact task-set-3 focused command from the F1 packet after the native
 implementation and source-list updates are present:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest \
+${PY} -m pytest \
   tests/native_r9700/test_resident_memory_contract.py \
   tests/native_r9700/test_model_weight_binder_contract.py \
   tests/native_r9700/test_runtime_lifecycle.py \

@@ -17,9 +17,9 @@ Fixture contract:
 
 Verification:
 - RED before implementation: `python3 -m pytest tests/native_r9700/test_ref_fixtures.py -q` failed with missing `layer_trace_fixtures.npz` and missing schema entry.
-- Generation: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures` wrote 6 fixture files.
-- Focused fixture suite: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -q` -> `10 passed in 0.06s`.
-- Native focused suite after review fixes/refactor: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700 -q` -> `128 passed, 2 warnings in 11.16s`.
+- Generation: `${PY} -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct --fixtures-dir tests/native_r9700/fixtures` wrote 6 fixture files.
+- Focused fixture suite: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -q` -> `10 passed in 0.06s`.
+- Native focused suite after review fixes/refactor: `${PY} -m pytest tests/native_r9700 -q` -> `128 passed, 2 warnings in 11.16s`.
 
 Decisions:
 - Kept one compact NPZ rather than two per-layer files because the compressed output is 13 KiB and the schema records exact per-layer keys; this avoids another file-management convention.

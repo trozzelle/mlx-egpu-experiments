@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Required shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Required shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Native proof code must not import, shell out to, dynamically load, or require tinygrad at runtime.
 - Substantial tinygrad-derived C++ must include the MIT notice and file/line provenance comments beside ported logic.
 - No guessed SDMA register offsets, doorbell values, packet fields, ring-size formulas, or completion semantics. Each constant must cite a tinygrad source line or generated AMD header line.
@@ -38,14 +38,14 @@
 - Current transfer command: `docs/tasks/native-r9700-producer/validation-commands.md` C0B native AMDev/SDMA transfer proof builds `experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp`, runs `--transfer-proof`, and writes `logs/c0b-native-amdev-sdma-transfer.log`.
 - Current packet helper: `native_amdev_transfer_probe.cpp` already emits a 7-dword linear-copy packet whose hex is `010000001f0000000000000008070605040302018877665544332211`.
 - VM shape: `native_amdev_transfer_probe.cpp` has fixed VA base `0x0000200000000000`, staging VA `0x0000200000000000`, VRAM VA `0x0000200000001000`, readback VA `0x0000200000002000`, one PDB2/PDB1/PDB0/PTB page-table chain, and a fixed VRAM paddr `0x0000000006000000`.
-- SDMA ring setup source: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/support/am/ip.py` lines 497-556. For SDMA IP >= 7.0.0 it uses `regSDMA0_QUEUE0`, `MCU` write-pointer polling, the doorbell index formula, `RB_RPTR`, `RB_WPTR`, `RB_BASE`, `RB_RPTR_ADDR`, `RB_WPTR_POLL_ADDR`, `DOORBELL_OFFSET`, `DOORBELL`, `RB_CNTL`, and `IB_CNTL` writes.
+- SDMA ring setup source: `<tinygrad-checkout>/tinygrad/runtime/support/am/ip.py` lines 497-556. For SDMA IP >= 7.0.0 it uses `regSDMA0_QUEUE0`, `MCU` write-pointer polling, the doorbell index formula, `RB_RPTR`, `RB_WPTR`, `RB_BASE`, `RB_RPTR_ADDR`, `RB_WPTR_POLL_ADDR`, `DOORBELL_OFFSET`, `DOORBELL`, `RB_CNTL`, and `IB_CNTL` writes.
 - SDMA teardown/reset source: `ip.py` lines 524-535 disable `RB_CNTL.rb_enable`, `IB_CNTL.ib_enable`, `DOORBELL.enable`, clear `DOORBELL_OFFSET`, then assert/deassert `regGRBM_SOFT_RESET.soft_reset_sdma0` for SDMA IP >= 6.0.0. The native proof must reset before setup because repeated proof runs reuse the same TinyGPU.app server and can inherit live queue0 write-pointer polling.
 - Doorbell aperture source: `ip.py` lines 30-48 and 515-522.
-- Submission source: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/ops_amd.py` lines 524-560 and `AMDQueueDesc.signal_doorbell` lines 679-688.
+- Submission source: `<tinygrad-checkout>/tinygrad/runtime/ops_amd.py` lines 524-560 and `AMDQueueDesc.signal_doorbell` lines 679-688.
 - Queue allocation source: `ops_amd.py` lines 875-887 and 1058-1063.
-- SDMA copy packet source: `ops_amd.py` lines 474-481 and `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/sdma_6_0_0.py` lines 7-67.
+- SDMA copy packet source: `ops_amd.py` lines 474-481 and `<tinygrad-checkout>/tinygrad/runtime/autogen/am/sdma_6_0_0.py` lines 7-67.
 - SDMA fence packet source: `sdma_6_0_0.py` lines 232-273 and field helpers around 2991-3042.
-- SDMA register constants for local gfx1201 SDMA0 7.0.1: `${HOME}/Development/ml/tools/tinygrad/tinygrad/runtime/autogen/am/regs.py` `gc_12_0_0` block lines 5428-5474 has `regSDMA0_QUEUE0_RB_CNTL`, `RB_BASE`, `RB_RPTR`, `RB_WPTR`, `RB_RPTR_ADDR`, `RB_WPTR_POLL_ADDR`, `IB_CNTL`, `CONTEXT_STATUS`, `DOORBELL`, `DOORBELL_OFFSET`, and `MINOR_PTR_UPDATE`.
+- SDMA register constants for local gfx1201 SDMA0 7.0.1: `<tinygrad-checkout>/tinygrad/runtime/autogen/am/regs.py` `gc_12_0_0` block lines 5428-5474 has `regSDMA0_QUEUE0_RB_CNTL`, `RB_BASE`, `RB_RPTR`, `RB_WPTR`, `RB_RPTR_ADDR`, `RB_WPTR_POLL_ADDR`, `IB_CNTL`, `CONTEXT_STATUS`, `DOORBELL`, `DOORBELL_OFFSET`, and `MINOR_PTR_UPDATE`.
 - SDMA HWID and doorbell constants: `tinygrad/runtime/autogen/am/am.py` has `SDMA0_HWID = 42` and `AMDGPU_NAVI10_DOORBELL_sDMA_ENGINE0 = 256`.
 
 ---
@@ -168,8 +168,8 @@ In `test_help_lists_hardware_modes`, add:
 Supervisor runs:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: pytest exits nonzero because `--self-test sdma-ring-setup`, `--self-test sdma-fence-packet-encoding`, and `--self-test sdma-submit-sequence` are not implemented yet, and existing VM self-tests do not print the SDMA control page lines yet.
@@ -194,7 +194,7 @@ Needs review. RED contract added; implementation is absent by design.
 Supervisor should run:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected failure: the three new SDMA self-test modes and extended VM control-page output are absent until Task 2.
@@ -336,8 +336,8 @@ In the `--self-test` dispatch in `main`, add branches for the three new names an
 Supervisor runs:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: all no-hardware tests pass.
@@ -369,7 +369,7 @@ Needs review. C++ deterministic SDMA helpers/self-tests added.
 ## Supervisor command
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected GREEN: all no-hardware tests pass.
@@ -556,8 +556,8 @@ Preserve existing fields and their names.
 Supervisor runs focused pytest:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Expected: all no-hardware tests pass.
@@ -659,7 +659,7 @@ Reviewer accepts or rejects fixes. Do not commit until Critical/Important findin
 Supervisor runs:
 
 ```sh
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 git diff --check experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp tests/test_native_amdev_transfer_contract.py docs/tasks/native-r9700-producer/validation-commands.md .superpowers/swarm/progress.md .superpowers/swarm/native-r9700-producer-supervisor.md .superpowers/swarm/reports/c0b-sdma-task-1-contracts.md .superpowers/swarm/reports/c0b-sdma-task-2-selftests.md .superpowers/swarm/reports/c0b-sdma-task-3-hardware-submit.md .superpowers/swarm/reports/c0b-sdma-review.md .superpowers/swarm/reports/c0b-sdma-final-review.md
 ```
 

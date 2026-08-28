@@ -22,4 +22,4 @@
 - No validation commands were run by this agent, per assignment.
 
 ## Minimal supervisor commands
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_runtime_contract.py -q`
+- `${PY} -m pytest tests/native_r9700/test_prefill.py tests/native_r9700/test_runtime_contract.py -q`

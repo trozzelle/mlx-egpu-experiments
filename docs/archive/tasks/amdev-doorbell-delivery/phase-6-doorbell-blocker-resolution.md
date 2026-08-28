@@ -11,7 +11,7 @@ Turn the current C0 `compute_doorbell_not_consumed` timeout into either CPU-veri
 
 ## Dependencies
 - C0A Compute 18 / Phase 5 reviewed source-gap state is complete.
-- Shared work boundary: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer` on branch `feature/native-r9700-producer`.
+- Shared work boundary: `<former-native-r9700-worktree>` on branch `feature/native-r9700-producer`.
 - Existing hardware symptom: `compute_doorbell_probe_status: submitted`, `doorbell_hit=0`, `hqd_pq_rptr=0x00000000`, `cp_stat=0x00000000`, `failure_stage: kernel_timeline_timeout`, `wrapper_exit_status: 1`.
 
 ## Orchestration map
@@ -52,7 +52,7 @@ Source-gap exit report exists and cites BAR2 `matches`, CP MEC range `matches`, 
 
 ### Validation
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 git diff --check .superpowers/swarm/reports/c0a-compute-task-9-source-gap-exit.md docs/archive/tasks/amdev-doorbell-delivery/phase-6-doorbell-blocker-resolution.md .superpowers/swarm/progress.md .superpowers/swarm/gx1202-compute-dispatch-supervisor.md
 ```
 
@@ -74,8 +74,8 @@ Supervisor RED command fails because `compute-doorbell-consumption` is absent or
 
 ### Validation
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py::test_compute_doorbell_consumption_self_test_reports_hqd_contract -v
 ```
 
 ## Task set 3: Consumption instrumentation
@@ -96,8 +96,8 @@ New log fields are emitted by `print_kernel_log(...)`, self-test output matches 
 
 ### Validation
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ## Task set 4: Hardware consumption diagnostic
@@ -118,7 +118,7 @@ The hardware log contains `compute_doorbell_consumption_timeout` and `compute_do
 
 ### Validation
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
+cd <former-native-r9700-worktree>
 /bin/bash -o pipefail -c 'mkdir -p build/native-r9700-runtime logs; log=logs/c0e-native-amdev-doorbell-consumption.log; { printf "%s\n" "command: xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof"; date -u "+timestamp_utc: %Y-%m-%dT%H:%M:%SZ"; xcrun --sdk macosx clang++ -std=c++17 -O2 -Wall -Wextra experiments/native-r9700-runtime/native_amdev_transfer_probe.cpp -o build/native-r9700-runtime/native_amdev_transfer_probe && build/native-r9700-runtime/native_amdev_transfer_probe --kernel-proof; status=$?; printf "wrapper_exit_status: %d\n" "$status"; exit "$status"; } 2>&1 | tee "$log"'
 ```
 
@@ -160,8 +160,8 @@ Completion requires either:
 
 ### Validation
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 git diff --check
 ```
 

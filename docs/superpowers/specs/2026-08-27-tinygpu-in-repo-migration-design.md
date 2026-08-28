@@ -80,8 +80,8 @@ The migration changes paths and ownership only. It must not weaken the current f
 ## Git and Publication Cutover
 
 - Commit imported source and active-document path changes to `feature/r9700-products-wave-a`.
-- Push that branch to `<account>/mlx-egpu-experiments`.
-- Delete the unauthorized `<account>/tinygrad` fork only after the egpu branch containing the complete source is pushed and verified.
+- Push that branch to `<products-repository>`.
+- Delete the unauthorized `<temporary-tinygrad-fork>` fork only after the egpu branch containing the complete source is pushed and verified.
 - Remove the local `fork` remote from the old TinyGPU checkout.
 - Do not delete the old local worktree or branch during this migration; local destruction requires a separate explicit cleanup decision.
 
@@ -114,5 +114,5 @@ The migration is complete when:
 3. all host contracts and unsigned Xcode targets pass from the in-repository path;
 4. the full egpu pytest suite passes;
 5. both worktree and remote products branch contain the migration commit;
-6. `<account>/tinygrad` has been deleted and no local writable fork remote remains;
+6. `<temporary-tinygrad-fork>` has been deleted and no local writable fork remote remains;
 7. P1 blockers and non-acceptance claims remain explicit and unchanged.

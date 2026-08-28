@@ -53,8 +53,8 @@ Agents update only their row and append evidence/notes as work completes.
 Executor records these exact supervisor commands; executor does not run them in OMP task mode:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 Supervisor should also run the exact C0B SDMA transfer proof if this task changes transfer behavior:
@@ -93,8 +93,8 @@ Supervisor should also run the exact C0B SDMA transfer proof if this task change
 Executor records these exact supervisor commands; executor does not run them in OMP task mode:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ```sh
@@ -131,8 +131,8 @@ Expected after this task set if PM4 dispatch is not implemented yet: code/kernar
 Executor records these exact supervisor commands; executor does not run them in OMP task mode:
 
 ```sh
-cd ${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer
-${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/test_native_amdev_transfer_contract.py -v
+cd <former-native-r9700-worktree>
+${PY} -m pytest tests/test_native_amdev_transfer_contract.py -v
 ```
 
 ```sh

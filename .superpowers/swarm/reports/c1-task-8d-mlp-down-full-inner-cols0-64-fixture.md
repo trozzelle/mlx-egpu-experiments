@@ -6,7 +6,7 @@ Add full-inner layer0 MLP down-projection CPU oracle data for output cols0:64. T
 
 ## Work boundary
 
-- Path: `${HOME}/Development/ml/tools/egpu/.worktrees/native-r9700-producer`
+- Path: `<former-native-r9700-worktree>`
 - Branch: `feature/native-r9700-producer`
 - Boundary type: current feature branch.
 
@@ -31,20 +31,20 @@ Split down weights by four 2048-column inner windows. A single 8192×64 weight f
 ## Verification
 
 - RED before implementation:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_full_inner_to_cols0_64_chunk_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_full_inner_to_cols0_64_fixtures_match_fp32_oracle -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_full_inner_to_cols0_64_chunk_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_full_inner_to_cols0_64_fixtures_match_fp32_oracle -q`
   - Result: failed with missing chunk schema key and missing final fixture file.
 - Regeneration:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct`
+  - Command: `${PY} -m native_r9700.ref_fixtures --generate --model ../tinygrad-kv-worker-phase0/mlx_models/meta-Llama-3.2-1B-Instruct`
   - Result: wrote 21 fixture files including the full-inner down final and four chunk fixtures.
 - New fixture digests/sizes:
   - Final fixture SHA256: `e3aab29d893f849fc4627e4781ca36fef1574ccf4d5dda562fcdacf3438bb338`
   - Final expected fp32 SHA256: `84f9ddf66e1e71849b928caa061b6abcca81d00bea59081635592ca7d58f4d7e`
   - Sizes: final `2515` bytes; chunk0 `224919`; chunk1 `224877`; chunk2 `224829`; chunk3 `224796`.
 - Focused green:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_full_inner_to_cols0_64_chunk_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_full_inner_to_cols0_64_fixtures_match_fp32_oracle tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_inner_cols0_64_to_cols0_64_fixture_matches_partial_fp32_oracle tests/native_r9700/test_ref_fixtures.py::test_all_fixture_files_small_enough tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_full_inner_to_cols0_64_chunk_fixtures_schema_shape_dtype tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_full_inner_to_cols0_64_fixtures_match_fp32_oracle tests/native_r9700/test_ref_fixtures.py::test_layer0_mlp_down_proj_inner_cols0_64_to_cols0_64_fixture_matches_partial_fp32_oracle tests/native_r9700/test_ref_fixtures.py::test_all_fixture_files_small_enough tests/native_r9700/test_ref_fixtures.py::test_schema_json_matches_disk_digests -q`
   - Result: `5 passed in 0.16s`.
 - Full fixture suite:
-  - Command: `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_ref_fixtures.py -q`
+  - Command: `${PY} -m pytest tests/native_r9700/test_ref_fixtures.py -q`
   - Result: `48 passed in 0.10s`.
 
 ## Remaining blocker

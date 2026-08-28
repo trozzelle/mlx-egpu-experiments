@@ -26,4 +26,4 @@
 - Text-level check via repository search found no remaining `layer0_resident_kv_projection_dispatch_not_parameterized` references in `native_r9700` or `tests/native_r9700` after the edits.
 
 ## Suggested supervisor command
-- `${HOME}/.pyenv/versions/3.12.8/bin/python3 -m pytest tests/native_r9700/test_runtime_contract.py tests/native_r9700/test_prefill.py -q`
+- `${PY} -m pytest tests/native_r9700/test_runtime_contract.py tests/native_r9700/test_prefill.py -q`
